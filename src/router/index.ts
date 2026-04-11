@@ -30,6 +30,7 @@ import AdminReports from '@/views/admin/AdminReports.vue'
 
 import AdminPayments from '@/views/admin/AdminPayments.vue'
 
+
 import AdminStaff from '@/views/admin/Staff/index.vue'
 import AdminStaffCreate from '@/views/admin/Staff/create.vue'
 
@@ -37,6 +38,7 @@ import AdminStaffCreate from '@/views/admin/Staff/create.vue'
 import AdminLevels from '@/views/admin/Levels/index.vue'
 
 import AdminPartners from '@/views/admin/Partners/index.vue'
+
 import AdminPartnerCreate from '@/views/admin/Partners/create.vue'
 import PublicRegisterWizard from '@/views/student/PublicRegisterWizard.vue'
 
