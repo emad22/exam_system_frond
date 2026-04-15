@@ -5,21 +5,30 @@ import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
 import Button from 'primevue/button';
 import InputNumber from 'primevue/inputnumber';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
 import Dialog from 'primevue/dialog';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import FileUpload from 'primevue/fileupload';
+import Toast from 'primevue/toast';
+import { useToast } from 'primevue/usetoast';
 
 const router = useRouter();
 const route = useRoute();
+const toast = useToast();
 
 const examId = ref(route.params.id || null);
 const availableSkills = ref([]);
 const languages = ref([]);
+const categories = ref([]);
 const currentStep = ref(1); // 1: Identity, 2: Skills, 3: Questions/Levels, 4: Review
 
 const form = ref({
     title: '',
     description: '',
     language_id: null,
-    exam_type: 'adult',
+    exam_category_id: null,
     passing_score: 60,
     is_adaptive: false,
     selectedSkills: [] 
@@ -38,12 +47,14 @@ const isEditMode = computed(() => !!examId.value);
 onMounted(async () => {
     isLoading.value = true;
     try {
-        const [langRes, skillRes] = await Promise.all([
+        const [langRes, skillRes, catRes] = await Promise.all([
             api.get('/admin/languages'),
-            api.get('/admin/skills-with-levels')
+            api.get('/admin/skills-with-levels'),
+            api.get('/admin/exam-categories')
         ]);
         
         languages.value = langRes.data;
+        categories.value = catRes.data;
         // Auto-select Arabic if it exists
         const arabic = languages.value.find(l => l.name.toLowerCase().includes('arab'));
         if (arabic) form.value.language_id = arabic.id;
@@ -57,19 +68,45 @@ onMounted(async () => {
             
             form.value = {
                 title: exam.title,
+                description: exam.description ?? '',
                 language_id: exam.language_id,
-                exam_type: exam.exam_type || 'adult',
+                exam_category_id: exam.exam_category_id,
                 passing_score: exam.passing_score ?? 60,
-                is_adaptive: false,
+                is_adaptive: exam.is_adaptive ?? false,
                 selectedSkills: exam.skills.map(skill => {
                     return {
                         skill_id: skill.id,
                         duration: skill.pivot.duration,
                         is_optional: !!skill.pivot.is_optional,
-                        rules: [] // We'll manage questions directly now
+                        rules: []
                     };
                 })
             };
+
+            // Initialize localQuestions from fetched questions
+            if (exam.questions && exam.questions.length > 0) {
+                exam.questions.forEach(q => {
+                    const sId = q.skill_id;
+                    const lNum = q.difficulty_level;
+                    if (!localQuestions.value[sId]) localQuestions.value[sId] = {};
+                    if (!localQuestions.value[sId][lNum]) localQuestions.value[sId][lNum] = [];
+                    
+                    localQuestions.value[sId][lNum].push({
+                        type: q.type,
+                        content: q.content,
+                        points: q.points,
+                        passage_content: q.passage_content,
+                        passage_group_id: q.passage_group_id,
+                        passage_randomize: q.passage_randomize,
+                        passage_limit: q.passage_limit,
+                        media_path: q.media_path,
+                        options: q.options.map(o => ({
+                            option_text: o.option_text,
+                            is_correct: !!o.is_correct
+                        }))
+                    });
+                });
+            }
         }
     } catch (err) {
         console.error('Failed to load pre-requisites', err);
@@ -104,6 +141,95 @@ const toggleSkill = (skillId) => {
 
 const isSkillSelected = (skillId) => {
     return form.value.selectedSkills.some(s => s.skill_id === skillId);
+};
+
+// Level Manager Logic
+const showLevelModal = ref(false);
+const editingSkill = ref(null);
+const editingLevels = ref([]);
+const isSavingLevels = ref(false);
+
+const isLeveledSkill = (skill) => {
+    if (!skill) return false;
+    const code = (skill.short_code || '').toUpperCase();
+    return !['W', 'S'].includes(code); // Writing and Speaking are static
+};
+
+const openLevelManager = async (skill) => {
+    editingSkill.value = skill;
+    showLevelModal.value = true;
+    try {
+        const res = await api.get('/admin/levels', { params: { skill_id: skill.id } });
+        editingLevels.value = res.data;
+    } catch (err) {
+        console.error('Failed to load levels', err);
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load levels.' });
+    }
+};
+
+const addLevel = () => {
+    const nextNum = editingLevels.value.length > 0 
+        ? Math.max(...editingLevels.value.map(l => l.level_number)) + 1 
+        : 1;
+    
+    editingLevels.value.push({
+        id: null,
+        skill_id: editingSkill.value.id,
+        name: `Level ${nextNum}`,
+        level_number: nextNum,
+        min_score: (nextNum - 1) * 10,
+        max_score: nextNum * 10,
+        pass_threshold: 70,
+        instructions: '',
+        is_active: true
+    });
+};
+
+const removeLevel = async (level, index) => {
+    if (!level.id) {
+        editingLevels.value.splice(index, 1);
+        return;
+    }
+
+    if (confirm('Are you sure you want to delete this level globally? This cannot be undone.')) {
+        try {
+            await api.delete(`/admin/levels/${level.id}`);
+            editingLevels.value.splice(index, 1);
+            toast.add({ severity: 'success', summary: 'Deleted', detail: 'Level removed successfully.' });
+        } catch (err) {
+            console.error(err);
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete level.' });
+        }
+    }
+};
+
+const saveLevels = async () => {
+    isSavingLevels.value = true;
+    try {
+        // We'll use a bulk update/create approach
+        // For simplicity, we'll send them one by one or create a bulk endpoint
+        // Let's assume we use the SkillController's bulkUpdateLevels or similar
+        await api.post(`/admin/skills/${editingSkill.value.id}/levels/bulk`, {
+            levels: editingLevels.value
+        });
+        
+        // Refresh available skills to get updated level list
+        const skillRes = await api.get('/admin/skills-with-levels');
+        availableSkills.value = skillRes.data;
+        
+        toast.add({ severity: 'success', summary: 'Success', detail: 'Levels updated successfully.' });
+        showLevelModal.value = false;
+    } catch (err) {
+        console.error(err);
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to synchronize levels.' });
+    } finally {
+        isSavingLevels.value = false;
+    }
+};
+
+const onAudioUpload = (event, level) => {
+    // Handle audio upload logic here
+    toast.add({ severity: 'info', summary: 'Audio', detail: 'Audio uploaded (mock).' });
 };
 
 // Question Builder Logic
@@ -179,8 +305,35 @@ const newQuestion = ref({
     ],
     passage_content: null,
     passage_group_id: null,
-    passage_randomize: true
+    passage_randomize: true,
+    passage_limit: null,
+    min_words: null,
+    max_words: null
 });
+
+const passageLimit = ref(5);
+const isUploadingMedia = ref(false);
+
+const handleMediaUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    isUploadingMedia.value = true;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await api.post('/admin/media/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        newQuestion.value.media_path = res.data.path;
+        newQuestion.value.media_url = res.data.url;
+    } catch (err) {
+        alert('Failed to upload audio file. Ensure it is a valid MP3/WAV/OGG.');
+    } finally {
+        isUploadingMedia.value = false;
+    }
+};
 
 const openQuestionBuilder = (skillId, levelNum, isPassage = false) => {
     activeSkillForQuestions.value = skillId;
@@ -206,7 +359,10 @@ const resetNewQuestion = () => {
         ],
         passage_content: isPassageMode.value ? passageContent.value : null,
         passage_group_id: currentGroupId.value || null,
-        passage_randomize: true
+        passage_randomize: true,
+        passage_limit: isPassageMode.value ? passageLimit.value : null,
+        min_words: null,
+        max_words: null
     };
 };
 
@@ -258,6 +414,7 @@ const commitQuestion = () => {
         if (!currentGroupId.value) currentGroupId.value = generateGroupId();
         questionToSave.passage_group_id = currentGroupId.value;
         questionToSave.passage_content = passageContent.value;
+        questionToSave.passage_limit = passageLimit.value;
     }
 
     if (!localQuestions.value[activeSkillForQuestions.value]) {
@@ -279,6 +436,27 @@ const finishPassage = () => {
 
 const removeLocalQuestion = (skillId, levelNum, idx) => {
     localQuestions.value[skillId][levelNum].splice(idx, 1);
+};
+
+const removeLocalQuestionInGroup = (skillId, levelNum, question) => {
+    const idx = localQuestions.value[skillId][levelNum].findIndex(q => q === question);
+    if (idx !== -1) localQuestions.value[skillId][levelNum].splice(idx, 1);
+};
+
+const getGroupedQuestions = (questions) => {
+    if (!questions) return {};
+    const groups = { independent: [] };
+    questions.forEach(q => {
+        if (q.passage_group_id) {
+            if (!groups[q.passage_group_id]) groups[q.passage_group_id] = [];
+            groups[q.passage_group_id].push(q);
+        } else {
+            groups.independent.push(q);
+        }
+    });
+    // Remove independent if empty to avoid loop
+    if (groups.independent.length === 0) delete groups.independent;
+    return groups;
 };
 
 const getTotalQuestions = () => {
@@ -408,10 +586,12 @@ const saveExam = async () => {
                                 placeholder="E.G. MIDTERM_ALPHAV1">
                         </div>
                         <div class="space-y-3">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Target Audience Stratum</label>
-                            <select v-model="form.exam_type" class="premium-input text-xs font-black uppercase tracking-widest cursor-pointer">
-                                <option value="adult">Adult (Professional Matrix)</option>
-                                <option value="children">Children (Foundation Tier)</option>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Target Audience Category</label>
+                            <select v-model="form.exam_category_id" class="premium-input text-xs font-black uppercase tracking-widest cursor-pointer">
+                                <option :value="null" disabled>Select Category</option>
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                                    {{ cat.name }}
+                                </option>
                             </select>
                         </div>
                     </div>
@@ -471,14 +651,18 @@ const saveExam = async () => {
             <div v-if="form.selectedSkills.length === 0" class="p-20 text-center bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
                 <p class="text-xs font-black text-slate-400 uppercase tracking-widest italic">No skills selected. Return to Step 2 to proceed.</p>
             </div>
-
             <div v-else class="space-y-16">
-                <div v-for="selected in form.selectedSkills" :key="selected.skill_id" class="space-y-8">
-                    <div class="flex items-center space-x-4">
-                        <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                        <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">
-                            {{ availableSkills.find(s => s.id === selected.skill_id)?.name }} Matrix
-                        </h3>
+                <!-- LEVELED SKILLS (Reading, Listening, etc) -->
+                <div v-for="selected in form.selectedSkills.filter(s => isLeveledSkill(availableSkills.find(as => as.id === s.skill_id)))" :key="selected.skill_id" class="space-y-8">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                            <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">
+                                {{ availableSkills.find(s => s.id === selected.skill_id)?.name }} Matrix
+                            </h3>
+                        </div>
+                        <Button label="Manage Levels Table" icon="pi pi-table" severity="help" size="small" outlined rounded
+                            @click="openLevelManager(availableSkills.find(s => s.id === selected.skill_id))" />
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -492,41 +676,106 @@ const saveExam = async () => {
                                 </div>
                                 <div class="flex-1">
                                     <p class="text-[10px] font-black text-slate-800 uppercase tracking-tight">{{ level.name }}</p>
-                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ localQuestions[selected.skill_id]?.[level.level_number]?.length || 0 }} Added</p>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ localQuestions[selected.skill_id]?.[level.level_number]?.length || 0 }} Questions</p>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <button @click="openQuestionBuilder(selected.skill_id, level.level_number)"
-                                            class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all"
-                                            title="Add Single Question">
-                                        <i class="pi pi-plus text-xs"></i>
+                                    <!-- Standard Question Path -->
+                                    <button @click="openQuestionBuilder(selected.skill_id, level.level_number, false)"
+                                            title="Add Standard Item"
+                                            class="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 flex flex-col items-center justify-center hover:bg-indigo-600 hover:text-white transition-all">
+                                        <i class="pi pi-plus text-[10px]"></i>
+                                        <span class="text-[7px] font-black uppercase mt-0.5">Item</span>
                                     </button>
+                                    
+                                    <!-- Passage Group Path -->
                                     <button @click="openQuestionBuilder(selected.skill_id, level.level_number, true)"
-                                            class="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-slate-800 hover:text-white transition-all"
-                                            title="Add Passage Group">
-                                        <i class="pi pi-align-left text-xs"></i>
+                                            title="Create Passage Group"
+                                            class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex flex-col items-center justify-center hover:bg-indigo-600 hover:text-white transition-all">
+                                        <i class="pi pi-book text-[10px]"></i>
+                                        <span class="text-[7px] font-black uppercase mt-0.5">Passage</span>
                                     </button>
+
                                     <button @click="openBankSelector(selected.skill_id, level.level_number)"
-                                            class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all"
-                                            title="Import from Bank">
-                                        <i class="pi pi-search text-xs"></i>
+                                            title="Import from Bank"
+                                            class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex flex-col items-center justify-center hover:bg-emerald-600 hover:text-white transition-all">
+                                        <i class="pi pi-search text-[10px]"></i>
+                                        <span class="text-[7px] font-black uppercase mt-0.5">Bank</span>
                                     </button>
                                 </div>
                              </div>
 
-                             <!-- List of questions inside the card -->
-                             <div v-if="localQuestions[selected.skill_id]?.[level.level_number]?.length > 0" class="px-6 pb-6 space-y-2">
-                                <div v-for="(q, qIdx) in localQuestions[selected.skill_id][level.level_number]" :key="qIdx" 
-                                     :class="q.passage_group_id ? 'border-indigo-100 bg-indigo-50/30' : 'border-slate-100 bg-slate-50'"
-                                     class="flex justify-between items-center text-[9px] p-2 rounded-lg border">
-                                    <div class="flex items-center space-x-2 truncate">
-                                        <i v-if="q.passage_group_id" class="pi pi-link text-indigo-400 text-[8px]"></i>
-                                        <span class="font-bold text-slate-600 truncate">{{ q.content }}</span>
+                             <div v-if="localQuestions[selected.skill_id]?.[level.level_number]?.length > 0" class="px-6 pb-6 space-y-4">
+                                <!-- Passages -->
+                                <div v-for="(group, groupId) in getGroupedQuestions(localQuestions[selected.skill_id][level.level_number])" :key="groupId" class="space-y-1">
+                                    <div v-if="groupId !== 'independent'" class="mb-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                        <div class="flex justify-between items-center mb-2">
+                                             <span class="text-[8px] font-black text-indigo-600 uppercase tracking-widest">📖 Passage Group (Limit: {{ group[0].passage_limit }})</span>
+                                        </div>
+                                        <div class="space-y-1">
+                                            <div v-for="(q, qIdx) in group" :key="qIdx" 
+                                                 class="flex justify-between items-center text-[9px] p-2 rounded-lg bg-white/50 border border-indigo-50">
+                                                <div v-if="q.media_path" class="text-[7px] font-black text-indigo-500 uppercase bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">Audio</div>
+                        <span class="font-bold text-slate-600 truncate max-w-[150px]">{{ q.content }}</span>
+                                                <button @click="removeLocalQuestionInGroup(selected.skill_id, level.level_number, q)" class="text-rose-500">
+                                                    <i class="pi pi-trash text-[8px]"></i>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button @click="removeLocalQuestion(selected.skill_id, level.level_number, qIdx)" class="text-rose-500">
-                                        <i class="pi pi-trash text-[8px]"></i>
-                                    </button>
+                                    
+                                    <!-- Independent Questions -->
+                                    <template v-else>
+                                        <div v-for="(q, qIdx) in group" :key="qIdx" 
+                                             class="flex justify-between items-center text-[9px] p-2 rounded-lg border border-slate-100 bg-slate-50">
+                                            <span class="font-bold text-slate-600 truncate max-w-[180px]">{{ q.content }}</span>
+                                            <button @click="removeLocalQuestionInGroup(selected.skill_id, level.level_number, q)" class="text-rose-500">
+                                                <i class="pi pi-trash text-[8px]"></i>
+                                            </button>
+                                        </div>
+                                    </template>
                                 </div>
                              </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NON-LEVELED SKILLS (Writing, Speaking) -->
+                <div v-for="selected in form.selectedSkills.filter(s => !isLeveledSkill(availableSkills.find(as => as.id === s.skill_id)))" :key="selected.skill_id" class="space-y-8">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+                        <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">
+                            {{ availableSkills.find(s => s.id === selected.skill_id)?.name }} Configuration
+                        </h3>
+                    </div>
+
+                    <div class="premium-card p-10 bg-emerald-50/20 border-emerald-100">
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div class="flex-1 space-y-4 text-center md:text-left">
+                                <h4 class="text-sm font-black text-emerald-700 uppercase">Single Assessment Module</h4>
+                                <p class="text-xs font-bold text-slate-500">This skill does not use difficulty levels. All questions added here will be active for the entire duration of this module.</p>
+                                <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+                                     <span class="bg-white px-3 py-1 rounded-lg border border-emerald-100 text-[10px] font-black text-emerald-600 uppercase">
+                                         {{ localQuestions[selected.skill_id]?.[1]?.length || 0 }} Questions Total
+                                     </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <Button label="Standard Item" icon="pi pi-plus" severity="success" size="small" @click="openQuestionBuilder(selected.skill_id, 1, false)" />
+                                <Button label="Passage Group" icon="pi pi-book" severity="info" size="small" @click="openQuestionBuilder(selected.skill_id, 1, true)" />
+                                <Button label="Bank Import" icon="pi pi-search" severity="secondary" outlined size="small" @click="openBankSelector(selected.skill_id, 1)" />
+                            </div>
+                        </div>
+
+                        <!-- Question List for Static Skill -->
+                        <div v-if="localQuestions[selected.skill_id]?.[1]?.length > 0" class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div v-for="(q, qIdx) in localQuestions[selected.skill_id][1]" :key="qIdx" 
+                                 class="p-4 bg-white rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                                    <span class="text-[11px] font-bold text-slate-700 truncate max-w-[200px]">{{ q.content }}</span>
+                                </div>
+                                <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="removeLocalQuestion(selected.skill_id, 1, qIdx)" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -585,9 +834,16 @@ const saveExam = async () => {
                 <div v-if="isPassageMode" class="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">📖 Shared Passage Content</label>
-                        <div class="flex items-center space-x-2">
-                             <input type="checkbox" v-model="newQuestion.passage_randomize" class="w-4 h-4 rounded">
-                             <span class="text-[8px] font-black text-slate-400 uppercase">Randomize Internal Order</span>
+                        <div class="flex items-center space-x-6">
+                             <div class="flex items-center space-x-2">
+                                  <span class="text-[8px] font-black text-slate-400 uppercase">Show Only</span>
+                                  <InputNumber v-model="passageLimit" :min="1" :max="20" class="w-16" inputClass="p-1 text-center font-black text-[10px]" />
+                                  <span class="text-[8px] font-black text-slate-400 uppercase">Items</span>
+                             </div>
+                             <div class="flex items-center space-x-2">
+                                  <input type="checkbox" v-model="newQuestion.passage_randomize" class="w-4 h-4 rounded">
+                                  <span class="text-[8px] font-black text-slate-400 uppercase">Shuffle Order</span>
+                             </div>
                         </div>
                     </div>
                     <textarea v-model="passageContent" rows="5" class="premium-input text-sm bg-white" placeholder="Enter the main passage/text here..."></textarea>
@@ -608,9 +864,51 @@ const saveExam = async () => {
                     </div>
                 </div>
 
+                <!-- Audio Resource Path -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Audio Resource (Listening)</label>
+                        <span v-if="newQuestion.media_path" class="text-[8px] font-black text-emerald-600 uppercase bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 flex items-center">
+                            <i class="pi pi-check-circle mr-1"></i> Audio Linked
+                        </span>
+                    </div>
+                    
+                    <div v-if="newQuestion.media_path" class="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-2">
+                        <audio :src="newQuestion.media_url" controls class="h-8 max-w-[150px]"></audio>
+                        <button @click="newQuestion.media_path = null; newQuestion.media_url = null" class="text-rose-500 hover:text-rose-700">
+                             <i class="pi pi-trash text-xs"></i>
+                        </button>
+                    </div>
+
+                    <div v-else class="relative group">
+                        <input type="file" @change="handleMediaUpload" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                        <div class="flex items-center space-x-4 p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl group-hover:border-indigo-400 transition-all text-slate-400 group-hover:text-indigo-600">
+                            <div class="w-10 h-10 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center transition-all">
+                                <i :class="isUploadingMedia ? 'pi pi-spinner animate-spin' : 'pi pi-upload'" class="text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-black uppercase tracking-tight">{{ isUploadingMedia ? 'TRANSFERRED DATA...' : 'UPLOAD AUDIO ASSET' }}</p>
+                                <p class="text-[9px] font-bold text-slate-400 group-hover:text-indigo-400">MP3, WAV, or OGG • Max 10MB</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="space-y-2">
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Question Content</label>
-                    <textarea v-model="newQuestion.content" rows="3" class="premium-input text-sm resize-none" :placeholder="isPassageMode ? 'Enter a question related to the passage above...' : ''"></textarea>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Question Content / Prompt</label>
+                    <textarea v-model="newQuestion.content" rows="3" class="premium-input text-sm resize-none" :placeholder="isPassageMode ? 'Enter a question related to the passage above...' : 'Enter the writing prompt or task instructions here...'"></textarea>
+                </div>
+
+                <!-- Writing Constraints -->
+                <div v-if="newQuestion.type === 'writing'" class="grid grid-cols-2 gap-6 bg-indigo-50/30 p-6 rounded-2xl border border-indigo-100/50">
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">Minimum Words</label>
+                        <InputNumber v-model="newQuestion.min_words" :min="0" class="w-full" inputClass="font-black p-3" placeholder="E.G. 150" />
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">Maximum Words</label>
+                        <InputNumber v-model="newQuestion.max_words" :min="0" class="w-full" inputClass="font-black p-3" placeholder="E.G. 250" />
+                    </div>
                 </div>
 
                 <!-- MCQ Options -->
@@ -706,6 +1004,62 @@ const saveExam = async () => {
                 </div>
             </div>
         </Dialog>
+        <!-- Level Manager Modal (TABLE BASED) -->
+        <Dialog v-model:visible="showLevelModal" :header="`Manage Levels: ${editingSkill?.name}`" class="max-w-6xl w-full" modal>
+            <div class="p-4 space-y-6">
+                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Configure difficulty tiers for this module sequence</p>
+                     <Button label="Append New Level" icon="pi pi-plus" size="small" rounded @click="addLevel" />
+                </div>
+
+                <DataTable :value="editingLevels" class="p-datatable-sm text-xs rounded-2xl overflow-hidden border border-slate-100 shadow-sm"
+                           responsiveLayout="scroll">
+                    <Column field="level_number" header="NUM" style="width: 50px">
+                        <template #body="slotProps">
+                            <span class="font-black text-slate-400">#{{ slotProps.data.level_number }}</span>
+                        </template>
+                    </Column>
+                    <Column header="LEVEL NAME">
+                        <template #body="slotProps">
+                            <InputText v-model="slotProps.data.name" class="w-full text-xs font-bold" placeholder="Level Title" />
+                        </template>
+                    </Column>
+                    <Column header="SCORE RANGE">
+                        <template #body="slotProps">
+                            <div class="flex items-center space-x-2">
+                                <InputNumber v-model="slotProps.data.min_score" class="w-16" inputClass="text-center text-[10px]" />
+                                <span class="text-slate-300">-</span>
+                                <InputNumber v-model="slotProps.data.max_score" class="w-16" inputClass="text-center text-[10px]" />
+                            </div>
+                        </template>
+                    </Column>
+                    <Column header="PASS %">
+                        <template #body="slotProps">
+                            <InputNumber v-model="slotProps.data.pass_threshold" suffix="%" class="w-20" inputClass="text-center font-bold text-indigo-600" />
+                        </template>
+                    </Column>
+                    <Column header="INSTRUCTIONS">
+                        <template #body="slotProps">
+                            <Textarea v-model="slotProps.data.instructions" rows="1" autoResize class="w-full text-[10px]" placeholder="Student guidance..." />
+                        </template>
+                    </Column>
+                    <Column header="ACTIONS" style="width: 80px">
+                        <template #body="slotProps">
+                            <div class="flex items-center space-x-2">
+                                 <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="removeLevel(slotProps.data, slotProps.index)" />
+                            </div>
+                        </template>
+                    </Column>
+                </DataTable>
+
+                <div class="flex justify-end space-x-4 pt-6 border-t border-slate-50">
+                    <Button label="Discard" severity="secondary" outlined @click="showLevelModal = false" />
+                    <Button label="Commit Changes Globally" icon="pi pi-save" :loading="isSavingLevels" @click="saveLevels" />
+                </div>
+            </div>
+        </Dialog>
+
+        <Toast />
     </div>
   </AdminLayout>
 </template>

@@ -121,8 +121,8 @@ onMounted(() => {
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Assigned Skills</label>
                             <div class="bg-slate-50 border border-slate-100 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                 <div v-for="skill in availableSkills" :key="skill.id" class="flex items-center space-x-3">
-                                    <input type="checkbox" :id="'skill-'+skill.id" :value="skill.id" v-model="currentPackage.skills" class="w-5 h-5 text-indigo-600 rounded-lg border-slate-300 focus:ring-indigo-500">
-                                    <label :for="'skill-'+skill.id" class="text-xs font-bold text-slate-700 uppercase tracking-tight cursor-pointer">{{ skill.name }}</label>
+                                    <input type="checkbox" :id="'skill-'+skill.id" :value="skill.short_code" v-model="currentPackage.skills" class="w-5 h-5 text-indigo-600 rounded-lg border-slate-300 focus:ring-indigo-500">
+                                    <label :for="'skill-'+skill.id" class="text-xs font-bold text-slate-700 uppercase tracking-tight cursor-pointer">{{ skill.name }} ({{skill.short_code}})</label>
                                 </div>
                             </div>
                         </div>
@@ -132,7 +132,7 @@ onMounted(() => {
                             <select v-model="currentPackage.exam_id" class="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl font-black text-slate-700 px-6 uppercase text-xs focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 transition-all outline-none">
                                 <option :value="null">No Linked Exam (Independent)</option>
                                 <option v-for="exam in exams" :key="exam.id" :value="exam.id">
-                                    [{{ exam.exam_type }}] {{ exam.title }}
+                                    [{{ exam.category?.name || 'General' }}] {{ exam.title }}
                                 </option>
                             </select>
                         </div>

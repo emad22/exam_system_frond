@@ -189,6 +189,19 @@ const displayNumber = computed(() => globalOffset.value + currentIndex.value + 1
 const displayTotal  = computed(() => totalSkillQuestions.value || '...');
 const isLastQuestion = computed(() => currentIndex.value === questions.value.length - 1);
 
+const wordCount = computed(() => {
+    const text = answers.value[currentIndex.value]?.text_answer || '';
+    if (!text.trim()) return 0;
+    return text.trim().split(/\s+/).length;
+});
+
+const isWordCountValid = computed(() => {
+    if (!currentQ.value || currentQ.value.type !== 'writing') return true;
+    const min = currentQ.value.min_words || 0;
+    const max = currentQ.value.max_words || 99999;
+    return wordCount.value >= min && wordCount.value <= max;
+});
+
 onMounted(fetchData);
 </script>
 
@@ -384,9 +397,22 @@ onMounted(fetchData);
                         </div>
 
                         <!-- Question Content -->
-                        <h2 class="text-2xl md:text-3xl font-black text-slate-800 leading-tight mb-16 tracking-tight">
-                            {{ currentQ.content }}
-                        </h2>
+                        <div class="space-y-6 mb-16">
+                            <h2 class="text-2xl md:text-3xl font-black text-slate-800 leading-tight tracking-tight">
+                                {{ currentQ.content }}
+                            </h2>
+
+                            <!-- Audio Player -->
+                            <div v-if="currentQ.media_url" class="p-6 bg-white border-2 border-slate-100 rounded-3xl shadow-sm flex items-center space-x-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                                    <i class="pi pi-volume-up text-xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <audio :src="currentQ.media_url" controls class="w-full h-10"></audio>
+                                    <p class="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest pl-2">Listening Resource Attached</p>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- A. MCQ (Clean Professional List) -->
                         <div v-if="currentQ.type === 'mcq'" class="space-y-4" :class="questionSubmitted ? 'pointer-events-none' : ''">
@@ -432,6 +458,38 @@ onMounted(fetchData);
                              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-4">Your response will be verified for master accuracy</p>
                         </div>
 
+                        <!-- D. Writing (Report/Essay) -->
+                        <div v-if="currentQ.type === 'writing'" class="space-y-6">
+                            <div class="flex justify-between items-center mb-2 px-4">
+                                <div class="flex items-center space-x-4">
+                                     <div class="flex items-center space-x-2">
+                                          <span class="text-[10px] font-black text-slate-400 uppercase">Words:</span>
+                                          <span :class="isWordCountValid ? 'text-emerald-600' : 'text-amber-500'" class="text-xs font-black">{{ wordCount }}</span>
+                                     </div>
+                                     <div v-if="currentQ.min_words" class="text-[9px] font-bold text-slate-300 uppercase">Min: {{ currentQ.min_words }}</div>
+                                     <div v-if="currentQ.max_words" class="text-[9px] font-bold text-slate-300 uppercase">Max: {{ currentQ.max_words }}</div>
+                                </div>
+                                <div v-if="currentQ.min_words && wordCount < currentQ.min_words" class="text-[8px] font-black text-amber-500 uppercase bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+                                    {{ currentQ.min_words - wordCount }} more words required
+                                </div>
+                                <div v-else-if="isWordCountValid" class="text-[8px] font-black text-emerald-600 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                                    Requirement Met ✓
+                                </div>
+                            </div>
+
+                            <textarea v-model="answers[currentIndex].text_answer" 
+                                      rows="12" 
+                                      class="w-full rounded-[2rem] p-8 bg-white border-2 border-slate-200 text-lg font-medium leading-[1.6] text-slate-700 focus:border-[#004a99] transition-all resize-none shadow-sm"
+                                      placeholder="Compose your report here..."></textarea>
+                            
+                            <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex items-start space-x-4">
+                                <i class="pi pi-info-circle text-indigo-400 mt-0.5"></i>
+                                <p class="text-[10px] font-medium text-indigo-700 leading-relaxed">
+                                    Structure your report with a clear introduction, supporting paragraphs, and a conclusion. Ensure your arguments are logical and well-supported.
+                                </p>
+                            </div>
+                        </div>
+
                         <!-- Footer: Two-Step Submit then Next -->
                         <div class="mt-20 pt-10 border-t border-slate-100">
 
@@ -441,7 +499,7 @@ onMounted(fetchData);
                                     سؤال {{ displayNumber }} من {{ displayTotal }}
                                 </div>
                                 <button @click="submitAnswer"
-                                    :disabled="!answers[currentIndex]?.option_id && !answers[currentIndex]?.text_answer"
+                                    :disabled="(!answers[currentIndex]?.option_id && !answers[currentIndex]?.text_answer) || !isWordCountValid"
                                     class="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all duration-300 shadow-xl hover:-translate-y-0.5 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 bg-[#004a99] text-white shadow-blue-100">
                                     <i class="pi pi-check-circle"></i>
                                     <span>تأكيد الإجابة</span>

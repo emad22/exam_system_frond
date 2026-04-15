@@ -102,7 +102,7 @@ onMounted(() => {
                                 <i class="pi pi-book mr-3"></i> Academic Sync
                             </h4>
                             <div class="grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                <div v-for="(val, key) in { Package: selectedStudent.package?.name || 'Custom', Mode: selectedStudent.exam_type, Type: selectedStudent.student_type || 'General', Source: selectedStudent.registration_source }" :key="key" class="space-y-1">
+                                <div v-for="(val, key) in { Package: selectedStudent.package?.name || 'Custom', Mode: selectedStudent.category?.name || 'General', Type: selectedStudent.student_type || 'General', Source: selectedStudent.registration_source }" :key="key" class="space-y-1">
                                     <label class="text-[10px] font-bold text-slate-400">{{ key }}</label>
                                     <p class="text-sm font-bold text-slate-700">{{ val }}</p>
                                 </div>

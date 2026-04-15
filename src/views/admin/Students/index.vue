@@ -271,9 +271,11 @@ onMounted(() => {
                             </template>
                         </Column>
 
-                        <Column header="Logic Mode" style="min-width: 120px">
+                        <Column header="Logic Mode (Category)" style="min-width: 140px">
                             <template #body="{ data }">
-                                <Tag :value="data.exam_type" :severity="data.exam_type === 'adult' ? 'success' : 'warning'" class="text-[10px] uppercase tracking-wider mb-1" />
+                                <Tag :value="data.category?.name || 'General'" 
+                                     :severity="data.category?.slug === 'adult' ? 'success' : 'info'" 
+                                     class="text-[10px] uppercase tracking-wider mb-1" />
                                 <div v-if="data.not_adaptive" class="text-[9px] font-bold text-amber-500 uppercase tracking-tighter">Non-Adaptive</div>
                             </template>
                         </Column>

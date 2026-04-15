@@ -9,6 +9,7 @@ import Select from 'primevue/select';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
 import FileUpload from 'primevue/fileupload';
+import Checkbox from 'primevue/checkbox';
 import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
@@ -22,18 +23,29 @@ const step = ref(1); // 1: Select, 2: Process, 3: Result
 const partners = ref([])
 const partner_id = ref('')
 
+const exams = ref([])
+const exam_id = ref(null)
+const skills = ref([])
+const assigned_skills = ref([])
 
-const fetchPartners = async () => {
+
+const fetchData = async () => {
     try {
-        const res = await api.get('/admin/partners/active')
-        partners.value = res.data
+        const [pRes, eRes, sRes] = await Promise.all([
+            api.get('/admin/partners/active'),
+            api.get('/admin/exams'),
+            api.get('/admin/skills')
+        ])
+        partners.value = pRes.data
+        exams.value = eRes.data
+        skills.value = sRes.data
     } catch (e) {
-        console.error('Failed to load partners', e)
+        console.error('Failed to load batch prerequisites', e)
     }
 }
 
 onMounted(() => {
-    fetchPartners()
+    fetchData()
 })
 
 const onFileSelect = (e) => {
@@ -58,7 +70,11 @@ const triggerUpload = async () => {
     const formData = new FormData();
     formData.append('file', selectedFile.value);
 
-    formData.append('partner_id', partner_id.value); // 🔥 المهم
+    formData.append('partner_id', partner_id.value); 
+    if (exam_id.value) formData.append('exam_id', exam_id.value);
+    if (assigned_skills.value.length > 0) {
+        formData.append('assigned_skills', JSON.stringify(assigned_skills.value));
+    }
 
     try {
         const res = await api.post('/admin/students/batch', formData, {
@@ -84,6 +100,8 @@ const reset = () => {
     selectedFile.value = null;
     uploadErrors.value = [];
     partner_id.value = '';
+    exam_id.value = null;
+    assigned_skills.value = [];
     successMsg.value = '';
 };
 const downloadTemplate = async () => {
@@ -125,22 +143,70 @@ const downloadTemplate = async () => {
                         <!-- Step 1: Selection -->
                         <div v-if="step === 1" class="space-y-10 animate-in fade-in duration-500">
                             
-                            <!-- Partner Selection -->
-                            <div class="max-w-xl mx-auto space-y-2">
-                                <label class="text-xs font-black text-slate-500 uppercase tracking-widest pl-2">1. Select Target Partner Node</label>
-                                <Select 
-                                    v-model="partner_id" 
-                                    :options="partners" 
-                                    optionLabel="partner_name" 
-                                    optionValue="id"
-                                    placeholder="Choose an active partner..." 
-                                    class="w-full shadow-sm rounded-xl"
-                                />
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                                <!-- Partner Selection -->
+                                <div class="space-y-4 shadow-sm border border-slate-100 p-6 rounded-3xl bg-white">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <i class="pi pi-users text-xs"></i>
+                                        </div>
+                                        <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">1. Select Target Partner</label>
+                                    </div>
+                                    <Select 
+                                        v-model="partner_id" 
+                                        :options="partners" 
+                                        optionLabel="partner_name" 
+                                        optionValue="id"
+                                        placeholder="Choose a partner..." 
+                                        class="w-full rounded-xl"
+                                    />
+                                </div>
+
+                                <!-- Exam Override -->
+                                <div class="space-y-4 shadow-sm border border-slate-100 p-6 rounded-3xl bg-white">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <i class="pi pi-book text-xs"></i>
+                                        </div>
+                                        <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">2. Global Exam Override</label>
+                                    </div>
+                                    <Select 
+                                        v-model="exam_id" 
+                                        :options="exams" 
+                                        optionLabel="title" 
+                                        optionValue="id"
+                                        placeholder="Default from File/System" 
+                                        class="w-full rounded-xl"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Skill Overrides -->
+                            <div class="max-w-4xl mx-auto space-y-4 shadow-sm border border-slate-100 p-8 rounded-3xl bg-white">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <i class="pi pi-verified text-xs"></i>
+                                        </div>
+                                        <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">3. Global Skill Selection (Override)</label>
+                                    </div>
+                                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">Apply to all Students</span>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    <label v-for="skill in skills" :key="skill.id" 
+                                        :class="assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 bg-slate-50'"
+                                        class="flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer hover:border-indigo-200">
+                                        <Checkbox :value="skill.short_code" v-model="assigned_skills" />
+                                        <span class="mt-2 text-[10px] font-black text-slate-700 uppercase tracking-tighter">
+                                            {{ skill.name }}
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
 
                             <!-- File Selection using PrimeVue -->
                             <div class="max-w-xl mx-auto space-y-2 mt-8">
-                                <label class="text-xs font-black text-slate-500 uppercase tracking-widest pl-2">2. Provide Excel/CSV Data Source</label>
+                                <label class="text-xs font-black text-slate-500 uppercase tracking-widest pl-2 text-center block">4. Provide Excel/CSV Data Source</label>
                                 
                                 <div class="border-2 border-dashed border-slate-200 bg-slate-50 rounded-3xl p-8 flex flex-col items-center justify-center transition-colors hover:border-indigo-300">
                                     <template v-if="!selectedFile">

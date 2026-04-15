@@ -10,7 +10,9 @@ const router = useRouter()
 const navigation = [
     { name: 'Dashboard', href: '/admin', icon: 'pi pi-home' },
     { name: 'Exams', href: '/admin/exams', icon: 'pi pi-file-edit' },
+    { name: 'Exam Categories', href: '/admin/exam-categories', icon: 'pi pi-tags' },
     { name: 'Questions', href: '/admin/questions', icon: 'pi pi-list' },
+    { name: 'Levels', href: '/admin/levels', icon: 'pi pi-sort-amount-up' },
     { name: 'Students', href: '/admin/students', icon: 'pi pi-users' },
     { name: 'Reports', href: '/admin/reports', icon: 'pi pi-chart-bar' },
     { name: 'Skills', href: '/admin/skills', icon: 'pi pi-star' },

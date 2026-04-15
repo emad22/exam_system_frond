@@ -77,7 +77,7 @@ const saveRules = async () => {
         await api.patch(`/admin/exams/${selectedExam.value.id}`, {
             title: selectedExam.value.title,
             passing_score: selectedExam.value.passing_score,
-            exam_type: selectedExam.value.exam_type,
+            exam_category_id: selectedExam.value.exam_category_id,
             language_id: selectedExam.value.language_id,
             is_adaptive: selectedExam.value.is_adaptive,
             skills: rulesForm.value.skills
@@ -93,16 +93,18 @@ const saveRules = async () => {
     }
 };
 
-const getCategorySeverity = (type) => {
-    switch(type) {
+const getCategorySeverity = (category) => {
+    if (!category) return 'secondary';
+    const slug = (category.slug || '').toLowerCase();
+    switch(slug) {
         case 'adult': return 'success';
         case 'children': return 'warn';
-        default: return 'secondary';
+        default: return 'info';
     }
 }
 
 const setDefaultExam = async (exam) => {
-    if (!window.confirm(`Are you sure you want to set "${exam.title}" as the default exam for ${exam.exam_type} registration?`)) return;
+    if (!window.confirm(`Are you sure you want to set "${exam.title}" as the default exam for ${exam.category?.name || 'General'} registration?`)) return;
     try {
         await api.patch(`/admin/exams/${exam.id}/set-default`);
         alert('Universal Default Exam updated.');
@@ -186,7 +188,7 @@ onMounted(fetchExams);
 
                                 <Column header="Category" style="min-width: 120px">
                                     <template #body="{ data }">
-                                        <Tag :value="data.exam_type || 'General'" :severity="getCategorySeverity(data.exam_type)" class="text-[9px] uppercase tracking-widest" />
+                                        <Tag :value="data.category?.name || 'General'" :severity="getCategorySeverity(data.category)" class="text-[9px] uppercase tracking-widest" />
                                     </template>
                                 </Column>
 

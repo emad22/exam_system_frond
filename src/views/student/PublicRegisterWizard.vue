@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
 
@@ -8,15 +8,28 @@ const step = ref(1); // 1: Personal, 2: Academic, 3: Account
 const isSubmitting = ref(false);
 const errorMsg = ref('');
 
+const categories = ref([]);
 const form = reactive({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
-    exam_type: 'adult',
+    exam_category_id: null,
     gender: 'male',
     password: '',
     password_confirmation: ''
+});
+
+onMounted(async () => {
+    try {
+        const res = await api.get('/public/exam-categories');
+        categories.value = res.data.filter(c => c.is_active);
+        if (categories.value.length > 0) {
+            form.exam_category_id = categories.value[0].id;
+        }
+    } catch (err) {
+        console.error('Failed to load categories', err);
+    }
 });
 
 const nextStep = () => {
@@ -116,8 +129,13 @@ const handleRegister = async () => {
                             <div class="space-y-3">
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Operational Mode</label>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <button type="button" @click="form.exam_type = 'adult'" :class="form.exam_type === 'adult' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-50 text-slate-400'" class="p-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Adult (18+)</button>
-                                    <button type="button" @click="form.exam_type = 'children'" :class="form.exam_type === 'children' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-50 text-slate-400'" class="p-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Young Learner</button>
+                                    <button v-for="cat in categories" :key="cat.id"
+                                        type="button" 
+                                        @click="form.exam_category_id = cat.id" 
+                                        :class="form.exam_category_id === cat.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-50 text-slate-400'" 
+                                        class="p-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">
+                                        {{ cat.name }}
+                                    </button>
                                 </div>
                             </div>
 

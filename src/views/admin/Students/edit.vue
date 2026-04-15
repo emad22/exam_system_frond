@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -19,6 +19,7 @@ const loading = ref(true);
 const isSaving = ref(false);
 const packages = ref([]);
 const skills = ref([]);
+const categories = ref([]);
 const studentId = route.params.id;
 
 const editForm = ref({
@@ -39,7 +40,7 @@ const editForm = ref({
     year_of_arabic: null,
     not_adaptive: false,
     package_id: '',
-    exam_type: 'adult',
+    exam_category_id: null,
     assigned_skills: [],
     password: '',
     is_active: true,
@@ -48,14 +49,16 @@ const editForm = ref({
 const loadData = async () => {
     loading.value = true;
     try {
-        const [studentRes, pctRes, skillRes] = await Promise.all([
+        const [studentRes, pctRes, skillRes, catRes] = await Promise.all([
             api.get(`/admin/students/${studentId}`),
             api.get('/admin/packages'),
-            api.get('/admin/skills')
+            api.get('/admin/skills'),
+            api.get('/admin/exam-categories')
         ]);
         
         packages.value = pctRes.data;
         skills.value = skillRes.data;
+        categories.value = catRes.data;
         
         const student = studentRes.data;
         editForm.value = {
@@ -77,7 +80,7 @@ const loadData = async () => {
             not_adaptive: !!student.not_adaptive,
             is_active: !!student.user?.is_active,
             package_id: student.package_id || '',
-            exam_type: student.exam_type || 'adult',
+            exam_category_id: student.exam_category_id,
             assigned_skills: student.assigned_skills || [],
             password: '',
         };
@@ -94,10 +97,29 @@ const onPackageChange = () => {
     if (editForm.value.package_id !== '') {
         const selected = packages.value.find(p => p.id === editForm.value.package_id);
         if (selected && selected.skills) {
-            editForm.value.assigned_skills = selected.skills.map(s => s.id);
+            editForm.value.assigned_skills = selected.skills.map(s => s.id || s.short_code);
         }
     }
 };
+
+// Monitor skill changes to detect custom overrides
+watch(() => editForm.value.assigned_skills, (newSkills) => {
+    if (editForm.value.package_id === '') return;
+
+    const selectedPkg = packages.value.find(p => p.id === editForm.value.package_id);
+    if (!selectedPkg) return;
+
+    const pkgSkills = (selectedPkg.skills || []).map(s => s.id || s.short_code).sort();
+    const currentSkills = [...(newSkills || [])].sort();
+
+    const isMatch = pkgSkills.length === currentSkills.length && 
+                    pkgSkills.every((val, index) => val === currentSkills[index]);
+
+    if (!isMatch) {
+        // If they don't match, we are in "Customized" territory
+        editForm.value.package_id = '';
+    }
+}, { deep: true });
 
 const saveStudent = async () => {
     isSaving.value = true;
@@ -188,11 +210,11 @@ onMounted(() => {
                                     class="w-full shadow-sm rounded-xl" />
                             </div>
                             <div class="flex flex-col">
-                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Logic Mode</label>
-                                <Select v-model="editForm.exam_type" 
-                                    :options="[{label:'Adult (18+)', value:'adult'}, {label:'Child (-18)', value:'children'}]" 
-                                    optionLabel="label" 
-                                    optionValue="value" 
+                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Logic Mode (Category)</label>
+                                <Select v-model="editForm.exam_category_id" 
+                                    :options="categories" 
+                                    optionLabel="name" 
+                                    optionValue="id" 
                                     class="w-full shadow-sm rounded-xl" />
                             </div>
                         </div>
@@ -223,9 +245,9 @@ onMounted(() => {
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <label v-for="skill in skills" :key="skill.id" 
-                                    :class="editForm.assigned_skills.includes(skill.id) ? 'border-indigo-600 bg-white shadow-sm' : 'border-slate-100 bg-white'"
+                                    :class="editForm.assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-white shadow-sm' : 'border-slate-100 bg-white'"
                                     class="flex items-center p-5 rounded-2xl border-2 transition-all duration-300 group cursor-pointer hover:border-indigo-200">
-                                    <Checkbox :value="skill.id" v-model="editForm.assigned_skills" />
+                                    <Checkbox :value="skill.short_code" v-model="editForm.assigned_skills" />
                                     <span class="ml-4 text-xs font-bold text-slate-700 truncate">
                                         {{ skill.name }}
                                     </span>

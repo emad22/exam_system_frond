@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -21,6 +21,8 @@ const generatePassword = () => {
 
 const skills = ref([]);
 const partners = ref([]);
+const exams = ref([]);
+const categories = ref([]);
 
 const form = ref({
     first_name: '',
@@ -31,7 +33,8 @@ const form = ref({
     birth_date: null,
     student_code: '',
     password: generatePassword(),
-    exam_type: 'adult',
+    exam_category_id: null,
+    exam_id: null,
     assigned_skills: [],
     is_active: true,
     partner_id: '',
@@ -42,12 +45,18 @@ const errorMsg = ref('');
 
 onMounted(async () => {
     try {
-        const [skillRes, partnerRes] = await Promise.all([
+        const [skillRes, partnerRes, examRes, catRes] = await Promise.all([
             api.get('/admin/skills'),
-            api.get('/admin/partners/active')
+            api.get('/admin/partners/active'),
+            api.get('/admin/exams'),
+            api.get('/admin/exam-categories')
         ]);
         skills.value = skillRes.data;
         partners.value = partnerRes.data;
+        exams.value = examRes.data;
+        categories.value = catRes.data;
+
+        if (categories.value.length > 0) form.value.exam_category_id = categories.value[0].id;
 
         if (partners.value.length > 0) form.value.partner_id = partners.value[0].id;
 
@@ -73,6 +82,10 @@ const addStudent = async () => {
         isSubmitting.value = false;
     }
 };
+
+const filteredExams = computed(() => {
+    return exams.value.filter(e => e.exam_category_id === form.value.exam_category_id);
+});
 </script>
 
 <template>
@@ -161,9 +174,9 @@ const addStudent = async () => {
 
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <label v-for="skill in skills" :key="skill.id" 
-                                            :class="form.assigned_skills.includes(skill.id) ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 bg-white'"
+                                            :class="form.assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 bg-white'"
                                             class="flex items-center p-4 rounded-2xl border-2 transition-all duration-300 group cursor-pointer hover:border-indigo-200">
-                                            <Checkbox :value="skill.id" v-model="form.assigned_skills" />
+                                            <Checkbox :value="skill.short_code" v-model="form.assigned_skills" />
                                             <span class="ml-4 text-xs font-bold text-slate-700 truncate">
                                                 {{ skill.name }}
                                             </span>
@@ -188,10 +201,21 @@ const addStudent = async () => {
 
                                     <div class="flex flex-col">
                                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Exam category</label>
-                                        <Select v-model="form.exam_type" 
-                                            :options="[{label:'Adult (18+)', value:'adult'}, {label:'Children (-18)', value:'children'}]" 
-                                            optionLabel="label" 
-                                            optionValue="value" 
+                                        <Select v-model="form.exam_category_id" 
+                                            @change="form.exam_id = null"
+                                            :options="categories" 
+                                            optionLabel="name" 
+                                            optionValue="id" 
+                                            class="w-full rounded-xl bg-slate-50 border-slate-100" />
+                                    </div>
+
+                                    <div class="flex flex-col">
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Specific Exam (Optional Override)</label>
+                                        <Select v-model="form.exam_id" 
+                                            :options="filteredExams" 
+                                            optionLabel="title" 
+                                            optionValue="id" 
+                                            placeholder="System Default"
                                             class="w-full rounded-xl bg-slate-50 border-slate-100" />
                                     </div>
 

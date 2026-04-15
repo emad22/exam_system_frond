@@ -18,6 +18,7 @@ import AdminStudentShow from '@/views/admin/Students/show.vue'
 import AdminExams from '@/views/admin/Exams/index.vue'
 import AdminExamCreate from '@/views/admin/Exams/create.vue'
 import AdminExamImport from '@/views/admin/Exams/import.vue'
+import AdminExamCategories from '@/views/admin/Exams/Categories.vue'
 
 import AdminQuestions from '@/views/admin/Questions/index.vue'
 import AdminQuestionCreate from '@/views/admin/Questions/create.vue'
@@ -151,6 +152,11 @@ const routes = [
     props: true
   },
   {
+    path: '/admin/exam-categories',
+    name: 'admin.exams.categories',
+    component: AdminExamCategories
+  },
+  {
     path: '/admin/questions',
     name: 'admin.questions',
     component: AdminQuestions
@@ -175,6 +181,11 @@ const routes = [
     path: '/admin/skills/create',
     name: 'admin.skills.create',
     component: AdminSkillCreate
+  },
+  {
+    path: '/admin/levels',
+    name: 'admin.levels.all',
+    component: AdminLevels
   },
   {
     path: '/admin/skills/:id/levels',
