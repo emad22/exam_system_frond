@@ -21,7 +21,8 @@ const isSaving = ref(false);
 const openEditModal = (skill) => {
     editingSkill.value = { 
         id: skill.id, 
-        name: skill.name
+        name: skill.name,
+        short_code: skill.short_code || ''
     };
     showEditModal.value = true;
 };
@@ -31,7 +32,8 @@ const updateSkill = async () => {
     isSaving.value = true;
     try {
         await api.patch(`/admin/skills/${editingSkill.value.id}`, {
-            name: editingSkill.value.name
+            name: editingSkill.value.name,
+            short_code: editingSkill.value.short_code
         });
         showEditModal.value = false;
         fetchSkills(); // Refresh list
@@ -108,6 +110,7 @@ onMounted(fetchSkills);
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">ID</th>
                                     <th class="px-6 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Module Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Code</th>
                                     <th class="px-6 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Levels</th>
                                     <th class="px-6 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Questions Count</th>
                                     <th class="px-6 py-3 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Actions</th>
@@ -117,6 +120,9 @@ onMounted(fetchSkills);
                                 <tr v-for="skill in filteredSkills" :key="skill.id" class="hover:bg-slate-50/50 transition-colors">
                                     <td class="px-6 py-4 text-sm text-gray-500">#{{ String(skill.id).padStart(3, '0') }}</td>
                                     <td class="px-6 py-4 text-sm font-medium text-gray-900 uppercase font-black tracking-tight">{{ skill.name }}</td>
+                                    <td class="px-6 py-4 text-sm">
+                                        <code class="bg-slate-50 border border-slate-200 px-2 py-1 rounded text-slate-600 text-xs font-black">{{ skill.short_code || '-' }}</code>
+                                    </td>
                                     <td class="px-6 py-4 text-sm">
                                         <span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100">{{ skill.levels_count || 0 }} Levels</span>
                                     </td>
@@ -179,10 +185,17 @@ onMounted(fetchSkills);
 
                 <!-- Form Body -->
                 <div class="p-8 space-y-6">
-                    <div class="space-y-2">
-                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Module Identity (Name)</label>
-                        <input v-model="editingSkill.name" type="text"
-                            class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-black text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none">
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Module Identity (Name)</label>
+                            <input v-model="editingSkill.name" type="text"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-black text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Short Code (e.g. R, W)</label>
+                            <input v-model="editingSkill.short_code" type="text" maxlength="5"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-black text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none">
+                        </div>
                     </div>
                 </div>
 

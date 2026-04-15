@@ -1,12 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
-import InputText from 'primevue/inputtext';
-import InputNumber from 'primevue/inputnumber';
 
+const router = useRouter();
 const packages = ref([]);
 const loading = ref(true);
 const searchQuery = ref('');
@@ -25,51 +23,15 @@ const avgSkills = computed(() => {
     return (total / packages.value.length).toFixed(1);
 });
 
-// CRUD Modal Logic
-const showModal = ref(false);
-const isEditing = ref(false);
-const isSaving = ref(false);
-const currentPackage = ref({
-    id: null,
-    name: '',
-    skills_count: 3,
-    description: '',
-    wp_package_id: ''
-});
-
-const openCreateModal = () => {
-    isEditing.value = false;
-    currentPackage.value = {
-        id: null,
-        name: '',
-        skills_count: 3,
-        description: '',
-        wp_package_id: ''
-    };
-    showModal.value = true;
-};
-
-const openEditModal = (pkg) => {
-    isEditing.value = true;
-    currentPackage.value = { ...pkg };
-    showModal.value = true;
-};
-
-const savePackage = async () => {
-    if (!currentPackage.value.name) return;
-    isSaving.value = true;
+const fetchPackages = async () => {
+    loading.value = true;
     try {
-        if (isEditing.value) {
-            await api.patch(`/admin/packages/${currentPackage.value.id}`, currentPackage.value);
-        } else {
-            await api.post('/admin/packages', currentPackage.value);
-        }
-        showModal.value = false;
-        fetchPackages();
+        const res = await api.get('/admin/packages');
+        packages.value = res.data;
     } catch (err) {
-        alert(err.response?.data?.message || 'Failed to save package.');
+        console.error('Failed to load packages', err);
     } finally {
-        isSaving.value = false;
+        loading.value = false;
     }
 };
 
@@ -83,16 +45,12 @@ const deletePackage = async (id) => {
     }
 };
 
-const fetchPackages = async () => {
-    loading.value = true;
-    try {
-        const res = await api.get('/admin/packages');
-        packages.value = res.data;
-    } catch (err) {
-        console.error('Failed to load packages', err);
-    } finally {
-        loading.value = false;
-    }
+const openCreate = () => {
+    router.push('/admin/packages/create');
+};
+
+const openEdit = (pkg) => {
+    router.push(`/admin/packages/${pkg.id}/edit`);
 };
 
 onMounted(fetchPackages);
@@ -107,7 +65,7 @@ onMounted(fetchPackages);
                     <h1 class="text-3xl font-black text-slate-800 tracking-tight text-indigo-900">Standard Packages</h1>
                     <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Configure skill bundles & WP integrations</p>
                 </div>
-                <button @click="openCreateModal"
+                <button @click="openCreate"
                     class="bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all font-black text-xs uppercase tracking-widest">
                     Create New Package +
                 </button>
@@ -157,6 +115,7 @@ onMounted(fetchPackages);
                                     <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ID</th>
                                     <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Package Identity</th>
                                     <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Skill Count</th>
+                                    <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Linked Exam</th>
                                     <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">WP Linked ID</th>
                                     <th class="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Management</th>
                                 </tr>
@@ -176,17 +135,21 @@ onMounted(fetchPackages);
                                         </span>
                                     </td>
                                     <td class="px-8 py-6">
+                                        <span v-if="pkg.exam" class="text-[10px] font-bold text-slate-600">{{ pkg.exam?.title || 'Unknown Exam' }}</span>
+                                        <span v-else class="text-[10px] font-bold text-slate-400 italic">No Exam</span>
+                                    </td>
+                                    <td class="px-8 py-6">
                                         <code class="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
                                             {{ pkg.wp_package_id || 'NOT_LINKED' }}
                                         </code>
                                     </td>
                                     <td class="px-8 py-6 text-right space-x-2">
-                                        <button @click="openEditModal(pkg)"
-                                            class="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                        <button @click="openEdit(pkg)"
+                                            class="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm inline-flex">
                                             <i class="pi pi-pencil text-sm"></i>
                                         </button>
                                         <button @click="deletePackage(pkg.id)"
-                                            class="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">
+                                            class="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm inline-flex">
                                             <i class="pi pi-trash text-sm"></i>
                                         </button>
                                     </td>
@@ -203,69 +166,11 @@ onMounted(fetchPackages);
                     <p class="text-slate-400 font-medium max-w-sm mx-auto mb-12 text-sm leading-relaxed italic">
                         Define your standardized assessment packages to automate student exam generation.
                     </p>
-                    <button @click="openCreateModal" class="inline-block bg-indigo-600 text-white font-black py-5 px-12 rounded-2xl shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:bg-indigo-700 transition transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs">
+                    <button @click="openCreate" class="inline-block bg-indigo-600 text-white font-black py-5 px-12 rounded-2xl shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:bg-indigo-700 transition transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs">
                         Define First Package ➜
                     </button>
                 </div>
             </div>
         </div>
-
-        <!-- Create/Edit Modal -->
-        <Dialog v-model:visible="showModal" 
-                :header="isEditing ? 'UPDATE MODULE CONFIG' : 'INITIALIZE NEW PACKAGE'" 
-                class="max-w-xl w-full" 
-                modal 
-                pt:header:class="border-b border-slate-50 p-8"
-                pt:content:class="p-8">
-            <div class="space-y-8">
-                <div class="grid grid-cols-1 gap-6">
-                    <div class="space-y-2">
-                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Package Designation</label>
-                        <InputText v-model="currentPackage.name" 
-                                  placeholder="e.g. Adult Elite / Trial Plan" 
-                                  class="w-full h-14 bg-slate-50 border-slate-100 rounded-2xl font-black text-slate-700 uppercase px-6" />
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Skill Capacity</label>
-                            <InputNumber v-model="currentPackage.skills_count" 
-                                        :min="1" :max="5" showButtons 
-                                        buttonLayout="horizontal"
-                                        class="w-full"
-                                        pt:pcInput:class="h-14 bg-slate-50 border-slate-100 rounded-2xl font-black text-slate-700 px-6" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WP Integration Key</label>
-                            <InputText v-model="currentPackage.wp_package_id" 
-                                      placeholder="WooProductID" 
-                                      class="w-full h-14 bg-slate-50 border-slate-100 rounded-2xl font-black text-slate-500 px-6" />
-                        </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Extended Narrative (Description)</label>
-                        <textarea v-model="currentPackage.description" 
-                                  rows="4"
-                                  class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-6 text-xs text-slate-600 font-medium focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
-                                  placeholder="Describe the purpose of this skill bundle..."></textarea>
-                    </div>
-                </div>
-
-                <div class="pt-6 border-t border-slate-50 flex justify-end space-x-3">
-                    <Button label="Discard" outlined severity="secondary" @click="showModal = false" class="px-8 font-black text-[10px] uppercase tracking-widest" />
-                    <Button :label="isSaving ? 'PERSISTING...' : (isEditing ? 'COMMIT UPDATES' : 'INITIALIZE PACKAGE')" 
-                            :loading="isSaving"
-                            @click="savePackage" 
-                            class="px-10 bg-indigo-600 border-none font-black text-[10px] uppercase tracking-widest" />
-                </div>
-            </div>
-        </Dialog>
     </AdminLayout>
 </template>
-
-<style scoped>
-:deep(.p-dialog-header-slot) {
-    font-size: 0.75rem;
-}
-</style>

@@ -8,7 +8,8 @@ import Button from 'primevue/button';
 const router = useRouter();
 
 const form = ref({
-    name: ''
+    name: '',
+    short_code: ''
 });
 
 const isSubmitting = ref(false);
@@ -63,12 +64,21 @@ const addSkill = async () => {
                         <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Module Identity</h3>
                     </div>
 
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">Logical Designation (Module Name)</label>
-                        <input v-model="form.name" type="text" required 
-                            class="premium-input uppercase text-sm placeholder:text-slate-300 w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-800 font-bold tracking-wide" 
-                            placeholder="E.G. GRAMMAR_MODULE_V1">
-                        <p class="text-[9px] text-slate-400 mt-3 ml-4 font-bold uppercase tracking-widest">This identifier will be used system-wide to map assessments</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">Logical Designation (Module Name)</label>
+                            <input v-model="form.name" type="text" required 
+                                class="premium-input uppercase text-sm placeholder:text-slate-300 w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-800 font-bold tracking-wide" 
+                                placeholder="E.G. GRAMMAR_MODULE_V1">
+                            <p class="text-[9px] text-slate-400 mt-3 ml-4 font-bold uppercase tracking-widest">This identifier will be used system-wide</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">Mapping Key (Short Code)</label>
+                            <input v-model="form.short_code" type="text" maxlength="5"
+                                class="premium-input uppercase text-sm placeholder:text-slate-300 w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-800 font-bold tracking-wide" 
+                                placeholder="E.G. R, W, G">
+                            <p class="text-[9px] text-slate-400 mt-3 ml-4 font-bold uppercase tracking-widest">Used for bulk enrollment mapping (e.g., 'r' for reading)</p>
+                        </div>
                     </div>
                 </div>
 

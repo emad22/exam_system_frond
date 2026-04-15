@@ -41,7 +41,9 @@ import AdminPartners from '@/views/admin/Partners/index.vue'
 import AdminPartnerCreate from '@/views/admin/Partners/create.vue'
 import AdminPartnerEdit from '@/views/admin/Partners/edit.vue'
 import AdminPartnerShow from '@/views/admin/Partners/show.vue'
-import AdminPackages from '@/views/admin/Packages.vue'
+import AdminPackagesIndex from '@/views/admin/Packages/index.vue'
+import AdminPackagesCreate from '@/views/admin/Packages/create.vue'
+import AdminPackagesEdit from '@/views/admin/Packages/edit.vue'
 import AdminSystemRequirements from '@/views/admin/SystemRequirements/index.vue'
 import PublicRegisterWizard from '@/views/student/PublicRegisterWizard.vue'
 
@@ -79,8 +81,18 @@ const routes = [
   },
   {
     path: '/admin/packages',
-    name: 'admin.packages',
-    component: AdminPackages
+    name: 'admin.packages.index',
+    component: AdminPackagesIndex
+  },
+  {
+    path: '/admin/packages/create',
+    name: 'admin.packages.create',
+    component: AdminPackagesCreate
+  },
+  {
+    path: '/admin/packages/:id/edit',
+    name: 'admin.packages.edit',
+    component: AdminPackagesEdit
   },
   {
     path: '/admin/students',

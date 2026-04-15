@@ -6,6 +6,7 @@ import api from '@/services/api';
 
 import Button from 'primevue/button';
 import Card from 'primevue/card';
+import Dialog from 'primevue/dialog';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
@@ -22,6 +23,14 @@ const skills = ref([]);
 
 const selectedStudents = ref([]);
 const searchQuery = ref('');
+
+// Bulk Skills State
+const showBulkSkillsModal = ref(false);
+const bulkEmails = ref('');
+const bulkSkills = ref('');
+const bulkFile = ref(null);
+const fileInput = ref(null);
+const isBulkSaving = ref(false);
 
 const filteredStudents = computed(() => {
     if (!searchQuery.value) return students.value;
@@ -106,6 +115,83 @@ const bulkDelete = async () => {
 
 
 
+const handleFileUpload = (e) => {
+    bulkFile.value = e.target.files[0];
+};
+
+const downloadExcelTemplate = async () => {
+    try {
+        const response = await api.get('/admin/students/bulk-skills-export', { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'students_skills_template.xlsx');
+        document.body.appendChild(link);
+        link.click();
+    } catch (err) {
+        console.error('Download error:', err);
+        alert('Failed to download template.');
+    }
+};
+
+const submitBulkSkills = async () => {
+    if (bulkFile.value) {
+        // Upload via Excel
+        const formData = new FormData();
+        formData.append('file', bulkFile.value);
+        isBulkSaving.value = true;
+        
+        try {
+            const res = await api.post('/admin/students/bulk-skills-import', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            alert(res.data.message || 'Skills updated successfully from file.');
+            showBulkSkillsModal.value = false;
+            bulkFile.value = null;
+            if (fileInput.value) fileInput.value.value = '';
+            fetchStudents();
+        } catch (err) {
+            console.error('Import error:', err);
+            alert(err.response?.data?.message || err.response?.data?.error || 'Failed to import file.');
+        } finally {
+            isBulkSaving.value = false;
+        }
+    } else {
+        // Text based update
+        if (!bulkEmails.value || !bulkSkills.value) {
+            alert('Please provide either an Excel file OR emails and short codes.');
+            return;
+        }
+        
+        const emailsArray = bulkEmails.value.split(/[\s,]+/).map(e => e.trim()).filter(e => e);
+        const skillsArray = bulkSkills.value.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(s => s);
+
+        if (emailsArray.length === 0 || skillsArray.length === 0) {
+            alert('Invalid input format for emails or skills.');
+            return;
+        }
+
+        isBulkSaving.value = true;
+        try {
+            const res = await api.post('/admin/students/bulk-skills', {
+                emails: emailsArray,
+                skills: skillsArray
+            });
+            
+            alert(res.data.message || 'Skills updated successfully.');
+            showBulkSkillsModal.value = false;
+            bulkEmails.value = '';
+            bulkSkills.value = '';
+            fetchStudents();
+        } catch (err) {
+            console.error('Bulk skill error:', err);
+            alert(err.response?.data?.message || err.response?.data?.error || 'Failed to update skills.');
+        } finally {
+            isBulkSaving.value = false;
+        }
+    }
+};
+
 const getSourceStyles = (source) => {
     switch (source) {
         case 'wordpress': return 'bg-blue-50 text-blue-600 border-blue-100';
@@ -133,6 +219,7 @@ onMounted(() => {
                 </div>
                 <div class="flex items-center space-x-3">
                     <Button v-if="selectedStudents.length > 0" label="Delete Selected" :badge="selectedStudents.length.toString()" badgeSeverity="danger" icon="pi pi-trash" severity="danger" outlined size="small" @click="bulkDelete" />
+                    <Button label="Bulk Skills" icon="pi pi-tags" severity="secondary" outlined size="small" @click="showBulkSkillsModal = true" />
                     <Button label="Bulk Import (XLS)" icon="pi pi-file-excel" severity="secondary" outlined size="small" @click="router.push('/admin/students/batch')" />
                     <Button label="Register Entity" icon="pi pi-plus" size="small" @click="router.push('/admin/students/create')" />
                 </div>
@@ -222,6 +309,70 @@ onMounted(() => {
         </div>
 
         <!-- Modals Extracted -->
+
+        <!-- Bulk Skills Modal -->
+        <Dialog v-model:visible="showBulkSkillsModal" 
+                header="BULK SKILL ASSIGNMENT" 
+                class="max-w-xl w-full" 
+                modal 
+                pt:header:class="border-b border-slate-50 p-8"
+                pt:content:class="p-8">
+            <div class="space-y-6">
+                
+                <div class="bg-indigo-50 text-indigo-600 p-4 rounded-xl text-xs font-medium border border-indigo-100 flex gap-3">
+                    <i class="pi pi-info-circle mt-0.5"></i>
+                    <div>
+                        Update module assignments either by pasting emails manually, OR by downloading the template, editing fields, and uploading it here.
+                    </div>
+                </div>
+
+                <!-- File Upload Approach -->
+                <div class="space-y-3 p-5 rounded-2xl border border-slate-200 bg-white">
+                    <div class="flex items-center justify-between border-b border-slate-50 pb-3">
+                        <label class="block text-[10px] font-black text-slate-800 uppercase tracking-widest">Excel Synced Update</label>
+                        <Button label="Download Master Sheet" icon="pi pi-download" size="small" severity="info" outlined @click="downloadExcelTemplate" class="text-[10px] uppercase font-black" />
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="w-full relative">
+                            <input type="file" ref="fileInput" @change="handleFileUpload" accept=".xlsx,.xls,.csv"
+                                class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all border border-slate-100 rounded-xl bg-slate-50">
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                        If a file is chosen, it overrides manual inputs below. Make sure columns match the exported template.
+                    </p>
+                </div>
+
+                <div class="flex items-center space-x-4 w-full">
+                    <div class="h-px bg-slate-100 w-full"></div>
+                    <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest flex-shrink-0">OR PUSH MANUALLY</span>
+                    <div class="h-px bg-slate-100 w-full"></div>
+                </div>
+
+                <div class="space-y-2 opacity-60 hover:opacity-100 transition-opacity duration-300">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Identity Emails</label>
+                    <textarea v-model="bulkEmails" 
+                        class="w-full h-24 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                        placeholder="john@example.com, sara@example.com&#10;(comma, space, or newline separated)"></textarea>
+                </div>
+
+                <div class="space-y-2 opacity-60 hover:opacity-100 transition-opacity duration-300">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Module Mapping Keys (Short Codes)</label>
+                    <input v-model="bulkSkills" type="text"
+                        class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-black uppercase text-indigo-600 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                        placeholder="R, W, G (comma separated)">
+                </div>
+
+                <div class="pt-6 border-t border-slate-50 flex justify-end space-x-3">
+                    <Button label="Cancel" outlined severity="secondary" @click="showBulkSkillsModal = false" class="px-8 font-black text-[10px] uppercase tracking-widest" />
+                    <Button :label="isBulkSaving ? 'COMPILING...' : 'COMMIT BULK ASSIGNMENT'" 
+                            :loading="isBulkSaving"
+                            @click="submitBulkSkills" 
+                            class="px-10 bg-indigo-600 border-none font-black text-[10px] uppercase tracking-widest" />
+                </div>
+            </div>
+        </Dialog>
+
     </AdminLayout>
 </template>
 
