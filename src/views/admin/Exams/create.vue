@@ -105,6 +105,7 @@ onMounted(async () => {
                         passage_randomize: !!q.passage_randomize,
                         passage_limit: q.passage_limit,
                         media_path: q.media_path,
+                        media_url: q.media_url,
                          options: (q.options || []).map(o => ({
                             option_text: o.option_text,
                             is_correct: !!o.is_correct
@@ -395,7 +396,7 @@ const saveExam = async () => {
 
         <!-- STEP 1: IDENTITY -->
         <div v-if="currentStep === 1" class="space-y-10 animate-in fade-in zoom-in-95 duration-700">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div class="max-w-3xl mx-auto">
                 <div class="bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-[0_32px_80px_-20px_rgba(0,0,0,0.03)] space-y-12">
                     <div class="space-y-4">
                         <h3 class="text-xl font-black text-slate-800 uppercase tracking-tight">Logical Identity</h3>
@@ -415,44 +416,65 @@ const saveExam = async () => {
                         </div>
                     </div>
                 </div>
-
-                <div class="bg-slate-800 p-12 rounded-[3.5rem] text-white flex flex-col justify-center space-y-12 relative overflow-hidden group">
-                    <div class="absolute -bottom-24 -right-24 w-80 h-80 bg-brand-primary/20 rounded-full blur-3xl group-hover:bg-brand-accent/30 transition-all duration-1000"></div>
-                    <div class="space-y-4">
-                        <h3 class="text-xl font-black uppercase tracking-tight">Environmental Metrics</h3>
-                        <p class="text-[10px] font-bold text-rose-100/60 uppercase tracking-widest leading-relaxed">Configure success threshold parameters.</p>
-                    </div>
-                    <div class="space-y-10">
-                        <div class="space-y-4">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Success Threshold (%)</label>
-                            <InputNumber v-model="form.passing_score" :min="0" :max="100" class="w-full" inputClass="bg-white/5 border-none text-white font-black text-2xl p-6 text-center rounded-3xl" />
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
         <!-- STEP 2: SKILLS SELECTION -->
-        <div v-if="currentStep === 2" class="space-y-12 animate-in fade-in slide-in-from-right-12 duration-700">
-            <div class="text-center space-y-4">
-                 <h2 class="text-3xl font-black text-slate-800 uppercase tracking-tight">Cognitive Modules</h2>
-                 <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">Select the domains to be evaluated in this sequence</p>
+        <div v-if="currentStep === 2" class="relative space-y-16 animate-in fade-in slide-in-from-right-12 duration-700">
+            <!-- Decorative Background Elements -->
+            <div class="absolute -top-24 -left-24 w-96 h-96 bg-brand-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-brand-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+            <div class="text-center space-y-6 relative z-10">
+                 <h2 class="text-4xl font-black text-slate-800 uppercase tracking-tighter">Cognitive Modules</h2>
+                 <p class="text-[12px] font-bold text-slate-400 uppercase tracking-[0.3em] max-w-xl mx-auto leading-relaxed">
+                    Select the strategic domains to be synchronized for this assessment sequence.
+                 </p>
+                 <div class="flex justify-center mt-8">
+                     <div class="bg-white/50 backdrop-blur-md px-6 py-2 rounded-2xl border border-slate-100 flex items-center space-x-4 shadow-sm">
+                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Sequence:</span>
+                         <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">{{ form.selectedSkills.length }} Modules Synchronized</span>
+                     </div>
+                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10 pb-12">
                 <div v-for="skill in availableSkills" :key="skill.id" 
                      @click="toggleSkill(skill.id)"
-                     :class="isSkillSelected(skill.id) ? 'bg-white border-brand-primary shadow-2xl shadow-brand-primary/10' : 'bg-slate-50 border-slate-50 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'"
-                     class="group p-10 rounded-[3rem] border-2 transition-all duration-500 cursor-pointer text-center relative">
-                    <div v-if="isSkillSelected(skill.id)" class="absolute top-6 right-6 text-brand-primary animate-in zoom-in group-hover:scale-110">
-                        <i class="pi pi-check-circle text-xl"></i>
+                     :class="isSkillSelected(skill.id) 
+                        ? 'bg-white border-brand-primary shadow-[0_40px_80px_-15px_rgba(185,28,28,0.15)] ring-1 ring-brand-primary/20 scale-[1.02]' 
+                        : 'bg-white/40 border-slate-100 backdrop-blur-sm grayscale opacity-70 hover:grayscale-0 hover:opacity-100 hover:border-brand-primary/30 hover:scale-[1.01] hover:bg-white'"
+                     class="group p-12 rounded-[4rem] border-2 transition-all duration-700 cursor-pointer text-center relative overflow-hidden">
+                    
+                    <!-- Selection Indicator -->
+                    <div v-if="isSkillSelected(skill.id)" class="absolute top-8 right-8 text-brand-primary animate-in zoom-in duration-500">
+                        <div class="w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                            <i class="pi pi-check text-[10px]"></i>
+                        </div>
                     </div>
-                    <div :class="isSkillSelected(skill.id) ? 'bg-brand-primary text-white rotate-6' : 'bg-white text-slate-300'" 
-                         class="w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-4xl mx-auto mb-8 shadow-sm transition-all duration-700 group-hover:-translate-y-2">
-                         {{ skill.icon || 'ðŸ§ ' }}
+
+                    <!-- Icon Container -->
+                    <div :class="isSkillSelected(skill.id) 
+                            ? 'bg-brand-primary text-white rotate-6 shadow-2xl shadow-brand-primary/30' 
+                            : 'bg-slate-50 text-slate-300 group-hover:rotate-3'" 
+                         class="w-24 h-24 rounded-[2.5rem] flex items-center justify-center text-5xl mx-auto mb-10 shadow-sm transition-all duration-700 group-hover:-translate-y-3 relative z-10">
+                         {{ skill.icon || '🧠' }}
                     </div>
-                    <h4 class="text-sm font-black uppercase tracking-widest">{{ skill.name }}</h4>
-                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-2 italic">{{ skill.levels?.length || 0 }} Tier Matrix Available</p>
+
+                    <div class="space-y-3 relative z-10">
+                        <h4 class="text-sm font-black uppercase tracking-widest text-slate-800">{{ skill.name }}</h4>
+                        <div class="flex flex-col items-center space-y-1">
+                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter italic">
+                                {{ skill.levels?.length || 0 }} Tier Architecture
+                            </span>
+                            <div v-if="isSkillSelected(skill.id)" class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest mt-2 animate-in fade-in slide-in-from-top-1">
+                                Ready for matrixing
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtle Pattern Background -->
+                    <div v-if="isSkillSelected(skill.id)" class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, black 1px, transparent 0); background-size: 20px 20px;"></div>
                 </div>
             </div>
         </div>
@@ -678,7 +700,7 @@ const saveExam = async () => {
                 <div class="space-y-4">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Audio Resource (Optional) / ملف صوتي</label>
                     <div v-if="newQuestion.media_path" class="flex items-center space-x-4 p-4 bg-rose-50 rounded-2xl">
-                         <audio :src="newQuestion.media_url" controls class="h-8 flex-1"></audio>
+                         <audio :key="newQuestion.media_path" :src="newQuestion.media_url" controls class="h-8 flex-1"></audio>
                          <button @click="newQuestion.media_path = null; newQuestion.media_url = null" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm">
                               <i class="pi pi-trash text-xs"></i>
                          </button>
