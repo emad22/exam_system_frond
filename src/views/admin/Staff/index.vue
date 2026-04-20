@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, onMounted, computed } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -112,6 +112,9 @@ onMounted(fetchData);
                                         </div>
                                         <div class="text-xs text-slate-400 mt-0.5">
                                             {{ data.email }}
+                                        </div>
+                                        <div v-if="data.partner" class="text-[9px] font-black text-brand-primary mt-1 uppercase tracking-tighter">
+                                            Partner: {{ data.partner.partner_name }}
                                         </div>
                                     </div>
                                 </div>

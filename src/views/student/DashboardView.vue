@@ -30,9 +30,9 @@ onMounted(fetchDashboard);
 const skills = () => exams.value?.[0]?.skills || [];
 
 const isSkillCompleted = (skillId) => {
-    const latestAttempt = exams.value?.[0]?.latest_attempt;
-    if (!latestAttempt || !latestAttempt.attempt_skills) return false;
-    return latestAttempt.attempt_skills.some(as => as.skill_id === skillId && (as.status === 'completed' || as.status === 'failed'));
+    const exam = exams.value?.[0];
+    if (!exam || !exam.completed_skill_ids) return false;
+    return exam.completed_skill_ids.includes(skillId);
 };
 
 const startSkill = async (skillId) => {
@@ -119,9 +119,57 @@ const logout = () => {
                     </div>
                     <div class="flex flex-col space-y-2">
                         <h2 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-                            مرحباً، <span class="text-brand-primary">{{ student?.name?.split(' ')[0] || 'Candidate' }}</span>
+                            Hi, <span class="text-brand-primary">{{ student?.user?.first_name || 'Candidate' }}</span>
                         </h2>
                         <p class="text-slate-500 font-medium text-lg italic opacity-80 uppercase tracking-tighter">"Knowledge is power. Select your cognitive module below."</p>
+                    </div>
+                </section>
+
+                <!-- Student Profile Matrix -->
+                <section class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div class="lg:col-span-3 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center md:items-start space-y-8 md:space-y-0 md:space-x-12 relative overflow-hidden group">
+                        <div class="absolute -right-10 -top-10 w-40 h-40 bg-brand-primary/5 rounded-full blur-3xl transition-all group-hover:scale-150"></div>
+                        
+                        <!-- Identity Avatar -->
+                        <div class="w-24 h-24 rounded-3xl bg-slate-900 text-white flex items-center justify-center text-4xl font-black shadow-xl shrink-0">
+                            {{ student?.user?.first_name?.[0] || 'S' }}
+                        </div>
+
+                        <div class="flex-1 space-y-6 text-center md:text-left">
+                            <div class="space-y-1">
+                                <p class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Institutional Identity</p>
+                                <h3 class="text-3xl font-black text-slate-800 tracking-tight uppercase">{{ student?.user?.first_name }} {{ student?.user?.last_name }}</h3>
+                            </div>
+
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Code</p>
+                                    <p class="text-xs font-black uppercase text-brand-primary">{{ student?.student_code || 'UNCODED' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                                    <Tag value="ACTIVE" severity="success" class="text-[8px] px-2 font-black tracking-widest" />
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Gender</p>
+                                    <p class="text-xs font-black uppercase text-slate-600">{{ student?.user?.gender || 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Category</p>
+                                    <p class="text-xs font-black uppercase text-brand-accent">{{ student?.category?.name || 'Academic' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Small Stat Card -->
+                    <div class="bg-brand-primary rounded-[2.5rem] p-10 text-white flex flex-col justify-between shadow-lg shadow-rose-100 relative overflow-hidden">
+                        <div class="absolute -left-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+                        <p class="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] relative z-10">Evaluations Finished</p>
+                        <div class="relative z-10">
+                            <span class="text-6xl font-black italic tracking-tighter">{{ exams?.[0]?.completed_skill_ids?.length || 0 }}</span>
+                            <span class="text-lg font-bold ml-2 opacity-60">/ {{ (exams?.[0]?.skills?.length || 0) }}</span>
+                        </div>
                     </div>
                 </section>
 

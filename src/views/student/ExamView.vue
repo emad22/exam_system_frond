@@ -25,6 +25,42 @@ const questionSubmitted = ref(false);
 const errorMsg = ref('');
 const checkedRequirements = ref([]);
 const autoVerifiedIds = ref([]);
+const audioRef = ref(null);
+const isAudioPlaying = ref(false);
+
+const syncAudioState = () => {
+    if (audioRef.value) isAudioPlaying.value = !audioRef.value.paused;
+};
+
+const toggleAudioManual = async () => {
+    if (!audioRef.value) {
+        console.warn('Audio reference missing');
+        return;
+    }
+    
+    try {
+        if (audioRef.value.paused) {
+            await audioRef.value.play();
+        } else {
+            audioRef.value.pause();
+        }
+    } catch (err) {
+        console.error('Audio playback failed:', err);
+        // Fallback: Try to force reload if it's a structural error
+        if (err.name === 'NotAllowedError') {
+            alert('Browser blocked audio. Please click play again.');
+        } else {
+            audioRef.value.load();
+            audioRef.value.play().catch(e => console.error('Double failure:', e));
+        }
+    }
+    syncAudioState();
+};
+
+const onAudioError = (e) => {
+    console.error('Audio element error event:', e);
+    isPlaying.value = false;
+};
 
 const canStart = computed(() => {
     const mandatoryIds = systemRequirements.value
@@ -84,7 +120,7 @@ const fetchData = async () => {
         systemRequirements.value = reqRes.data;
         autoVerifyRequirements(reqRes.data);
         
-        if (attempt.value.status === 'completed') {
+        if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
             router.push(`/exam/${attemptId}/result`);
             return;
         }
@@ -118,6 +154,7 @@ const fetchNextBatch = async () => {
             questions.value = res.data.questions;
             currentIndex.value = 0;
             questionSubmitted.value = false;
+            isAudioPlaying.value = false; // Reset audio state for new question
             
             answers.value = questions.value.map(q => ({
                 question_id: q.id,
@@ -149,6 +186,7 @@ const advanceQuestion = async () => {
     questionSubmitted.value = false;
     if (currentIndex.value < questions.value.length - 1) {
         currentIndex.value++;
+        isAudioPlaying.value = false; // Reset audio state
         window.scrollTo(0, 0);
     } else {
         await submitCurrentBatch();
@@ -400,7 +438,7 @@ onMounted(fetchData);
                 </div>
 
                 <!-- Right Pane: Question & Answers -->
-                <div :class="{'bg-white': !currentQ.passage_content, 'bg-slate-50/30': currentQ.passage_content}" class="overflow-y-auto p-12 md:p-24 flex flex-col items-center justify-start animate-in slide-in-from-right-12 duration-1000">
+                <div :class="{'bg-white': !currentQ.passage_content, 'bg-slate-50/30': currentQ.passage_content}" class="overflow-y-auto p-12 md:p-24 flex flex-col items-center justify-start relative">
                     <div class="w-full max-w-2xl bg-white p-12 md:p-16 rounded-[3.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.03)] border border-slate-100">
                         
                         <!-- Question Header -->
@@ -421,17 +459,33 @@ onMounted(fetchData);
                             </h2>
 
                             <!-- Audio Player -->
-                            <div v-if="currentQ.media_url" class="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-sm flex flex-col space-y-6 animate-in slide-in-from-top-6 duration-700">
+                            <div v-if="currentQ.media_url" 
+                                class="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-sm flex flex-col space-y-6 relative z-[9999]"
+                                style="pointer-events: all !important;">
                                 <div class="flex items-center justify-between">
                                      <div class="flex items-center space-x-4">
-                                          <div class="w-12 h-12 bg-white text-brand-primary rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
-                                              <i class="pi pi-volume-up text-xl"></i>
+                                          <div class="w-12 h-12 bg-white text-brand-primary rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 cursor-pointer hover:scale-105 transition-transform"
+                                               @click="toggleAudioManual">
+                                              <i :class="isAudioPlaying ? 'pi pi-pause' : 'pi pi-play'" class="text-xl"></i>
                                           </div>
-                                          <span class="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">Audio Transceiver</span>
+                                          <div>
+                                              <span class="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] block">Audio Transceiver</span>
+                                              <span v-if="!isAudioPlaying" class="text-[8px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Tap icon to play</span>
+                                          </div>
                                      </div>
-                                     <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest italic opacity-60">High-Fidelity Stream</span>
+                                     <div class="flex items-center space-x-3">
+                                         <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest italic opacity-60">Manual Override Active</span>
+                                         <div v-if="isAudioPlaying" class="w-2 h-2 bg-rose-500 rounded-full animate-ping"></div>
+                                     </div>
                                 </div>
-                                <audio :src="currentQ.media_url" controls class="w-full h-12 rounded-full opacity-90 hover:opacity-100 transition-opacity"></audio>
+                                <audio ref="audioRef" 
+                                       :key="currentQ.id" 
+                                       :src="currentQ.media_url" 
+                                       @play="isAudioPlaying = true" 
+                                       @pause="isAudioPlaying = false"
+                                       @error="onAudioError"
+                                       class="w-full h-12 rounded-full relative z-[10000]"
+                                       style="pointer-events: all !important;"></audio>
                             </div>
                         </div>
 
@@ -535,14 +589,14 @@ onMounted(fetchData);
                                 <div class="flex flex-col">
                                     <span class="text-[8px] font-black text-slate-300 uppercase tracking-[0.4em] mb-1">Index Point</span>
                                     <div class="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] italic">
-                                        سؤال <span class="text-brand-primary">{{ displayNumber }}</span> من <span class="text-slate-400">{{ displayTotal }}</span>
+                                        Question <span class="text-brand-primary">{{ displayNumber }}</span> of <span class="text-slate-400">{{ displayTotal }}</span>
                                     </div>
                                 </div>
                                 <button @click="submitAnswer"
                                     :disabled="(!answers[currentIndex]?.option_id && !answers[currentIndex]?.text_answer) || !isWordCountValid"
                                     class="flex items-center gap-4 px-12 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.3em] ml-[0.3em] transition-all duration-500 shadow-[0_20px_50px_rgba(159,18,57,0.15)] hover:shadow-[0_25px_60px_rgba(159,18,57,0.25)] hover:-translate-y-1 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none bg-brand-primary text-white">
                                     <i class="pi pi-check-circle text-base"></i>
-                                    <span>تأكيد الإجابة</span>
+                                    <span>Confirm Response</span>
                                 </button>
                             </div>
 
@@ -558,7 +612,7 @@ onMounted(fetchData);
                                         : 'bg-brand-primary shadow-brand-primary/20'"
                                     class="flex items-center gap-4 px-12 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.3em] ml-[0.3em] text-white shadow-2xl hover:-translate-y-1 active:scale-95 transition-all duration-500 disabled:opacity-50">
                                     <div v-if="isSubmittingBatch" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-                                    <span>{{ isLastQuestion ? 'إنهاء المهارة ➜' : 'السؤال التالي ➜' }}</span>
+                                    <span>{{ isLastQuestion ? 'Complete Domain ➜' : 'Next Question ➜' }}</span>
                                 </button>
                             </div>
                         </div>

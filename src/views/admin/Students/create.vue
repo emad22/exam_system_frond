@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -194,7 +194,7 @@ const filteredExams = computed(() => {
                         </Card>
 
                         <!-- Module Discovery Matrix -->
-                        <Card class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden">
+                        <Card v-if="form.package_id === 4" class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden animate-in fade-in zoom-in duration-500">
                             <template #content>
                                 <div class="p-4 space-y-6">
                                     <div class="flex items-center justify-between mb-4">

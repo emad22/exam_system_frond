@@ -49,7 +49,15 @@ const fetchStaff = async () => {
     loading.value = true;
     try {
         const res = await api.get(`/admin/staff/${staffId}`);
-        form.value = { ...res.data, password: '' };
+        const data = res.data;
+        // Map user and partner data to the flat form structure
+        form.value = { 
+            ...data, 
+            password: '',
+            partner_name: data.partner?.partner_name || '',
+            website: data.partner?.website || '',
+            note: data.partner?.note || ''
+        };
     } catch (err) {
         console.error('Failed to load identity', err);
         router.push('/admin/staff');
@@ -76,7 +84,12 @@ const saveStaff = async () => {
     }
 };
 
-onMounted(fetchStaff);
+onMounted(() => {
+    fetchStaff();
+    if (route.query.role && !isEditing.value) {
+        form.value.role = route.query.role;
+    }
+});
 </script>
 
 <template>
@@ -135,8 +148,19 @@ onMounted(fetchStaff);
 
                                             <div class="flex flex-col">
                                                 <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Security Key (Password)</label>
-                                                <InputText v-model="form.password" type="password" :required="!isEditing" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="w-full shadow-sm rounded-xl font-mono" />
+                                                <InputText v-model="form.password" type="password" :required="!isEditing" placeholder="••••••••" class="w-full shadow-sm rounded-xl font-mono" />
                                                 <p v-if="isEditing" class="text-xs text-slate-400 mt-2 font-bold italic pl-2">Leave blank to maintain current encryption</p>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div class="flex flex-col">
+                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Global Phone</label>
+                                                    <InputText v-model="form.phone" placeholder="+XX XXX XXX XXXX" class="w-full shadow-sm rounded-xl" />
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">National Origin</label>
+                                                    <InputText v-model="form.country" placeholder="EGYPT" class="w-full shadow-sm rounded-xl uppercase" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -168,39 +192,28 @@ onMounted(fetchStaff);
 
                         <!-- Partner Specific Details -->
                         <div v-if="form.role === 'partner'" class="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500">
-                            <Card class="border border-slate-100 shadow-sm rounded-[2.5rem] bg-indigo-50/30">
+                            <Card class="border border-slate-100 shadow-sm rounded-[2.5rem] bg-indigo-50/10">
                                 <template #content>
                                     <div class="space-y-8 p-4">
                                         <div class="flex items-center space-x-4">
                                             <div class="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Partner Profile Details</h3>
+                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Institutional Partner Profile</h3>
                                         </div>
 
                                         <div class="space-y-8">
                                             <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Company / Organization Name</label>
-                                                <InputText v-model="form.partner_name" placeholder="Enter Company Name" class="w-full shadow-sm rounded-xl uppercase" />
-                                            </div>
-
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Phone Number</label>
-                                                    <InputText v-model="form.phone" placeholder="+XX XXX XXX XXXX" class="w-full shadow-sm rounded-xl" />
-                                                </div>
-                                                <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Country</label>
-                                                    <InputText v-model="form.country" placeholder="Egypt" class="w-full shadow-sm rounded-xl uppercase" />
-                                                </div>
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Organizational Identity</label>
+                                                <InputText v-model="form.partner_name" placeholder="ENTER PARTNER NAME" class="w-full shadow-sm rounded-xl uppercase" />
                                             </div>
 
                                             <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Website</label>
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Digital Portal (Website)</label>
                                                 <InputText v-model="form.website" placeholder="https://www.example.com" class="w-full shadow-sm rounded-xl" />
                                             </div>
                                             
                                             <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Additional Notes</label>
-                                                <InputText v-model="form.note" placeholder="Any specific contract details or notes..." class="w-full shadow-sm rounded-xl" />
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Strategic Notes</label>
+                                                <InputText v-model="form.note" placeholder="INTERNAL PARTNERSHIP METADATA" class="w-full shadow-sm rounded-xl" />
                                             </div>
                                         </div>
                                     </div>

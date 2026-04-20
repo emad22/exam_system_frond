@@ -257,6 +257,8 @@ const newQuestion = ref({ type: 'mcq', content: '', points: 1, options: [{option
 const passageLimit = ref(5);
 const isUploadingMedia = ref(false);
 
+const isAudioPlayingInModal = ref(false);
+
 const handleMediaUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -266,7 +268,14 @@ const handleMediaUpload = async (event) => {
         const res = await api.post('/admin/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         newQuestion.value.media_path = res.data.path;
         newQuestion.value.media_url = res.data.url;
+        // Reset player state
+        isAudioPlayingInModal.value = false;
     } finally { isUploadingMedia.value = false; }
+};
+
+const handleAudioError = (e) => {
+    console.error('Modal audio error:', e);
+    toast.add({ severity: 'error', summary: 'Audio Error', detail: 'The attached audio protocol failed to initialize.', life: 3000 });
 };
 
 const openQuestionBuilder = (skillId, levelNum, isPassage = false) => {
@@ -699,11 +708,25 @@ const saveExam = async () => {
                 <!-- 3. Audio Context (Optional) -->
                 <div class="space-y-4">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Audio Resource (Optional) / ملف صوتي</label>
-                    <div v-if="newQuestion.media_path" class="flex items-center space-x-4 p-4 bg-rose-50 rounded-2xl">
-                         <audio :key="newQuestion.media_path" :src="newQuestion.media_url" controls class="h-8 flex-1"></audio>
-                         <button @click="newQuestion.media_path = null; newQuestion.media_url = null" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm">
-                              <i class="pi pi-trash text-xs"></i>
-                         </button>
+                    <div v-if="newQuestion.media_path" class="flex flex-col space-y-4 p-6 bg-rose-50 rounded-[2rem] border border-brand-primary/5 shadow-sm">
+                         <div class="flex items-center justify-between">
+                             <div class="flex items-center space-x-3">
+                                 <div class="w-8 h-8 rounded-xl bg-brand-primary text-white flex items-center justify-center shadow-lg">
+                                     <i :class="isAudioPlayingInModal ? 'pi pi-pause' : 'pi pi-play'"></i>
+                                 </div>
+                                 <span class="text-[9px] font-black text-brand-primary uppercase tracking-widest">Protocol Linked</span>
+                             </div>
+                             <button @click="newQuestion.media_path = null; newQuestion.media_url = null" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm">
+                                  <i class="pi pi-trash text-xs"></i>
+                             </button>
+                         </div>
+                         <audio :key="newQuestion.media_path" 
+                                :src="newQuestion.media_url" 
+                                @play="isAudioPlayingInModal = true" 
+                                @pause="isAudioPlayingInModal = false"
+                                @error="handleAudioError"
+                                controls 
+                                class="h-10 w-full rounded-full bg-white/50"></audio>
                     </div>
                     <div v-else class="relative group">
                          <input type="file" @change="handleMediaUpload" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />

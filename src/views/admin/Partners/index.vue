@@ -21,9 +21,10 @@ const filteredPartners = computed(() => {
     const query = searchQuery.value.toLowerCase();
     return partners.value.filter(p => {
         const name = (p.partner_name || '').toLowerCase();
-        const contact = `${p.fName_contact || ''} ${p.lName_contact || ''}`.toLowerCase();
-        const email = (p.email || '').toLowerCase();
-        return name.includes(query) || contact.includes(query) || email.includes(query);
+        const contact = `${p.user?.first_name || ''} ${p.user?.last_name || ''}`.toLowerCase();
+        const email = (p.user?.email || '').toLowerCase();
+        const website = (p.website || '').toLowerCase();
+        return name.includes(query) || contact.includes(query) || email.includes(query) || website.includes(query);
     });
 });
 
@@ -50,12 +51,12 @@ const deletePartner = async (id) => {
 };
 
 const toggleHold = async (partner) => {
-    const action = partner.is_active ? 'hold' : 'unhold';
+    const action = partner.user?.is_active ? 'hold' : 'unhold';
     if (!confirm(`Are you sure you want to ${action} this partner?`)) return;
 
     try {
         await api.post(`/admin/partners/${partner.id}/${action}`);
-        partner.is_active = !partner.is_active;
+        if (partner.user) partner.user.is_active = !partner.user.is_active;
     } catch (err) {
         console.error(err);
         alert(`Failed to ${action} partner`);
@@ -77,7 +78,7 @@ onMounted(fetchPartners);
                 </div>
                 <Button label="Authorize Partner" icon="pi pi-plus" 
                     class="px-8 py-3 rounded-2xl bg-brand-primary border-none shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
-                    @click="router.push('/admin/partners/create')" />
+                    @click="router.push('/admin/staff/create?role=partner')" />
             </div>
 
             <div v-if="loading" class="flex flex-col items-center justify-center py-32 space-y-4">
@@ -107,7 +108,7 @@ onMounted(fetchPartners);
                                          <i class="pi pi-briefcase text-lg"></i>
                                      </div>
                                      <div>
-                                         <div @click="router.push(`/admin/Partners/${data.id}/show`)" 
+                                         <div @click="router.push(`/admin/staff/${data.user_id}/edit`)" 
                                               class="font-black text-slate-800 hover:text-brand-primary cursor-pointer uppercase tracking-tight transition-colors">
                                               {{ data.partner_name }}
                                          </div>
@@ -120,28 +121,28 @@ onMounted(fetchPartners);
                         <Column header="Primary Liaison" style="min-width: 200px">
                             <template #body="{ data }">
                                 <div class="flex flex-col space-y-1">
-                                    <span class="font-black text-slate-700 text-[10px] uppercase tracking-tight">{{ data.fName_contact }} {{ data.lName_contact }}</span>
-                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ data.phone || 'NO_CONTACT_DATA' }}</span>
+                                    <span class="font-black text-slate-700 text-[10px] uppercase tracking-tight">{{ data.user?.first_name }} {{ data.user?.last_name }}</span>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ data.user?.phone || 'NO_CONTACT_DATA' }}</span>
                                 </div>
                             </template>
                         </Column>
 
                         <Column header="Digital Identifier" style="min-width: 150px">
                             <template #body="{ data }">
-                                <span class="text-[10px] font-bold text-slate-500 lowercase underline decoration-slate-200 underline-offset-4">{{ data.email || '---' }}</span>
+                                <span class="text-[10px] font-bold text-slate-500 lowercase underline decoration-slate-200 underline-offset-4">{{ data.user?.email || '---' }}</span>
                             </template>
                         </Column>
 
                         <Column header="Jurisdiction" style="min-width: 120px" class="text-center">
                             <template #body="{ data }">
-                                <Tag :value="data.country || 'Global'" severity="secondary" class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
+                                <Tag :value="data.user?.country || 'Global'" severity="secondary" class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
                             </template>
                         </Column>
 
                         <Column header="Status" style="min-width: 120px" class="text-center">
                             <template #body="{ data }">
-                                <Tag :value="data.is_active ? 'ACTIVE' : 'ON_HOLD'" 
-                                     :severity="data.is_active ? 'success' : 'warning'" 
+                                <Tag :value="data.user?.is_active ? 'ACTIVE' : 'ON_HOLD'" 
+                                     :severity="data.user?.is_active ? 'success' : 'warning'" 
                                      class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
                             </template>
                         </Column>
@@ -149,9 +150,9 @@ onMounted(fetchPartners);
                         <Column :exportable="false" style="min-width: 220px" class="text-right">
                             <template #body="{ data }">
                                 <div class="flex items-center justify-end space-x-2">
-                                     <Button :icon="data.is_active ? 'pi pi-pause' : 'pi pi-play'" text severity="warning" size="small" @click="toggleHold(data)" v-tooltip.top="data.is_active ? 'Place on Hold' : 'Reactivate'" />
-                                     <Button icon="pi pi-eye" text severity="info" size="small" @click="router.push(`/admin/Partners/${data.id}/show`)" />
-                                     <Button icon="pi pi-pencil" text severity="secondary" size="small" @click="router.push(`/admin/Partners/${data.id}/edit`)" />
+                                     <Button :icon="data.user?.is_active ? 'pi pi-pause' : 'pi pi-play'" text severity="warning" size="small" @click="toggleHold(data)" v-tooltip.top="data.user?.is_active ? 'Place on Hold' : 'Reactivate'" />
+                                     <Button icon="pi pi-eye" text severity="info" size="small" @click="router.push(`/admin/staff/${data.user_id}/edit`)" />
+                                     <Button icon="pi pi-pencil" text severity="secondary" size="small" @click="router.push(`/admin/staff/${data.user_id}/edit`)" />
                                      <Button icon="pi pi-trash" text severity="danger" size="small" @click="deletePartner(data.id)" />
                                 </div>
                             </template>

@@ -93,6 +93,19 @@ const deleteStudent = async (student) => {
     }
 };
 
+const resetProgress = async (student) => {
+    const fullName = `${student.user?.first_name} ${student.user?.last_name}`;
+    if (!confirm(`CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh.`)) return;
+
+    try {
+        await api.post(`/admin/students/${student.id}/reset-attempts`);
+        alert('Candidate progress has been successfully reset.');
+        fetchStudents();
+    } catch (err) {
+        alert(err.response?.data?.error || 'Failed to reset progress.');
+    }
+};
+
 const bulkDelete = async () => {
     if (!selectedStudents.value.length) return;
     if (!confirm(`Are you sure you want to delete ${selectedStudents.value.length} selected students? This action cannot be undone.`)) return;
@@ -260,9 +273,10 @@ onMounted(() => {
                         <Column :exportable="false" style="min-width: 180px" class="text-right">
                             <template #body="{ data }">
                                 <div class="flex items-center justify-end space-x-2">
-                                    <Button icon="pi pi-eye" text severity="info" size="small" @click="openView(data)" />
-                                    <Button icon="pi pi-pencil" text severity="warning" size="small" @click="openEdit(data)" />
-                                    <Button icon="pi pi-trash" text severity="danger" size="small" @click="deleteStudent(data)" />
+                                    <Button icon="pi pi-eye" text severity="info" size="small" @click="openView(data)" v-tooltip.top="'View Profile'" />
+                                    <Button icon="pi pi-refresh" text severity="danger" size="small" @click="resetProgress(data)" v-tooltip.top="'Reset Exam Progress'" />
+                                    <Button icon="pi pi-pencil" text severity="warning" size="small" @click="openEdit(data)" v-tooltip.top="'Edit Details'" />
+                                    <Button icon="pi pi-trash" text severity="danger" size="small" @click="deleteStudent(data)" v-tooltip.top="'Delete Identity'" />
                                 </div>
                             </template>
                         </Column>
