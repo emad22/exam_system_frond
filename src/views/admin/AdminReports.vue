@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -47,14 +47,14 @@ onMounted(fetchReports);
         <div class="flex space-x-3">
             <input v-model="search" type="text" placeholder="Search student or exam..."
                 class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm w-64">
-            <button class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 shadow-sm transition text-sm">
+            <button class="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-secondary shadow-sm transition text-sm">
                 Export PDF
             </button>
         </div>
     </div>
 
     <div v-if="loading" class="text-center py-20">
-        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-primary mx-auto"></div>
     </div>
 
     <div v-else>
@@ -72,7 +72,7 @@ onMounted(fetchReports);
                 <tbody class="divide-y divide-gray-50 text-sm">
                     <tr v-for="attempt in filtered()" :key="attempt.id" class="hover:bg-gray-50 transition">
                         <td class="p-4 pl-6 flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                            <div class="w-9 h-9 rounded-full bg-rose-100 text-brand-secondary flex items-center justify-center font-bold text-sm flex-shrink-0">
                                 {{ attempt.student?.first_name?.[0] || 'S' }}{{ attempt.student?.last_name?.[0] || '' }}
                             </div>
                             <div>
@@ -83,7 +83,7 @@ onMounted(fetchReports);
                         <td class="p-4 font-medium text-gray-700">{{ attempt.exam?.title }}</td>
                         <td class="p-4 text-center">
                             <span :class="scoreColor(attempt.overall_score)" class="text-xl font-black">
-                                {{ attempt.overall_score !== null ? attempt.overall_score + '%' : '—' }}
+                                {{ attempt.overall_score !== null ? attempt.overall_score + '%' : 'â€”' }}
                             </span>
                         </td>
                         <td class="p-4 text-center">
@@ -101,10 +101,11 @@ onMounted(fetchReports);
         </div>
 
         <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 p-16 text-center">
-            <div class="text-6xl mb-4">📈</div>
+            <div class="text-6xl mb-4">ðŸ“ˆ</div>
             <h3 class="text-xl font-bold text-gray-800 mb-2">No Completed Exams Yet</h3>
             <p class="text-gray-500 max-w-sm mx-auto">Reports will appear here once students complete their placement tests.</p>
         </div>
     </div>
   </AdminLayout>
 </template>
+

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -71,7 +71,7 @@ onMounted(fetchRequirements);
                 </div>
                 <div class="flex items-center space-x-3">
                     <Button label="Define Requirement" icon="pi pi-plus" 
-                        class="px-8 py-3 rounded-2xl bg-indigo-600 border-none shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
+                        class="px-8 py-3 rounded-2xl bg-brand-primary border-none shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
                         @click="router.push('/admin/system-requirements/create')" />
                 </div>
             </div>
@@ -166,3 +166,4 @@ onMounted(fetchRequirements);
     animation: slide-in-bottom 0.8s ease-out;
 }
 </style>
+

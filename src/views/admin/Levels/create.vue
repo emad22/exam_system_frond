@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -69,9 +69,9 @@ const saveLevel = async () => {
                          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Level provisioning matrix</p>
                     </div>
                 </div>
-                <div class="hidden md:flex items-center space-x-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-                    <div class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                    <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Adaptive Logic Engine</span>
+                <div class="hidden md:flex items-center space-x-2 bg-rose-50 px-4 py-2 rounded-2xl border border-indigo-100">
+                    <div class="w-2 h-2 bg-brand-primary rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">Adaptive Logic Engine</span>
                 </div>
             </div>
 
@@ -89,7 +89,7 @@ const saveLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-tag text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Classification</h3>
@@ -124,7 +124,7 @@ const saveLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-chart-bar text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Performance Metrics</h3>
@@ -141,7 +141,7 @@ const saveLevel = async () => {
                                             </div>
                                             <div class="flex flex-col">
                                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Pass Threshold (%)</label>
-                                                <InputNumber v-model="form.pass_threshold" suffix="%" class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-indigo-600" />
+                                                <InputNumber v-model="form.pass_threshold" suffix="%" class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-brand-primary" />
                                             </div>
                                         </div>
                                     </div>
@@ -155,7 +155,7 @@ const saveLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-cog text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Settings</h3>
@@ -173,7 +173,7 @@ const saveLevel = async () => {
                             </Card>
 
                             <div class="pt-4">
-                                <Button type="submit" label="Deploy Configuration" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
+                                <Button type="submit" label="Deploy Configuration" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
                             </div>
                         </div>
 
@@ -204,3 +204,4 @@ const saveLevel = async () => {
     animation: slide-in-bottom 0.8s ease-out;
 }
 </style>
+

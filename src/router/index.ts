@@ -290,4 +290,21 @@ const router = createRouter({
   routes
 })
 
-export default router
+// Global Navigation Guard
+router.beforeEach((to, from, next) => {
+    const token = localStorage.getItem('token');
+    const publicPages = ['/login', '/register', '/parent'];
+    const authRequired = !publicPages.includes(to.path);
+
+    if (authRequired && !token) {
+        return next('/login');
+    }
+
+    if (token && publicPages.includes(to.path) && to.path !== '/parent') {
+        return next('/admin'); 
+    }
+
+    next();
+});
+
+export default router

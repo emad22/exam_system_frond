@@ -11,6 +11,7 @@ import Tag from 'primevue/tag';
 import Card from 'primevue/card';
 import { useToast } from 'primevue/usetoast';
 import Toast from 'primevue/toast';
+import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
 const toast = useToast();
@@ -62,19 +63,24 @@ onMounted(fetchCategories);
         <Toast />
         <div class="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-24 mt-8 px-4 md:px-12">
             
-            <!-- Header Section -->
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-6 md:space-y-0">
+            <!-- Standardized Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 md:space-y-0">
                 <div>
                     <h1 class="text-3xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Assessment Tiers</h1>
-                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Classification Registry</p>
+                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Classification and Lifecycle Management</p>
                 </div>
                 <Button label="Register Category" icon="pi pi-plus" 
-                    class="px-8 py-3 rounded-2xl bg-indigo-600 border-none shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
+                    class="px-8 py-3 rounded-2xl bg-brand-primary border-none shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
                     @click="router.push('/admin/exam-categories/create')" />
             </div>
 
+            <div v-if="loading" class="flex flex-col items-center justify-center py-32 space-y-4">
+                <ProgressSpinner />
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Querying Classification Registry...</p>
+            </div>
+
             <!-- Registry Table Card -->
-            <Card class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden mt-6">
+            <Card v-else class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
                 <template #content>
                     <DataTable :value="filteredCategories" dataKey="id" paginator :rows="10" 
                         class="p-datatable-sm text-sm" responsiveLayout="scroll">
@@ -82,63 +88,63 @@ onMounted(fetchCategories);
                         <template #header>
                             <div class="flex justify-end p-2 pb-4">
                                 <span class="relative">
-                                    <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                                    <InputText v-model="searchQuery" placeholder="Search categories..." class="pl-10 w-full md:w-80 shadow-sm rounded-xl" />
+                                    <i class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 z-10" />
+                                    <InputText v-model="searchQuery" placeholder="Filter by name, slug or metadata..." class="pl-12 w-full md:w-96 shadow-sm rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white text-xs font-bold uppercase tracking-tight" />
                                 </span>
                             </div>
                         </template>
 
-                        <Column header="Classification Info" style="min-width: 250px">
+                        <Column header="Institutional Entity" style="min-width: 280px">
                             <template #body="{ data }">
-                                <div class="flex items-center space-x-4">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
-                                        {{ data.name[0] }}
+                                <div class="flex items-center space-x-6 py-2">
+                                    <div class="w-12 h-12 rounded-2xl bg-slate-50 text-brand-primary flex items-center justify-center font-black text-lg border border-slate-100 shadow-sm group-hover:bg-brand-primary group-hover:text-white transition-all">
+                                        {{ data.name[0].toUpperCase() }}
                                     </div>
                                     <div>
-                                        <div class="font-bold text-slate-700 uppercase tracking-tight">
+                                        <div class="font-black text-slate-800 uppercase tracking-tight leading-none mb-1.5">
                                             {{ data.name }}
                                         </div>
-                                        <div class="text-xs text-slate-400 mt-0.5">
-                                            {{ data.slug }} • ID: {{ data.id }}
+                                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] italic opacity-80">
+                                            Ref: {{ data.slug }} • Registry ID: {{ data.id }}
                                         </div>
                                     </div>
                                 </div>
                             </template>
                         </Column>
 
-                        <Column header="Metadata" style="min-width: 300px">
+                        <Column header="Institutional Narrative" style="min-width: 350px">
                             <template #body="{ data }">
                                 <p class="text-xs text-slate-500 font-medium leading-relaxed italic line-clamp-2">
-                                    {{ data.description || 'No descriptive context assigned to this tier.' }}
+                                    {{ data.description || 'No descriptive narrative has been assigned to this classification tier.' }}
                                 </p>
                             </template>
                         </Column>
 
-                        <Column header="Capacity" style="min-width: 100px" class="text-center">
+                        <Column header="Logic Density" style="width: 140px" class="text-center">
                             <template #body="{ data }">
-                                <Tag :value="data.exams_count + ' Exams'" severity="info" class="text-[10px] uppercase tracking-wider" />
+                                <Tag :value="data.exams_count + ' ACTIVE MATRICES'" class="text-[9px] font-black uppercase tracking-widest bg-rose-50 text-brand-primary border border-brand-primary/5 px-4 py-1.5 rounded-xl shadow-sm" />
                             </template>
                         </Column>
 
-                        <Column header="Status" style="min-width: 120px" class="text-center">
+                        <Column header="Operational Status" style="width: 140px" class="text-center">
                             <template #body="{ data }">
-                                <Tag :value="data.is_active ? 'Active' : 'Archived'" 
-                                     :severity="data.is_active ? 'success' : 'danger'" 
-                                     class="text-[10px] uppercase tracking-wider" />
+                                <Tag :value="data.is_active ? 'ENABLED' : 'ARCHIVED'" 
+                                     :severity="data.is_active ? 'success' : 'secondary'" 
+                                     class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
                             </template>
                         </Column>
 
-                        <Column :exportable="false" style="min-width: 150px" class="text-right">
+                        <Column :exportable="false" style="min-width: 150px" class="text-right pr-6">
                             <template #body="{ data }">
                                 <div class="flex items-center justify-end space-x-2">
-                                    <Button icon="pi pi-pencil" outlined rounded severity="warning" size="small" @click="router.push(`/admin/exam-categories/${data.id}/edit`)" />
-                                    <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="deleteCategory(data.id)" />
+                                    <Button icon="pi pi-pencil" text severity="secondary" @click="router.push(`/admin/exam-categories/${data.id}/edit`)" />
+                                    <Button icon="pi pi-trash" text severity="danger" @click="deleteCategory(data.id)" />
                                 </div>
                             </template>
                         </Column>
 
                         <template #empty>
-                            <div class="p-8 text-center text-slate-400">No categories discovered in system registry.</div>
+                            <div class="p-16 text-center text-slate-300 font-bold uppercase tracking-widest text-xs italic">No classification discovery data in operational registry.</div>
                         </template>
                     </DataTable>
                 </template>
@@ -148,36 +154,20 @@ onMounted(fetchCategories);
 </template>
 
 <style scoped>
-.p-datatable-custom :deep(.p-datatable-thead > tr > th) {
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+:deep(.p-datatable-thead > tr > th) {
     background: #fbfcfe;
     border-bottom: 2px solid #f1f5f9;
-    padding: 2rem 1rem;
+    padding: 1.5rem 1rem;
     color: #94a3b8;
     font-size: 10px;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.2em;
 }
-
-.p-datatable-custom :deep(.p-datatable-tbody > tr) {
-    border-bottom: 1px solid #f8fafc;
-    transition: all 0.2s ease;
-}
-
-.p-datatable-custom :deep(.p-datatable-tbody > tr:hover) {
+:deep(.p-datatable-tbody > tr:hover) {
     background: #fbfcfe;
-}
-
-.p-datatable-custom :deep(.p-datatable-tbody > tr > td) {
-    padding: 1rem;
-}
-
-@keyframes slide-in-bottom {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-in {
-    animation: slide-in-bottom 0.8s ease-out;
 }
 </style>

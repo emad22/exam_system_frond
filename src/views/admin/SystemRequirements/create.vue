@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -63,9 +63,9 @@ const saveRequirement = async () => {
                          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Technical requirement provisioning</p>
                     </div>
                 </div>
-                <div class="hidden md:flex items-center space-x-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-                    <div class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                    <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Technical Validation Logic</span>
+                <div class="hidden md:flex items-center space-x-2 bg-rose-50 px-4 py-2 rounded-2xl border border-indigo-100">
+                    <div class="w-2 h-2 bg-brand-primary rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">Technical Validation Logic</span>
                 </div>
             </div>
 
@@ -83,7 +83,7 @@ const saveRequirement = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-info-circle text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Requirement Details</h3>
@@ -110,7 +110,7 @@ const saveRequirement = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-cog text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Classification</h3>
@@ -148,7 +148,7 @@ const saveRequirement = async () => {
                             </Card>
 
                             <div class="pt-4">
-                                <Button type="submit" label="Complete Provisioning" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
+                                <Button type="submit" label="Complete Provisioning" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
                             </div>
                         </div>
 
@@ -179,3 +179,4 @@ const saveRequirement = async () => {
     animation: slide-in-bottom 0.8s ease-out;
 }
 </style>
+

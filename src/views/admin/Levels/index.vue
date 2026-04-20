@@ -48,7 +48,7 @@ const fetchData = async () => {
 };
 
 const getSkill = (skillId) => {
-    return skills.value.find(s => s.id === skillId) || { name: 'Unknown', icon: '🧠' };
+    return skills.value.find(s => s.id === skillId) || { name: 'Unknown', icon: '🎯' };
 };
 
 const filteredLevels = computed(() => {
@@ -95,17 +95,17 @@ watch(selectedSkill, (newVal) => {
 <template>
   <AdminLayout>
     <Toast />
-    <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 mt-6 px-4 md:px-12">
+    <div class="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-24 mt-8 px-4 md:px-12">
         
-        <!-- Header Section -->
-        <div class="flex flex-col md:flex-row items-start md:items-center justify-between space-y-6 md:space-y-0">
+        <!-- Standardized Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 md:space-y-0">
             <div>
-                 <h1 class="text-3xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Adaptive tiers</h1>
+                 <h1 class="text-3xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Adaptive Tiers</h1>
                  <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Configure difficulty matrices and mastery thresholds</p>
             </div>
             <div class="flex items-center space-x-3">
                 <Button label="Initialize Tier" icon="pi pi-plus" 
-                    class="px-8 py-3 rounded-2xl bg-indigo-600 border-none shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
+                    class="px-8 py-3 rounded-2xl bg-brand-primary border-none shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
                     @click="router.push('/admin/levels/create')" />
             </div>
         </div>
@@ -116,22 +116,22 @@ watch(selectedSkill, (newVal) => {
         </div>
 
         <!-- Registry Table Card -->
-        <Card v-else class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden mt-6">
+        <Card v-else class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
             <template #content>
             <DataTable :value="filteredLevels" dataKey="id" paginator :rows="10" 
                        class="p-datatable-sm text-sm" responsiveLayout="scroll">
                 
                 <template #header>
-                    <div class="flex flex-col md:flex-row justify-between items-center gap-4 p-2 pb-4">
-                        <div class="flex items-center space-x-4 w-full md:w-auto">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-shrink-0">Filter Module</span>
-                            <Select v-model="selectedSkill" :options="skills" optionLabel="name" placeholder="All Skills" 
-                                     class="w-full md:w-64 rounded-xl border-slate-100 bg-slate-50 text-xs font-bold" showClear />
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-6 p-2 pb-4">
+                        <div class="flex items-center space-x-4 w-full md:w-auto bg-slate-50/50 p-2 rounded-2xl border border-slate-100">
+                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest flex-shrink-0 ml-2">Module Filter</span>
+                            <Select v-model="selectedSkill" :options="skills" optionLabel="name" placeholder="Filter by Skill Domain" 
+                                     class="w-full md:w-64 rounded-xl border-none bg-white text-xs font-bold shadow-sm" showClear />
                         </div>
                         <div class="w-full md:w-80">
                             <span class="relative">
-                                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                                <InputText v-model="searchQuery" placeholder="Search difficulty metadata..." class="pl-10 w-full shadow-sm rounded-xl border-slate-100" />
+                                <i class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 z-10" />
+                                <InputText v-model="searchQuery" placeholder="Search difficulty metadata..." class="pl-12 w-full shadow-sm rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all font-bold" />
                             </span>
                         </div>
                     </div>
@@ -139,19 +139,19 @@ watch(selectedSkill, (newVal) => {
 
                 <Column field="level_number" header="#" style="width: 80px">
                     <template #body="{ data }">
-                        <span class="font-black text-slate-400">#{{ data.level_number }}</span>
+                        <span class="font-black text-slate-300 italic tracking-tighter">#{{ data.level_number }}</span>
                     </template>
                 </Column>
 
-                <Column header="Identity Module" style="min-width: 250px">
+                <Column header="Competency Domain" style="min-width: 280px">
                     <template #body="{ data }">
                         <div class="flex items-center space-x-4 py-2">
-                             <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shadow-sm">
+                             <div class="w-11 h-11 rounded-2xl bg-slate-50 text-brand-primary flex items-center justify-center text-xl border border-slate-100 shadow-sm">
                                  {{ getSkill(data.skill_id).icon }}
                              </div>
                              <div>
-                                 <div class="font-black text-slate-700 uppercase tracking-tight">{{ getSkill(data.skill_id).name }}</div>
-                                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Skill Association</div>
+                                 <div class="font-black text-slate-800 uppercase tracking-tight leading-none mb-1.5">{{ getSkill(data.skill_id).name }}</div>
+                                 <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic opacity-80">Institutional Master Domain</div>
                              </div>
                         </div>
                     </template>
@@ -159,28 +159,28 @@ watch(selectedSkill, (newVal) => {
 
                 <Column field="name" header="Designation" style="min-width: 150px">
                     <template #body="{ data }">
-                        <span class="font-bold text-slate-600 uppercase tracking-tight">{{ data.name }}</span>
+                        <span class="font-black text-slate-600 uppercase tracking-wider text-xs">{{ data.name }}</span>
                     </template>
                 </Column>
 
-                <Column header="Precision Range" style="width: 150px">
+                <Column header="Cognitive Load (Score Range)" style="width: 200px" class="text-center">
                     <template #body="{ data }">
-                        <div class="flex items-center space-x-2">
-                             <span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-black border border-indigo-100">{{ data.min_score }}</span>
-                             <span class="text-slate-200">/</span>
-                             <span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-black border border-indigo-100">{{ data.max_score }}</span>
+                        <div class="flex items-center justify-center space-x-3">
+                             <div class="bg-rose-50 text-brand-primary px-4 py-1.5 rounded-xl text-[10px] font-black border border-brand-primary/10 shadow-sm">{{ data.min_score }}</div>
+                             <i class="pi pi-arrow-right text-[8px] text-slate-300"></i>
+                             <div class="bg-rose-50 text-brand-primary px-4 py-1.5 rounded-xl text-[10px] font-black border border-brand-primary/10 shadow-sm">{{ data.max_score }}</div>
                         </div>
                     </template>
                 </Column>
 
-                <Column header="Mastery Threshold" style="width: 150px">
+                <Column header="Mastery Threshold" style="width: 180px">
                     <template #body="{ data }">
-                        <div class="space-y-1.5 pt-1">
-                             <div class="flex justify-between items-center px-1">
-                                 <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest">{{ data.pass_threshold }}% Threshold</span>
+                        <div class="space-y-2 pt-1 px-2">
+                             <div class="flex justify-between items-center">
+                                 <span class="text-[9px] font-black text-brand-primary uppercase tracking-widest">{{ data.pass_threshold }}% Target</span>
                              </div>
-                             <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden p-0.5 border border-slate-50">
-                                  <div class="bg-indigo-500 h-full rounded-full" :style="{ width: data.pass_threshold + '%' }"></div>
+                             <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden p-0 border border-slate-50 shadow-inner">
+                                  <div class="bg-brand-accent h-full rounded-full transition-all duration-1000" :style="{ width: data.pass_threshold + '%' }"></div>
                              </div>
                         </div>
                     </template>
@@ -188,23 +188,23 @@ watch(selectedSkill, (newVal) => {
 
                 <Column header="Status" style="width: 120px" class="text-center">
                     <template #body="{ data }">
-                        <Tag :value="data.is_active ? 'Active' : 'Deactivated'"
+                        <Tag :value="data.is_active ? 'ENABLED' : 'ARCHIVED'"
                              :severity="data.is_active ? 'success' : 'secondary'"
-                             class="text-[9px] uppercase tracking-wider px-3" />
+                             class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
                     </template>
                 </Column>
 
-                <Column :exportable="false" style="min-width: 150px" class="text-right pr-6">
+                <Column :exportable="false" style="min-width: 150px" class="text-right">
                     <template #body="{ data }">
                         <div class="flex items-center justify-end space-x-2">
-                             <Button icon="pi pi-pencil" outlined rounded severity="warning" size="small" @click="router.push(`/admin/levels/${data.id}/edit`)" />
-                             <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="deleteLevel(data.id)" />
+                             <Button icon="pi pi-pencil" text severity="info" size="small" @click="router.push(`/admin/levels/${data.id}/edit`)" />
+                             <Button icon="pi pi-trash" text severity="danger" size="small" @click="deleteLevel(data.id)" />
                         </div>
                     </template>
                 </Column>
 
                 <template #empty>
-                    <div class="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No configuration matrix found in system.</div>
+                    <div class="p-16 text-center text-slate-300 font-bold uppercase tracking-widest text-xs italic">No adaptive configurations discovered in system registry.</div>
                 </template>
             </DataTable>
             </template>
@@ -214,12 +214,20 @@ watch(selectedSkill, (newVal) => {
 </template>
 
 <style scoped>
-@keyframes slide-in-bottom {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
 .animate-in {
-    animation: slide-in-bottom 0.8s ease-out;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+:deep(.p-datatable-thead > tr > th) {
+    background: #fbfcfe;
+    border-bottom: 2px solid #f1f5f9;
+    padding: 1.5rem 1rem;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+}
+:deep(.p-datatable-tbody > tr:hover) {
+    background: #fbfcfe;
 }
 </style>

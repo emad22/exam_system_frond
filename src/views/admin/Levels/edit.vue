@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -103,7 +103,7 @@ const updateLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center shadow-lg shadow-rose-100">
                                                 <i class="pi pi-pencil text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Sync Specifications</h3>
@@ -116,7 +116,7 @@ const updateLevel = async () => {
                                             </div>
                                             <div class="flex flex-col">
                                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Designation Name</label>
-                                                <InputText v-model="form.name" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:border-indigo-500" placeholder="e.g. Intermediate I" />
+                                                <InputText v-model="form.name" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:border-brand-primary" placeholder="e.g. Intermediate I" />
                                             </div>
                                         </div>
 
@@ -138,7 +138,7 @@ const updateLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-chart-bar text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Performance Metrics</h3>
@@ -155,7 +155,7 @@ const updateLevel = async () => {
                                             </div>
                                             <div class="flex flex-col">
                                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Pass Threshold (%)</label>
-                                                <InputNumber v-model="form.pass_threshold" suffix="%" class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-indigo-600" />
+                                                <InputNumber v-model="form.pass_threshold" suffix="%" class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-brand-primary" />
                                             </div>
                                         </div>
                                     </div>
@@ -169,7 +169,7 @@ const updateLevel = async () => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-cog text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Deployment</h3>
@@ -187,7 +187,7 @@ const updateLevel = async () => {
                             </Card>
 
                             <div class="pt-4">
-                                <Button type="submit" label="Commit Updates" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
+                                <Button type="submit" label="Commit Updates" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
                             </div>
                         </div>
 
@@ -218,3 +218,4 @@ const updateLevel = async () => {
     animation: slide-in-bottom 0.8s ease-out;
 }
 </style>
+

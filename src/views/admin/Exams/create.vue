@@ -283,10 +283,18 @@ const resetNewQuestion = () => {
 };
 
 const currentGroupId = ref(null);
+
+const setTrueFalseAnswer = (isTrue) => {
+    if (!newQuestion.value.options[0]) newQuestion.value.options[0] = {option_text: '', is_correct: false};
+    if (!newQuestion.value.options[1]) newQuestion.value.options[1] = {option_text: '', is_correct: false};
+    newQuestion.value.options[0].is_correct = isTrue;
+    newQuestion.value.options[1].is_correct = !isTrue;
+};
+
 const commitQuestion = () => {
     if (!newQuestion.value.content) return;
     let q = { ...newQuestion.value };
-    if (q.type === 'true_false') q.options = [{option_text: 'True', is_correct: q.options[0].is_correct}, {option_text: 'False', is_correct: q.options[1].is_correct}];
+    if (q.type === 'true_false') q.options = [{option_text: 'True', is_correct: q.options[0]?.is_correct || false}, {option_text: 'False', is_correct: q.options[1]?.is_correct || false}];
     if (isPassageMode.value) {
         if (!currentGroupId.value) currentGroupId.value = 'grp_' + Math.random().toString(36).substr(2, 9);
         q.passage_group_id = currentGroupId.value; q.passage_content = passageContent.value; q.passage_limit = passageLimit.value;
@@ -346,14 +354,14 @@ const saveExam = async () => {
 <template>
   <AdminLayout>
     <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
-        <div class="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin mb-8"></div>
+        <div class="w-16 h-16 border-4 border-slate-100 border-t-brand-primary rounded-full animate-spin mb-8"></div>
         <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Calibrating Constructor...</p>
     </div>
     
     <div v-else class="animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-24 mt-8 px-4 md:px-16 max-w-7xl mx-auto">
         <!-- Unified Header Section -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 space-y-8 md:space-y-0 bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
-            <div class="absolute -right-16 -top-16 w-48 h-48 bg-indigo-50/50 rounded-full blur-3xl"></div>
+            <div class="absolute -right-16 -top-16 w-48 h-48 bg-rose-50/50 rounded-full blur-3xl"></div>
             <div class="relative z-10">
                 <div class="flex items-center space-x-6">
                     <button @click="router.push('/admin/exams')" class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-slate-800 hover:text-white transition-all transform hover:-translate-x-1 shadow-sm">
@@ -368,7 +376,7 @@ const saveExam = async () => {
             
             <div class="hidden lg:flex items-center space-x-2 bg-slate-50/50 px-6 py-4 rounded-[1.8rem] border border-slate-100 relative z-10">
                 <div v-for="s in 4" :key="s" class="flex items-center">
-                    <div :class="currentStep === s ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : (currentStep > s ? 'bg-emerald-500 text-white' : 'bg-white text-slate-300')" 
+                    <div :class="currentStep === s ? 'bg-brand-primary text-white shadow-lg shadow-rose-100' : (currentStep > s ? 'bg-emerald-500 text-white' : 'bg-white text-slate-300')" 
                          class="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black transition-all duration-500">
                          <i v-if="currentStep > s" class="pi pi-check text-[10px]"></i>
                          <span v-else>{{ s }}</span>
@@ -396,11 +404,11 @@ const saveExam = async () => {
                     <div class="space-y-8">
                         <div class="space-y-3">
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Logical Designation (Title)</label>
-                            <input v-model="form.title" type="text" class="w-full bg-slate-50 border border-slate-100 p-6 rounded-[1.5rem] text-sm font-bold uppercase tracking-tight focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all" placeholder="E.G. ALPH_CORE_2024">
+                            <input v-model="form.title" type="text" class="w-full bg-slate-50 border border-slate-100 p-6 rounded-[1.5rem] text-sm font-bold uppercase tracking-tight focus:bg-white focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary outline-none transition-all" placeholder="E.G. ALPH_CORE_2024">
                         </div>
                         <div class="space-y-3">
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Audience Class (Category)</label>
-                            <select v-model="form.exam_category_id" class="w-full bg-slate-50 border border-slate-100 p-6 rounded-[1.5rem] text-xs font-black uppercase tracking-widest focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all cursor-pointer">
+                            <select v-model="form.exam_category_id" class="w-full bg-slate-50 border border-slate-100 p-6 rounded-[1.5rem] text-xs font-black uppercase tracking-widest focus:bg-white focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary outline-none transition-all cursor-pointer">
                                 <option :value="null" disabled>Select Evaluation Segment</option>
                                 <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                             </select>
@@ -409,10 +417,10 @@ const saveExam = async () => {
                 </div>
 
                 <div class="bg-slate-800 p-12 rounded-[3.5rem] text-white flex flex-col justify-center space-y-12 relative overflow-hidden group">
-                    <div class="absolute -bottom-24 -right-24 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-400/30 transition-all duration-1000"></div>
+                    <div class="absolute -bottom-24 -right-24 w-80 h-80 bg-brand-primary/20 rounded-full blur-3xl group-hover:bg-brand-accent/30 transition-all duration-1000"></div>
                     <div class="space-y-4">
                         <h3 class="text-xl font-black uppercase tracking-tight">Environmental Metrics</h3>
-                        <p class="text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest leading-relaxed">Configure success threshold parameters.</p>
+                        <p class="text-[10px] font-bold text-rose-100/60 uppercase tracking-widest leading-relaxed">Configure success threshold parameters.</p>
                     </div>
                     <div class="space-y-10">
                         <div class="space-y-4">
@@ -434,14 +442,14 @@ const saveExam = async () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div v-for="skill in availableSkills" :key="skill.id" 
                      @click="toggleSkill(skill.id)"
-                     :class="isSkillSelected(skill.id) ? 'bg-white border-indigo-600 shadow-2xl shadow-indigo-500/10' : 'bg-slate-50 border-slate-50 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'"
+                     :class="isSkillSelected(skill.id) ? 'bg-white border-brand-primary shadow-2xl shadow-brand-primary/10' : 'bg-slate-50 border-slate-50 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'"
                      class="group p-10 rounded-[3rem] border-2 transition-all duration-500 cursor-pointer text-center relative">
-                    <div v-if="isSkillSelected(skill.id)" class="absolute top-6 right-6 text-indigo-600 animate-in zoom-in group-hover:scale-110">
+                    <div v-if="isSkillSelected(skill.id)" class="absolute top-6 right-6 text-brand-primary animate-in zoom-in group-hover:scale-110">
                         <i class="pi pi-check-circle text-xl"></i>
                     </div>
-                    <div :class="isSkillSelected(skill.id) ? 'bg-indigo-600 text-white rotate-6' : 'bg-white text-slate-300'" 
+                    <div :class="isSkillSelected(skill.id) ? 'bg-brand-primary text-white rotate-6' : 'bg-white text-slate-300'" 
                          class="w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-4xl mx-auto mb-8 shadow-sm transition-all duration-700 group-hover:-translate-y-2">
-                         {{ skill.icon || '🧠' }}
+                         {{ skill.icon || 'ðŸ§ ' }}
                     </div>
                     <h4 class="text-sm font-black uppercase tracking-widest">{{ skill.name }}</h4>
                     <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-2 italic">{{ skill.levels?.length || 0 }} Tier Matrix Available</p>
@@ -451,11 +459,11 @@ const saveExam = async () => {
 
         <!-- STEP 3: THE MATRIX -->
         <div v-if="currentStep === 3" class="space-y-16 animate-in fade-in slide-in-from-right-12 duration-700">
-            <div class="bg-indigo-600 p-12 rounded-[4rem] text-white flex flex-col md:flex-row justify-between items-center shadow-2xl shadow-indigo-500/20 relative overflow-hidden">
+            <div class="bg-brand-primary p-12 rounded-[4rem] text-white flex flex-col md:flex-row justify-between items-center shadow-2xl shadow-brand-primary/20 relative overflow-hidden">
                 <div class="absolute inset-0 bg-white/5 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 40px 40px;"></div>
                 <div class="relative z-10 space-y-2 text-center md:text-left">
                     <h3 class="text-3xl font-black uppercase tracking-tight">Logic Matrix</h3>
-                    <p class="text-[10px] font-bold text-indigo-100 uppercase tracking-[0.2em] opacity-80">Configure tier-specific content modules</p>
+                    <p class="text-[10px] font-bold text-rose-100 uppercase tracking-[0.2em] opacity-80">Configure tier-specific content modules</p>
                 </div>
                 <div v-if="form.selectedSkills.length > 0" class="relative z-10 mt-8 md:mt-0 px-8 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
                     Active: {{ form.selectedSkills.length }} Modalities
@@ -463,9 +471,9 @@ const saveExam = async () => {
             </div>
 
             <div v-if="form.selectedSkills.length === 0" class="bg-slate-50 rounded-[4rem] border-2 border-dashed border-slate-200 p-32 text-center group transition-colors hover:border-indigo-300">
-                <div class="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center text-5xl mx-auto mb-10 shadow-sm transition-transform group-hover:scale-110 duration-500">🚫</div>
+                <div class="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center text-5xl mx-auto mb-10 shadow-sm transition-transform group-hover:scale-110 duration-500">ðŸš«</div>
                 <p class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">No modalities selected. Return to sequence 2.</p>
-                <button @click="currentStep = 2" class="mt-8 text-indigo-600 text-[10px] font-black uppercase tracking-widest underline underline-offset-8">Configure Skills Matrix ➜</button>
+                <button @click="currentStep = 2" class="mt-8 text-brand-primary text-[10px] font-black uppercase tracking-widest underline underline-offset-8">Configure Skills Matrix âžœ</button>
             </div>
 
             <div v-else class="space-y-12">
@@ -473,9 +481,9 @@ const saveExam = async () => {
                 <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-[2rem] border border-slate-100">
                     <button v-for="selected in form.selectedSkills" :key="selected.skill_id"
                         @click="activeSkillTab = selected.skill_id"
-                        :class="activeSkillTab === selected.skill_id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-white text-slate-400 hover:bg-white hover:text-slate-800'"
+                        :class="activeSkillTab === selected.skill_id ? 'bg-brand-primary text-white shadow-xl shadow-rose-200' : 'bg-white text-slate-400 hover:bg-white hover:text-slate-800'"
                         class="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center space-x-3">
-                        <span class="w-2 h-2 rounded-full" :class="activeSkillTab === selected.skill_id ? 'bg-indigo-300' : 'bg-slate-200'"></span>
+                        <span class="w-2 h-2 rounded-full" :class="activeSkillTab === selected.skill_id ? 'bg-rose-300' : 'bg-slate-200'"></span>
                         <span>{{ availableSkills.find(s => s.id === selected.skill_id)?.name }}</span>
                     </button>
                 </div>
@@ -486,8 +494,8 @@ const saveExam = async () => {
                         <!-- Workplace Header -->
                         <div class="p-10 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
                             <div class="flex items-center space-x-6">
-                                <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl rotate-3">
-                                    {{ availableSkills.find(s => s.id === activeSkillTab)?.icon || '🧠' }}
+                                <div class="w-16 h-16 rounded-2xl bg-rose-50 text-brand-primary flex items-center justify-center text-2xl rotate-3">
+                                    {{ availableSkills.find(s => s.id === activeSkillTab)?.icon || 'ðŸ§ ' }}
                                 </div>
                                 <div>
                                     <h4 class="text-2xl font-black text-slate-800 uppercase tracking-tight">{{ availableSkills.find(s => s.id === activeSkillTab)?.name }} Protocol</h4>
@@ -496,7 +504,7 @@ const saveExam = async () => {
                             </div>
                             <div class="flex items-center space-x-3">
                                 <div class="bg-slate-50 px-6 py-3 rounded-xl border border-slate-100">
-                                    <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{{ form.selectedSkills.find(s => s.skill_id === activeSkillTab)?.duration || 30 }}m Allocation</span>
+                                    <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">{{ form.selectedSkills.find(s => s.skill_id === activeSkillTab)?.duration || 30 }}m Allocation</span>
                                 </div>
                                 <Button label="Tier Matrix" icon="pi pi-table" text class="text-[9px] font-black uppercase px-6" 
                                     @click="openLevelManager(availableSkills.find(s => s.id === activeSkillTab))" />
@@ -510,7 +518,7 @@ const saveExam = async () => {
                                 
                                 <!-- Tier Info -->
                                 <div class="flex items-center space-x-6 min-w-[240px]">
-                                    <div class="w-12 h-12 rounded-xl bg-white group-hover:bg-indigo-600 group-hover:text-white flex flex-col items-center justify-center transition-all shadow-sm">
+                                    <div class="w-12 h-12 rounded-xl bg-white group-hover:bg-brand-primary group-hover:text-white flex flex-col items-center justify-center transition-all shadow-sm">
                                         <span class="text-[7px] font-black opacity-30 leading-none">TIER</span>
                                         <span class="text-sm font-black">{{ level.level_number || 1 }}</span>
                                     </div>
@@ -545,7 +553,7 @@ const saveExam = async () => {
 
                                 <!-- Question Quick View (Small Toggle) -->
                                 <div v-if="localQuestions[activeSkillTab]?.[level.level_number || 1]?.length > 0">
-                                    <div class="flex items-center space-x-2 bg-indigo-50 px-4 py-2 rounded-xl text-indigo-600">
+                                    <div class="flex items-center space-x-2 bg-rose-50 px-4 py-2 rounded-xl text-brand-primary">
                                         <i class="pi pi-check-circle text-[10px]"></i>
                                         <span class="text-[9px] font-black tracking-widest uppercase">Verified</span>
                                     </div>
@@ -577,17 +585,17 @@ const saveExam = async () => {
                         </div>
                         <div class="flex justify-between items-center bg-slate-50 p-6 rounded-3xl">
                             <span class="text-[10px] font-black text-slate-400 uppercase">Active Modalities</span>
-                            <span class="text-xs font-black text-indigo-600">{{ form.selectedSkills.length }} Modules</span>
+                            <span class="text-xs font-black text-brand-primary">{{ form.selectedSkills.length }} Modules</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="bg-slate-800 p-12 rounded-[4rem] text-white flex flex-col justify-center text-center space-y-10 shadow-2xl shadow-slate-900/10">
-                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Execution Phase</p>
+                    <p class="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em]">Execution Phase</p>
                     <Button :label="isSubmitting ? 'PERSISTING DATA...' : 'INITIALIZE PROTOCOL ➜'" 
                             :loading="isSubmitting" 
                             @click="saveExam" 
-                            class="bg-white border-none text-slate-900 font-black text-[11px] py-10 rounded-[2.5rem] shadow-2xl hover:bg-indigo-500 hover:text-white transition-all transform hover:-translate-y-2 uppercase tracking-[0.2em]" />
+                            class="bg-white border-none text-slate-900 font-black text-[11px] py-10 rounded-[2.5rem] shadow-2xl hover:bg-brand-accent hover:text-white transition-all transform hover:-translate-y-2 uppercase tracking-[0.2em]" />
                     <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest opacity-60">This action will propagate the exam to all administrative endpoints</p>
                 </div>
             </div>
@@ -601,7 +609,7 @@ const saveExam = async () => {
             </button>
             <div v-else></div>
             
-            <button v-if="currentStep < 4" @click="nextStep" class="bg-indigo-600 text-white px-12 py-5 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 flex items-center space-x-4 transition-all hover:-translate-y-1 hover:shadow-indigo-500/10">
+            <button v-if="currentStep < 4" @click="nextStep" class="bg-brand-primary text-white px-12 py-5 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-100 flex items-center space-x-4 transition-all hover:-translate-y-1 hover:shadow-brand-primary/10">
                 <span>Advance Sequence</span>
                 <i class="pi pi-angle-right text-xl"></i>
             </button>
@@ -612,7 +620,7 @@ const saveExam = async () => {
             <template #header>
                 <div class="flex items-center w-full justify-between pr-8">
                     <div class="flex items-center space-x-6">
-                        <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg">
+                        <div class="w-12 h-12 rounded-2xl bg-brand-primary text-white flex items-center justify-center shadow-lg">
                             <i :class="isPassageMode ? 'pi pi-book' : 'pi pi-plus-circle'" class="text-xl"></i>
                         </div>
                         <div>
@@ -629,19 +637,19 @@ const saveExam = async () => {
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Choose Question Type / اختر نوع السؤال</label>
                     <div class="grid grid-cols-3 gap-4">
                         <div @click="newQuestion.type = 'mcq'" 
-                             :class="newQuestion.type === 'mcq' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
+                             :class="newQuestion.type === 'mcq' ? 'bg-brand-primary text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
                              class="p-4 rounded-2xl border border-transparent cursor-pointer transition-all text-center">
                             <i class="pi pi-list text-lg mb-2 block"></i>
                             <span class="text-[9px] font-black uppercase tracking-tight">MCQ</span>
                         </div>
                         <div @click="newQuestion.type = 'true_false'" 
-                             :class="newQuestion.type === 'true_false' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
+                             :class="newQuestion.type === 'true_false' ? 'bg-brand-primary text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
                              class="p-4 rounded-2xl border border-transparent cursor-pointer transition-all text-center">
                             <i class="pi pi-sliders-h text-lg mb-2 block"></i>
                             <span class="text-[9px] font-black uppercase tracking-tight">True/False</span>
                         </div>
                         <div @click="newQuestion.type = 'short_answer'" 
-                             :class="newQuestion.type === 'short_answer' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
+                             :class="newQuestion.type === 'short_answer' ? 'bg-brand-primary text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'"
                              class="p-4 rounded-2xl border border-transparent cursor-pointer transition-all text-center">
                             <i class="pi pi-pencil text-lg mb-2 block"></i>
                             <span class="text-[9px] font-black uppercase tracking-tight">Final Entry</span>
@@ -653,7 +661,7 @@ const saveExam = async () => {
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div class="md:col-span-3 space-y-4">
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Question Text / نص السؤال</label>
-                        <div class="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 focus-within:bg-white focus-within:ring-8 focus-within:ring-indigo-500/5 transition-all">
+                        <div class="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 focus-within:bg-white focus-within:ring-8 focus-within:ring-brand-primary/5 transition-all">
                              <textarea v-model="newQuestion.content" rows="4" class="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-700 outline-none resize-none no-scrollbar" placeholder="Start typing the question content here..."></textarea>
                         </div>
                     </div>
@@ -669,7 +677,7 @@ const saveExam = async () => {
                 <!-- 3. Audio Context (Optional) -->
                 <div class="space-y-4">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Audio Resource (Optional) / ملف صوتي</label>
-                    <div v-if="newQuestion.media_path" class="flex items-center space-x-4 p-4 bg-indigo-50 rounded-2xl">
+                    <div v-if="newQuestion.media_path" class="flex items-center space-x-4 p-4 bg-rose-50 rounded-2xl">
                          <audio :src="newQuestion.media_url" controls class="h-8 flex-1"></audio>
                          <button @click="newQuestion.media_path = null; newQuestion.media_url = null" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm">
                               <i class="pi pi-trash text-xs"></i>
@@ -677,33 +685,42 @@ const saveExam = async () => {
                     </div>
                     <div v-else class="relative group">
                          <input type="file" @change="handleMediaUpload" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                         <div class="p-6 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2rem] flex items-center justify-center space-x-4 group-hover:bg-indigo-50 transition-all">
-                              <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-300 group-hover:text-indigo-600 shadow-sm transition-all">
+                         <div class="p-6 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2rem] flex items-center justify-center space-x-4 group-hover:bg-rose-50 transition-all">
+                              <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-300 group-hover:text-brand-primary shadow-sm transition-all">
                                    <i :class="isUploadingMedia ? 'pi pi-spinner animate-spin' : 'pi pi-upload'" class="text-lg"></i>
                               </div>
-                              <p class="text-[9px] font-black uppercase text-slate-400 group-hover:text-indigo-600 transition-colors">{{ isUploadingMedia ? 'Syncing...' : 'Click to add audio file' }}</p>
+                              <p class="text-[9px] font-black uppercase text-slate-400 group-hover:text-brand-primary transition-colors">{{ isUploadingMedia ? 'Syncing...' : 'Click to add audio file' }}</p>
                          </div>
                     </div>
                 </div>
 
                 <!-- 4. Shared Resource Context (Bilingual) -->
-                <div v-if="isPassageMode" class="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-2xl space-y-6 relative overflow-hidden animate-in fade-in zoom-in duration-500">
+                <div v-if="isPassageMode" class="bg-brand-primary p-8 rounded-[3rem] text-white shadow-2xl space-y-6 relative overflow-hidden animate-in fade-in zoom-in duration-500">
                     <div class="flex justify-between items-center relative z-10">
                         <div class="flex items-center space-x-4">
                              <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
                                   <i class="pi pi-book"></i>
                              </div>
                              <div>
-                                 <label class="text-[10px] font-black uppercase tracking-widest text-indigo-100">Reading Context / نص القطعة المشترك</label>
-                                 <p class="text-[8px] font-bold text-indigo-200 mt-0.5 uppercase tracking-widest italic">Shared logic across artifacts</p>
+                                 <label class="text-[10px] font-black uppercase tracking-widest text-rose-100">Shared Reading Context / نص القطعة المشترك</label>
+                                 <p class="text-[8px] font-bold text-rose-200 mt-0.5 uppercase tracking-widest italic">Shared logic across artifacts</p>
                              </div>
                         </div>
-                        <div class="flex items-center space-x-3 bg-indigo-500/30 px-5 py-3 rounded-2xl border border-white/10">
-                             <span class="text-[8px] font-black uppercase text-indigo-200">Sync Limit</span>
-                             <InputNumber v-model="passageLimit" :min="1" :max="20" inputClass="w-8 text-center text-[10px] font-black border-none bg-transparent text-white" />
+                        <div class="flex items-center space-x-3 bg-brand-accent/30 px-5 py-3 rounded-2xl border border-white/10">
+                             <div class="flex items-center space-x-2 mr-4 border-r border-rose-400/30 pr-4">
+                                  <span class="text-[8px] font-black uppercase text-rose-200">Shuffle</span>
+                                  <div @click="newQuestion.passage_randomize = !newQuestion.passage_randomize" 
+                                       class="w-8 h-4 rounded-full flex items-center p-0.5 cursor-pointer transition-colors duration-300"
+                                       :class="newQuestion.passage_randomize ? 'bg-emerald-400/80' : 'bg-rose-300/30'">
+                                       <div class="w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-300"
+                                            :class="newQuestion.passage_randomize ? 'translate-x-4' : 'translate-x-0'"></div>
+                                  </div>
+                             </div>
+                             <span class="text-[8px] font-black uppercase text-rose-200">Sync Limit</span>
+                             <InputNumber v-model="passageLimit" :min="1" :max="20" inputClass="w-8 text-center text-[10px] font-black border-none bg-transparent text-white focus:outline-none focus:ring-0" />
                         </div>
                     </div>
-                    <textarea v-model="passageContent" rows="4" class="w-full bg-white/10 border border-white/10 rounded-[2rem] p-8 text-sm font-bold text-white placeholder:text-indigo-300 outline-none resize-none transition-all focus:bg-white/20 relative z-10" placeholder="Paste or type the shared reading text here..."></textarea>
+                    <textarea v-model="passageContent" rows="4" class="w-full bg-white/10 border border-white/10 rounded-[2rem] p-8 text-sm font-bold text-white placeholder:text-rose-300 outline-none resize-none transition-all focus:bg-white/20 relative z-10" placeholder="Paste or type the shared reading text here..."></textarea>
                     
                     <!-- Pattern Background -->
                     <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
@@ -712,8 +729,8 @@ const saveExam = async () => {
                 <!-- 5. Question Logic Formulation -->
                 <div v-if="newQuestion.type === 'mcq'" class="space-y-6">
                     <div class="flex justify-between items-center ml-1">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">4. Choice Matrix / الاختيارات</label>
-                        <button @click="newQuestion.options.push({option_text: '', is_correct: false})" class="text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:underline">+ Append Entry</button>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">4. Choice Matrix / Ø§Ù„Ø§Ø®ØªÙŠØ§Ø±Ø§Øª</label>
+                        <button @click="newQuestion.options.push({option_text: '', is_correct: false})" class="text-brand-primary text-[10px] font-black uppercase tracking-widest hover:underline">+ Append Entry</button>
                     </div>
                     <div class="space-y-3">
                         <div v-for="(opt, idx) in newQuestion.options" :key="idx" 
@@ -743,28 +760,28 @@ const saveExam = async () => {
 
                 <!-- 5. Binary Logic Formulation (True/False) -->
                 <div v-else-if="newQuestion.type === 'true_false'" class="space-y-6">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Select Logical Truth / حدد الحالة الصحيحة</label>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Select Logical Truth / Ø­Ø¯Ø¯ Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„ØµØ­ÙŠØ­Ø©</label>
                     <div class="grid grid-cols-2 gap-6">
-                        <div @click="newQuestion.options[0].is_correct = true; newQuestion.options[1].is_correct = false" 
-                             :class="newQuestion.options[0].is_correct ? 'bg-emerald-600 text-white shadow-2xl -translate-y-1' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 shadow-inner shadow-slate-200/50'"
+                        <div @click="setTrueFalseAnswer(true)" 
+                             :class="(newQuestion.options[0] && newQuestion.options[0].is_correct) ? 'bg-emerald-600 text-white shadow-2xl -translate-y-1' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 shadow-inner shadow-slate-200/50'"
                              class="p-10 rounded-[3rem] border-2 border-transparent cursor-pointer transition-all flex flex-col items-center justify-center space-y-4 group">
-                             <div :class="newQuestion.options[0].is_correct ? 'bg-white/20' : 'bg-slate-200'" class="w-16 h-16 rounded-3xl flex items-center justify-center transition-colors">
+                             <div :class="(newQuestion.options[0] && newQuestion.options[0].is_correct) ? 'bg-white/20' : 'bg-slate-200'" class="w-16 h-16 rounded-3xl flex items-center justify-center transition-colors">
                                  <i class="pi pi-check text-2xl"></i>
                              </div>
                              <div class="text-center">
                                  <h4 class="text-xl font-black uppercase tracking-tighter">TRUE</h4>
-                                 <p class="text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">صـــــواب</p>
+                                 <p class="text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">ØµÙ€Ù€Ù€Ù€Ù€ÙˆØ§Ø¨</p>
                              </div>
                         </div>
-                        <div @click="newQuestion.options[1].is_correct = true; newQuestion.options[0].is_correct = false" 
-                             :class="newQuestion.options[1].is_correct ? 'bg-rose-600 text-white shadow-2xl -translate-y-1' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 shadow-inner shadow-slate-200/50'"
+                        <div @click="setTrueFalseAnswer(false)" 
+                             :class="(newQuestion.options[1] && newQuestion.options[1].is_correct) ? 'bg-rose-600 text-white shadow-2xl -translate-y-1' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 shadow-inner shadow-slate-200/50'"
                              class="p-10 rounded-[3rem] border-2 border-transparent cursor-pointer transition-all flex flex-col items-center justify-center space-y-4 group">
-                             <div :class="newQuestion.options[1].is_correct ? 'bg-white/20' : 'bg-slate-200'" class="w-16 h-16 rounded-3xl flex items-center justify-center transition-colors">
+                             <div :class="(newQuestion.options[1] && newQuestion.options[1].is_correct) ? 'bg-white/20' : 'bg-slate-200'" class="w-16 h-16 rounded-3xl flex items-center justify-center transition-colors">
                                  <i class="pi pi-times text-2xl"></i>
                              </div>
                              <div class="text-center">
                                  <h4 class="text-xl font-black uppercase tracking-tighter">FALSE</h4>
-                                 <p class="text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">خـــــطأ</p>
+                                 <p class="text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">Ø®Ù€Ù€Ù€Ù€Ù€Ø·Ø£</p>
                              </div>
                         </div>
                     </div>
@@ -773,7 +790,7 @@ const saveExam = async () => {
 
             <template #footer>
                 <div class="flex space-x-4 pt-6 p-8 border-t border-slate-50">
-                    <button class="flex-1 bg-indigo-600 text-white font-black text-[11px] uppercase tracking-[0.2em] py-6 rounded-[2rem] shadow-xl shadow-indigo-100 hover:bg-slate-900 transition-all flex items-center justify-center space-x-4 group" @click="commitQuestion">
+                    <button class="flex-1 bg-brand-primary text-white font-black text-[11px] uppercase tracking-[0.2em] py-6 rounded-[2rem] shadow-xl shadow-rose-100 hover:bg-slate-900 transition-all flex items-center justify-center space-x-4 group" @click="commitQuestion">
                         <span>Save and Add to Exam</span>
                         <i class="pi pi-arrow-right group-hover:translate-x-2 transition-transform"></i>
                     </button>
@@ -822,10 +839,10 @@ const saveExam = async () => {
 
                 <div v-else class="grid grid-cols-1 gap-4">
                     <div v-for="bq in filteredBankQuestions" :key="bq.id" 
-                         class="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-indigo-600 hover:shadow-2xl transition-all duration-500 flex flex-col md:flex-row justify-between items-center gap-6">
+                         class="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-brand-primary hover:shadow-2xl transition-all duration-500 flex flex-col md:flex-row justify-between items-center gap-6">
                         <div class="flex-1 space-y-4">
                             <div class="flex items-center space-x-3">
-                                <span class="text-[8px] font-black bg-slate-50 text-slate-400 px-3 py-1 rounded-lg uppercase tracking-widest border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">{{ bq.type }}</span>
+                                <span class="text-[8px] font-black bg-slate-50 text-slate-400 px-3 py-1 rounded-lg uppercase tracking-widest border border-slate-100 group-hover:bg-rose-50 group-hover:text-brand-primary group-hover:border-indigo-100 transition-colors">{{ bq.type }}</span>
                                 <div class="w-1 h-1 rounded-full bg-slate-200"></div>
                                 <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">{{ bq.points }} Weighted Units</span>
                             </div>
@@ -833,9 +850,9 @@ const saveExam = async () => {
                         </div>
                         <button @click="importQuestion(bq)" 
                                 :disabled="isAlreadyAdded(bq.id)"
-                                :class="isAlreadyAdded(bq.id) ? 'bg-slate-50 text-slate-300' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:-translate-y-1 hover:shadow-indigo-500/20'"
+                                :class="isAlreadyAdded(bq.id) ? 'bg-slate-50 text-slate-300' : 'bg-brand-primary text-white shadow-xl shadow-rose-100 hover:-translate-y-1 hover:shadow-brand-primary/20'"
                                 class="shrink-0 px-10 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                            {{ isAlreadyAdded(bq.id) ? 'LINKED ✓' : 'SYNC TO EXAM' }}
+                            {{ isAlreadyAdded(bq.id) ? 'LINKED âœ“' : 'SYNC TO EXAM' }}
                         </button>
                     </div>
                 </div>
@@ -857,7 +874,7 @@ const saveExam = async () => {
                         <h3 class="text-xl font-black text-slate-800 uppercase tracking-tight">Matrix Tier Calibration</h3>
                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">Modifying architecture for {{ editingSkill?.name }} Domain</p>
                     </div>
-                    <Button label="Append Tier" icon="pi pi-plus" class="bg-indigo-600 border-none font-black text-[9px] uppercase tracking-widest px-8 rounded-xl shadow-lg shadow-indigo-100" @click="addLevel" />
+                    <Button label="Append Tier" icon="pi pi-plus" class="bg-brand-primary border-none font-black text-[9px] uppercase tracking-widest px-8 rounded-xl shadow-lg shadow-rose-100" @click="addLevel" />
                 </div>
             </template>
 
@@ -872,22 +889,22 @@ const saveExam = async () => {
                     </Column>
                     <Column header="Logical Name">
                         <template #body="slotProps">
-                            <InputText v-model="slotProps.data.name" class="w-full bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase p-4 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 outline-none" />
+                            <InputText v-model="slotProps.data.name" class="w-full bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase p-4 focus:bg-white focus:ring-4 focus:ring-brand-primary/10 outline-none" />
                         </template>
                     </Column>
                     <Column header="Logic Range (Points)" style="width: 250px">
                         <template #body="slotProps">
                             <div class="flex items-center space-x-3 bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100">
                                 <InputNumber v-model="slotProps.data.min_score" inputClass="w-12 border-none bg-transparent text-center font-black text-[10px]" />
-                                <span class="text-slate-300 font-bold">➜</span>
+                                <span class="text-slate-300 font-bold">âžœ</span>
                                 <InputNumber v-model="slotProps.data.max_score" inputClass="w-12 border-none bg-transparent text-center font-black text-[10px]" />
                             </div>
                         </template>
                     </Column>
                     <Column header="Success %" style="width: 150px">
                         <template #body="slotProps">
-                            <div class="bg-indigo-50/50 p-2 rounded-xl flex justify-center">
-                                <InputNumber v-model="slotProps.data.pass_threshold" suffix="%" inputClass="w-16 border-none bg-transparent text-center font-black text-[11px] text-indigo-600" />
+                            <div class="bg-rose-50/50 p-2 rounded-xl flex justify-center">
+                                <InputNumber v-model="slotProps.data.pass_threshold" suffix="%" inputClass="w-16 border-none bg-transparent text-center font-black text-[11px] text-brand-primary" />
                             </div>
                         </template>
                     </Column>
@@ -902,7 +919,7 @@ const saveExam = async () => {
             <template #footer>
                 <div class="flex justify-end p-6 bg-slate-50/50 border-t border-slate-50 space-x-4">
                     <Button label="Discard Changes" severity="secondary" text class="font-black text-[10px] uppercase tracking-widest px-8" @click="showLevelModal = false" />
-                    <Button label="Persist Matrix Globally" icon="pi pi-save" :loading="isSavingLevels" class="bg-indigo-600 border-none font-black text-[10px] uppercase tracking-widest px-10 rounded-2xl shadow-xl shadow-indigo-100" @click="saveLevels" />
+                    <Button label="Persist Matrix Globally" icon="pi pi-save" :loading="isSavingLevels" class="bg-brand-primary border-none font-black text-[10px] uppercase tracking-widest px-10 rounded-2xl shadow-xl shadow-rose-100" @click="saveLevels" />
                 </div>
             </template>
         </Dialog>
@@ -938,3 +955,4 @@ const saveExam = async () => {
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>
+

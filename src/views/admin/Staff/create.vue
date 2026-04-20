@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -103,7 +103,7 @@ onMounted(fetchStaff);
                                 <template #content>
                                     <div class="space-y-8 p-4">
                                         <div class="flex items-center space-x-4">
-                                            <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                                            <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
                                             <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Core Credentials</h3>
                                         </div>
 
@@ -128,7 +128,7 @@ onMounted(fetchStaff);
 
                                             <div class="flex flex-col">
                                                 <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Security Key (Password)</label>
-                                                <InputText v-model="form.password" type="password" :required="!isEditing" placeholder="••••••••" class="w-full shadow-sm rounded-xl font-mono" />
+                                                <InputText v-model="form.password" type="password" :required="!isEditing" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="w-full shadow-sm rounded-xl font-mono" />
                                                 <p v-if="isEditing" class="text-xs text-slate-400 mt-2 font-bold italic pl-2">Leave blank to maintain current encryption</p>
                                             </div>
                                         </div>
@@ -163,18 +163,18 @@ onMounted(fetchStaff);
                         <div class="space-y-8">
                             <div class="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-sm space-y-8">
                                 <div class="flex items-center space-x-4">
-                                    <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                                    <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
                                     <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Permission Tier</h3>
                                 </div>
 
                                 <div class="space-y-4">
                                     <label v-for="r in roles" :key="r.value" 
                                         class="block p-5 rounded-2xl border-2 transition-all cursor-pointer group flex items-start space-x-4"
-                                        :class="form.role === r.value ? 'bg-white border-indigo-600 shadow-md' : 'bg-white/50 border-transparent hover:border-slate-200'">
+                                        :class="form.role === r.value ? 'bg-white border-brand-primary shadow-md' : 'bg-white/50 border-transparent hover:border-slate-200'">
                                         <RadioButton v-model="form.role" :inputId="r.value" :value="r.value" class="mt-1" />
                                         <div class="flex flex-col">
                                             <span class="text-xs font-bold tracking-wider mb-1"
-                                                :class="form.role === r.value ? 'text-indigo-600' : 'text-slate-600'">{{ r.label }}</span>
+                                                :class="form.role === r.value ? 'text-brand-primary' : 'text-slate-600'">{{ r.label }}</span>
                                             <span class="text-[10px] font-medium"
                                                 :class="form.role === r.value ? 'text-indigo-400' : 'text-slate-400'">{{ r.desc }}</span>
                                         </div>
@@ -200,3 +200,4 @@ onMounted(fetchStaff);
     outline: none;
 }
 </style>
+

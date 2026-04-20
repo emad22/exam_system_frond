@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -138,9 +138,9 @@ const filteredExams = computed(() => {
                          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Quick identity provisioning</p>
                     </div>
                 </div>
-                <div class="hidden md:flex items-center space-x-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-                    <div class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                    <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Active Enrollment System</span>
+                <div class="hidden md:flex items-center space-x-2 bg-rose-50 px-4 py-2 rounded-2xl border border-indigo-100">
+                    <div class="w-2 h-2 bg-brand-primary rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">Active Enrollment System</span>
                 </div>
             </div>
 
@@ -157,7 +157,7 @@ const filteredExams = computed(() => {
                             <template #content>
                                 <div class="p-4 space-y-8">
                                     <div class="flex items-center space-x-3 mb-2">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                             <i class="pi pi-user text-xs"></i>
                                         </div>
                                         <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Core Identity</h3>
@@ -199,19 +199,19 @@ const filteredExams = computed(() => {
                                 <div class="p-4 space-y-6">
                                     <div class="flex items-center justify-between mb-4">
                                         <div class="flex items-center space-x-3">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-th-large text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Module Assignment</h3>
                                         </div>
-                                        <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100 flex items-center">
+                                        <span class="text-[9px] font-black text-brand-primary uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-lg border border-indigo-100 flex items-center">
                                             <i class="pi pi-unlock mr-2 text-[8px]"></i> Custom Allowed
                                         </span>
                                     </div>
 
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <label v-for="skill in skills" :key="skill.id" 
-                                            :class="form.assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 bg-white'"
+                                            :class="form.assigned_skills.includes(skill.short_code) ? 'border-brand-primary bg-rose-50/30' : 'border-slate-100 bg-white'"
                                             class="flex items-center p-4 rounded-2xl border-2 transition-all duration-300 group cursor-pointer hover:border-indigo-200">
                                             <Checkbox :value="skill.short_code" v-model="form.assigned_skills" />
                                             <span class="ml-4 text-xs font-bold text-slate-700 truncate">
@@ -230,7 +230,7 @@ const filteredExams = computed(() => {
                             <template #content>
                                 <div class="p-4 space-y-8">
                                     <div class="flex items-center space-x-3 mb-2">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                             <i class="pi pi-cog text-xs"></i>
                                         </div>
                                         <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Classification</h3>
@@ -268,7 +268,7 @@ const filteredExams = computed(() => {
                                         <Button icon="pi pi-refresh" text rounded severity="secondary" size="small" @click="form.password = generatePassword()" />
                                      </div>
                                      <div class="flex flex-col space-y-2">
-                                         <InputText v-model="form.password" required class="w-full bg-transparent border-slate-700 text-white text-xl font-black tracking-[0.2em] font-mono text-center focus:border-indigo-500 transition-all py-4" />
+                                         <InputText v-model="form.password" required class="w-full bg-transparent border-slate-700 text-white text-xl font-black tracking-[0.2em] font-mono text-center focus:border-brand-primary transition-all py-4" />
                                          <div class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center">Click to edit or regenerate above</div>
                                      </div>
                                 </div>
@@ -276,7 +276,7 @@ const filteredExams = computed(() => {
                         </Card>
 
                         <div class="pt-4">
-                            <Button type="submit" label="Complete Registration" icon="pi pi-check" :loading="isSubmitting" class="w-full py-6 rounded-3xl shadow-lg shadow-indigo-100 text-sm font-black tracking-widest uppercase" />
+                            <Button type="submit" label="Complete Registration" icon="pi pi-check" :loading="isSubmitting" class="w-full py-6 rounded-3xl shadow-lg shadow-rose-100 text-sm font-black tracking-widest uppercase" />
                         </div>
                     </div>
                 </div>
@@ -300,3 +300,4 @@ const filteredExams = computed(() => {
     padding: 0;
 }
 </style>
+

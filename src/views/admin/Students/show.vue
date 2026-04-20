@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -65,7 +65,7 @@ onMounted(() => {
                 <template #content>
                     <div class="px-8 py-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0 mb-6 rounded-2xl mx-4 mt-2">
                         <div class="flex items-center space-x-6">
-                            <div class="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-3xl font-black shadow-md shadow-indigo-100">
+                            <div class="w-16 h-16 rounded-2xl bg-brand-primary text-white flex items-center justify-center text-3xl font-black shadow-md shadow-rose-100">
                                 {{ selectedStudent.user?.first_name[0] }}
                             </div>
                             <div>
@@ -82,7 +82,7 @@ onMounted(() => {
                     <!-- Data Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
                         <div class="space-y-8">
-                            <h4 class="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center">
+                            <h4 class="text-xs font-black text-brand-primary uppercase tracking-[0.2em] flex items-center">
                                 <i class="pi pi-user mr-3"></i> Identity Profile
                             </h4>
                             <div class="grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
@@ -117,14 +117,14 @@ onMounted(() => {
                     </div>
 
                     <!-- Footer Stats -->
-                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 md:p-10 flex justify-around items-center shadow-lg shadow-indigo-200 mt-4 mx-4 md:mx-12">
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 md:p-10 flex justify-around items-center shadow-lg shadow-rose-200 mt-4 mx-4 md:mx-12">
                         <div class="text-center group">
-                            <p class="text-indigo-100 text-xs font-bold uppercase tracking-widest mb-2"><i class="pi pi-trophy mr-1"></i> Attempts</p>
+                            <p class="text-rose-100 text-xs font-bold uppercase tracking-widest mb-2"><i class="pi pi-trophy mr-1"></i> Attempts</p>
                             <p class="text-white text-4xl font-black">{{ selectedStudent.attempts_count || 0 }}</p>
                         </div>
                         <div class="w-px h-16 bg-white/20"></div>
                         <div class="text-center group">
-                            <p class="text-indigo-100 text-xs font-bold uppercase tracking-widest mb-2"><i class="pi pi-calendar mr-1"></i> Registry Data</p>
+                            <p class="text-rose-100 text-xs font-bold uppercase tracking-widest mb-2"><i class="pi pi-calendar mr-1"></i> Registry Data</p>
                             <p class="text-white text-lg font-bold mt-1">{{ new Date(selectedStudent.created_at).toLocaleDateString() }}</p>
                         </div>
                     </div>
@@ -134,3 +134,4 @@ onMounted(() => {
         </div>
     </AdminLayout>
 </template>
+

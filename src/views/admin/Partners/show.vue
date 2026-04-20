@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -50,7 +50,7 @@ onMounted(() => {
                     <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Read-only partner view</p>
                 </div>
                 <button @click="router.push('/admin/partners')"
-                    class="w-10 h-10 rounded-full bg-white border border-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors shadow-sm">✕</button>
+                    class="w-10 h-10 rounded-full bg-white border border-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors shadow-sm">âœ•</button>
             </div>
 
             <div class="bg-white rounded-[3.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full overflow-hidden flex flex-col border border-slate-100">
@@ -62,7 +62,7 @@ onMounted(() => {
                         <div>
                             <h3 class="text-3xl font-black text-slate-800 tracking-tight">{{ selectedPartner.partner_name }}</h3>
                             <div class="flex items-center space-x-3 mt-1.5">
-                                <span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">Contact Name: {{ selectedPartner.fName_contact || 'N/A' }} {{ selectedPartner.lName_contact }}</span>
+                                <span class="px-3 py-1 bg-rose-50 text-brand-primary rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">Contact Name: {{ selectedPartner.fName_contact || 'N/A' }} {{ selectedPartner.lName_contact }}</span>
                             </div>
                         </div>
                     </div>
@@ -72,8 +72,8 @@ onMounted(() => {
                     <!-- Data Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
                         <div class="space-y-8">
-                            <h4 class="text-[11px] font-black text-indigo-500 uppercase tracking-[0.3em] flex items-center">
-                                <span class="w-2 h-2 bg-indigo-500 rounded-full mr-3"></span> Identity Profile
+                            <h4 class="text-[11px] font-black text-brand-accent uppercase tracking-[0.3em] flex items-center">
+                                <span class="w-2 h-2 bg-brand-accent rounded-full mr-3"></span> Identity Profile
                             </h4>
                             <div class="grid grid-cols-2 gap-6">
                                 <div v-for="(val, key) in { Email: selectedPartner.email, Phone: selectedPartner.phone || 'N/A', Website: selectedPartner.website, Country: selectedPartner.country || 'N/A', Notes: selectedPartner.note || 'N/A', Is_Active: selectedPartner.is_active || 'N/A' }" :key="key" class="space-y-1">
@@ -91,3 +91,4 @@ onMounted(() => {
         </div>
     </AdminLayout>
 </template>
+

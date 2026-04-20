@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, computed } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -148,7 +148,7 @@ onMounted(fetchData);
 
             <!-- Empty Global State -->
             <div v-else class="bg-white rounded-[3rem] shadow-[0_32px_120px_rgba(0,0,0,0.02)] border border-slate-100 p-24 text-center group mt-6">
-                <div class="w-24 h-24 bg-indigo-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 text-5xl group-hover:rotate-12 transition-transform duration-500 text-indigo-500">
+                <div class="w-24 h-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 text-5xl group-hover:rotate-12 transition-transform duration-500 text-brand-accent">
                     <i class="pi pi-shield"></i>
                 </div>
                 <h3 class="text-3xl font-black text-slate-800 mb-4 tracking-tight uppercase">No Staff Members</h3>
@@ -167,3 +167,4 @@ onMounted(fetchData);
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>
+

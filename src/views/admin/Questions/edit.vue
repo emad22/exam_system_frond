@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -154,7 +154,7 @@ onMounted(async () => {
                 <template #content>
                     <div class="p-4 space-y-6">
                         <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
-                            <span class="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mr-3 text-sm font-black">1</span>
+                            <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">1</span>
                             Basic Configuration
                         </h3>
                         
@@ -192,7 +192,7 @@ onMounted(async () => {
                 <template #content>
                     <div class="p-4">
                         <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
-                            <span class="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mr-3 text-sm font-black">2</span>
+                            <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">2</span>
                             Question Content
                         </h3>
                         <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Question Text</label>
@@ -207,7 +207,7 @@ onMounted(async () => {
                     <div class="p-4">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="text-lg font-bold text-slate-800 flex items-center">
-                                <span class="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mr-3 text-sm font-black">3</span>
+                                <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">3</span>
                                 Answer Options
                             </h3>
                             <Button v-if="['mcq', 'short_answer'].includes(form.type)" type="button" @click="addOption" icon="pi pi-plus" label="Add Option" text size="small" rounded />
@@ -233,7 +233,7 @@ onMounted(async () => {
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-6 p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 text-xs font-bold tracking-wide flex items-center">
+                        <div class="mt-6 p-4 bg-rose-50 text-brand-secondary rounded-xl border border-indigo-100 text-xs font-bold tracking-wide flex items-center">
                             <i class="pi pi-info-circle mr-3 text-lg"></i> Click the circle next to an option to mark it as correct.
                         </div>
                     </div>
@@ -248,3 +248,4 @@ onMounted(async () => {
     </div>
   </AdminLayout>
 </template>
+

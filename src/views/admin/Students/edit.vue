@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -236,10 +236,10 @@ onMounted(() => {
 
                         <div>
                             <div class="flex items-center justify-between mb-8 ml-4">
-                                <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center">
+                                <label class="block text-[10px] font-black text-brand-primary uppercase tracking-widest flex items-center">
                                     <i class="pi pi-bolt mr-2"></i> Module Assignment Matrix
                                 </label>
-                                <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100 flex items-center">
+                                <span class="text-[9px] font-bold text-brand-primary uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-lg border border-indigo-100 flex items-center">
                                     <i class="pi pi-unlock mr-2"></i> Custom Overrides Enabled
                                 </span>
                             </div>
@@ -248,7 +248,7 @@ onMounted(() => {
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <label v-for="skill in skills" :key="skill.id" 
-                                    :class="editForm.assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-white shadow-sm' : 'border-slate-100 bg-white'"
+                                    :class="editForm.assigned_skills.includes(skill.short_code) ? 'border-brand-primary bg-white shadow-sm' : 'border-slate-100 bg-white'"
                                     class="flex items-center p-5 rounded-2xl border-2 transition-all duration-300 group cursor-pointer hover:border-indigo-200">
                                     <Checkbox :value="skill.short_code" v-model="editForm.assigned_skills" />
                                     <span class="ml-4 text-xs font-bold text-slate-700 truncate">
@@ -276,3 +276,4 @@ onMounted(() => {
         </div>
     </AdminLayout>
 </template>
+

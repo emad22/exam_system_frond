@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -131,7 +131,7 @@ onMounted(() => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center shadow-lg shadow-rose-100">
                                                 <i class="pi pi-pencil text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Bundle Identity</h3>
@@ -155,18 +155,18 @@ onMounted(() => {
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center justify-between mb-2">
                                             <div class="flex items-center space-x-3">
-                                                <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                                <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                     <i class="pi pi-th-large text-xs"></i>
                                                 </div>
                                                 <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Skill Matrix Association</h3>
                                             </div>
-                                            <span class="text-[9px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest">{{ currentPackage.skills.length }} Active</span>
+                                            <span class="text-[9px] font-black text-brand-accent bg-rose-50 px-3 py-1 rounded-full uppercase tracking-widest">{{ currentPackage.skills.length }} Active</span>
                                         </div>
 
                                         <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                                             <div v-for="skill in availableSkills" :key="skill.id" 
                                                  class="flex items-center p-3 rounded-2xl border transition-all duration-300 cursor-pointer group"
-                                                 :class="currentPackage.skills.includes(skill.short_code) ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-200'">
+                                                 :class="currentPackage.skills.includes(skill.short_code) ? 'bg-rose-50 border-indigo-200 shadow-sm' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-200'">
                                                 <Checkbox v-model="currentPackage.skills" :inputId="'skill-'+skill.id" :value="skill.short_code" />
                                                 <label :for="'skill-'+skill.id" class="ml-3 flex flex-col cursor-pointer">
                                                     <span class="text-[10px] font-black text-slate-700 uppercase tracking-tight leading-none">{{ skill.name }}</span>
@@ -185,7 +185,7 @@ onMounted(() => {
                                 <template #content>
                                     <div class="p-4 space-y-8">
                                         <div class="flex items-center space-x-3 mb-2">
-                                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                                 <i class="pi pi-cog text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Specifications</h3>
@@ -193,7 +193,7 @@ onMounted(() => {
 
                                         <div class="flex flex-col space-y-2">
                                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">Skill Depth Capacity (Autosync)</label>
-                                            <InputNumber v-model="currentPackage.skills_count" readonly class="w-full opacity-70" inputClass="rounded-xl bg-slate-100 border-slate-100 font-black text-center text-indigo-600" />
+                                            <InputNumber v-model="currentPackage.skills_count" readonly class="w-full opacity-70" inputClass="rounded-xl bg-slate-100 border-slate-100 font-black text-center text-brand-primary" />
                                             <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest ml-1 italic leading-none">Mapped to active module selection</p>
                                         </div>
 
@@ -218,7 +218,7 @@ onMounted(() => {
                             </Card>
 
                             <div class="pt-4">
-                                <Button type="submit" label="Commit Updates" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-indigo-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
+                                <Button type="submit" label="Commit Updates" icon="pi pi-check" :loading="isSaving" class="w-full py-6 rounded-3xl shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" />
                             </div>
                         </div>
 
@@ -256,3 +256,4 @@ onMounted(() => {
     animation: slide-in-bottom 0.8s ease-out;
 }
 </style>
+

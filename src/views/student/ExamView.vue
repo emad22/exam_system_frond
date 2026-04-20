@@ -2,6 +2,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/services/api';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 
 const route = useRoute();
 const router = useRouter();
@@ -13,8 +15,8 @@ const questions = ref([]);
 const currentIndex = ref(0);
 const answers = ref([]);
 const systemRequirements = ref([]);
-const globalOffset = ref(0);       // questions answered in previous batches (this skill)
-const totalSkillQuestions = ref(0); // total expected for this skill
+const globalOffset = ref(0);       
+const totalSkillQuestions = ref(0); 
 
 const isLoading = ref(true);
 const isStarting = ref(true); 
@@ -32,7 +34,6 @@ const canStart = computed(() => {
 });
 
 const toggleRequirement = (id) => {
-    // Don't toggle auto-verified items
     if (autoVerifiedIds.value.includes(id)) return;
     const index = checkedRequirements.value.indexOf(id);
     if (index === -1) {
@@ -42,7 +43,6 @@ const toggleRequirement = (id) => {
     }
 };
 
-// Auto-detect system capabilities and pre-check matching requirements
 const autoVerifyRequirements = (requirements) => {
     const ua = navigator.userAgent.toLowerCase();
     const isOnline = navigator.onLine;
@@ -82,8 +82,6 @@ const fetchData = async () => {
         ]);
         attempt.value = attRes.data;
         systemRequirements.value = reqRes.data;
-        
-        // Run auto-detection after requirements are loaded
         autoVerifyRequirements(reqRes.data);
         
         if (attempt.value.status === 'completed') {
@@ -110,12 +108,10 @@ const fetchNextBatch = async () => {
     try {
         const res = await api.get(`/attempts/${attemptId}/next-batch`);
         if (res.data.questions && res.data.questions.length > 0) {
-            // If we're starting a new skill, reset the global offset
             if (currentSkill.value?.id !== res.data.skill?.id) {
                 globalOffset.value = 0;
             }
             currentSkill.value = res.data.skill;
-            // Set total questions for this skill (returned by backend)
             if (res.data.total_questions) {
                 totalSkillQuestions.value = res.data.total_questions;
             }
@@ -140,9 +136,7 @@ const fetchNextBatch = async () => {
     }
 };
 
-// Step 1: Student confirms their answer for the current question
 const submitAnswer = () => {
-    // Require an answer to be selected
     const ans = answers.value[currentIndex.value];
     if (!ans.option_id && !ans.text_answer) {
         alert('Please select an answer before submitting.');
@@ -151,7 +145,6 @@ const submitAnswer = () => {
     questionSubmitted.value = true;
 };
 
-// Step 2: Advance to next question or submit the full batch
 const advanceQuestion = async () => {
     questionSubmitted.value = false;
     if (currentIndex.value < questions.value.length - 1) {
@@ -171,8 +164,9 @@ const submitCurrentBatch = async () => {
         
         if (res.data.finished_exam) {
             router.push(`/exam/${attemptId}/result`);
+        } else if (res.data.next_step === 'dashboard') {
+            router.push('/dashboard');
         } else {
-            // Accumulate the answered questions count
             globalOffset.value += questions.value.length;
             await fetchNextBatch();
         }
@@ -206,178 +200,199 @@ onMounted(fetchData);
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FDFDFD] font-sans text-slate-900 border-t-[6px] border-[#004a99]">
+  <div class="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-rose-100 selection:text-indigo-900 overflow-x-hidden">
     
-    <!-- Academic Header (TOEFL Style) -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div class="max-w-[1600px] mx-auto px-8 py-5 flex justify-between items-center">
+    <!-- Assessment Header -->
+    <header class="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-8 h-20 flex justify-between items-center">
             
             <div class="flex items-center space-x-6">
-                <div class="flex items-center space-x-3 border-r pr-6 border-slate-200">
-                    <div class="w-10 h-10 bg-[#004a99] rounded-lg flex items-center justify-center text-white font-black italic">A</div>
-                    <span class="text-sm font-black tracking-tight text-slate-800 uppercase">Assessment Center</span>
+                <div class="flex items-center space-x-3 pr-6 border-r border-slate-100">
+                    <div class="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-brand-primary/20">A</div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-black tracking-tight text-brand-primary uppercase leading-tight">Arab<span class="text-brand-accent">Academy</span></span>
+                        <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none">Assessment Suite</span>
+                    </div>
                 </div>
                 
-                <div v-if="!isStarting && currentSkill">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current Section</p>
-                    <h1 class="text-sm font-black text-[#004a99] uppercase tracking-wide">{{ currentSkill.name }}</h1>
+                <div v-if="!isStarting && currentSkill" class="animate-in fade-in slide-in-from-left-4 duration-500">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
+                        <h1 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">{{ currentSkill.name }} Domain</h1>
+                    </div>
                 </div>
             </div>
 
             <div v-if="!isStarting && questions.length > 0" class="flex items-center space-x-8">
-                <!-- Section Name -->
-                <div class="text-center hidden sm:block" v-if="currentSkill">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Section</p>
-                    <p class="text-sm font-black text-[#004a99] uppercase">{{ currentSkill.name }}</p>
-                </div>
-
-                <div class="w-px h-8 bg-slate-200 hidden sm:block"></div>
-
                 <!-- Global Question Counter -->
-                <div class="text-center">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Question</p>
-                    <p class="text-base font-black text-slate-800">
-                        {{ displayNumber }} <span class="text-slate-300 font-medium">/</span> {{ displayTotal }}
-                    </p>
+                <div class="bg-slate-50 px-6 py-2 rounded-2xl border border-slate-100 flex items-center space-x-4 shadow-sm">
+                    <div class="text-center">
+                        <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Progress Matrix</p>
+                        <p class="text-sm font-black text-brand-primary tracking-tighter">
+                            {{ displayNumber }} <span class="text-slate-300 mx-1">/</span> {{ displayTotal }}
+                        </p>
+                    </div>
                 </div>
 
-                <Button label="Exit" text severity="danger" size="small" class="font-black text-[10px] uppercase tracking-widest" @click="router.push('/dashboard')" />
+                <div class="h-8 w-px bg-slate-100"></div>
+
+                <button @click="router.push('/dashboard')" class="text-rose-500 bg-rose-50 hover:bg-rose-100 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-rose-100">
+                    Interrupt Session
+                </button>
             </div>
         </div>
         
         <!-- Global Progress Line -->
         <div v-if="!isStarting && questions.length > 0 && totalSkillQuestions > 0" class="h-1 w-full bg-slate-50">
-            <div class="h-full bg-[#004a99] transition-all duration-700" :style="{ width: `${(displayNumber / totalSkillQuestions) * 100}%` }"></div>
+            <div class="h-full bg-brand-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(159,18,57,0.3)]" :style="{ width: `${(displayNumber / totalSkillQuestions) * 100}%` }"></div>
         </div>
     </header>
 
-    <main class="w-full relative z-10 transition-all duration-500">
+    <main class="w-full relative z-10 min-h-[calc(100vh-80px)]">
         
         <!-- Loading -->
-        <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
-             <div class="w-12 h-12 border-4 border-slate-100 border-t-[#004a99] rounded-full animate-spin"></div>
-             <p class="mt-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Syncing Test Content...</p>
+        <div v-if="isLoading" class="flex flex-col items-center justify-center py-48">
+             <div class="w-12 h-12 border-4 border-slate-100 border-t-brand-primary rounded-full animate-spin"></div>
+             <p class="mt-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] animate-pulse">Syncing Cognitive Assets...</p>
         </div>
 
         <!-- Error -->
-        <div v-else-if="errorMsg" class="max-w-xl mx-auto py-32 text-center space-y-8 animate-in zoom-in duration-500">
-             <div class="text-6xl mb-6 grayscale opacity-30">⚠️</div>
-             <h2 class="text-2xl font-black text-slate-800 tracking-tight">System Notification</h2>
-             <p class="text-slate-500 font-medium leading-relaxed">{{ errorMsg }}</p>
+        <div v-else-if="errorMsg" class="max-w-2xl mx-auto py-32 px-8 text-center space-y-12 animate-in zoom-in-95 duration-500">
+             <div class="w-24 h-24 bg-rose-50 text-rose-500 rounded-[2rem] flex items-center justify-center text-4xl mx-auto shadow-sm border border-rose-100">
+                 <i class="pi pi-exclamation-triangle"></i>
+             </div>
+             <div class="space-y-4">
+                 <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase">Operational Error</h2>
+                 <p class="text-slate-500 font-medium leading-relaxed text-lg">{{ errorMsg }}</p>
+             </div>
              <div class="pt-6">
-                 <Button label="Return to Dashboard" severity="secondary" @click="router.push('/dashboard')" />
+                 <button @click="router.push('/dashboard')" class="bg-brand-primary text-white px-12 py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl shadow-rose-100 hover:-translate-y-1 transition-all">
+                    Return to Mission Control
+                 </button>
              </div>
         </div>
 
         <!-- 1. Formal Assessment Introduction (Test Booklet Style) -->
-        <div v-else-if="isStarting && attempt" class="max-w-4xl mx-auto px-8 py-20 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-             <div class="bg-white border-2 border-slate-200 rounded-[3.5rem] p-12 md:p-24 shadow-[0_45px_150px_rgba(0,0,0,0.08)] relative overflow-hidden">
+        <div v-else-if="isStarting && attempt" class="max-w-5xl mx-auto px-8 py-20 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+             <div class="bg-white border border-slate-100 rounded-[3.5rem] p-12 md:p-24 shadow-[0_40px_100px_rgba(0,0,0,0.04)] relative overflow-hidden">
                   
-                  <!-- Booklet Trim Decoration -->
-                  <div class="absolute inset-y-0 left-0 w-4 bg-[#004a99]"></div>
-                  <div class="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-bl-[4rem]"></div>
+                  <!-- Abstract Decorative Elements -->
+                  <div class="absolute -top-24 -right-24 w-64 h-64 bg-brand-primary/5 rounded-full blur-3xl"></div>
+                  <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-brand-accent/5 rounded-full blur-3xl"></div>
 
                   <div class="relative z-10 text-center mb-20">
-                       <div class="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-10 shadow-sm">
-                            <i class="pi pi-verified text-2xl text-[#004a99]"></i>
+                       <div class="w-20 h-20 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-10 shadow-sm transition-transform hover:rotate-6 duration-500">
+                            <i class="pi pi-shield text-3xl text-brand-primary"></i>
                        </div>
                        
-                       <div class="flex flex-col items-center space-y-4 mb-4">
-                            <span class="text-[10px] font-black text-[#004a99] uppercase tracking-[0.4em]">Official Evaluation Portal</span>
-                            <div class="h-px w-20 bg-slate-200"></div>
+                       <div class="flex flex-col items-center space-y-6 mb-8">
+                            <span class="text-[10px] font-black text-brand-primary/60 uppercase tracking-[0.5em] ml-[0.5em]">Evaluation Protocol Initiation</span>
+                            <div class="h-1.5 w-16 bg-gradient-to-r from-brand-primary to-brand-accent rounded-full"></div>
                        </div>
                        
-                       <h2 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-none mb-6">Academic Assessment Session</h2>
-                       <p class="text-slate-400 font-medium max-w-lg mx-auto text-base italic leading-relaxed">"Welcome to the institutional assessment framework. Please verify your system readiness below before proceeding."</p>
+                       <h2 class="text-5xl md:text-6xl font-black text-slate-900 tracking-tighter leading-none mb-8">Ready for Assessment?</h2>
+                       <p class="text-slate-400 font-medium max-w-xl mx-auto text-lg leading-relaxed italic">"Verification complete. You are about to enter a timed evaluation sequence. Please ensure zero interruptions."</p>
                   </div>
 
                   <!-- Instruction Matrix -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-20 text-left border-y border-slate-100 py-16">
-                       <div class="space-y-6">
-                            <h4 class="text-[10px] font-black text-slate-300 uppercase tracking-widest border-l-2 border-[#004a99] pl-4">Assessment Scope</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20 text-left bg-slate-50/50 rounded-[2.5rem] p-12 border border-slate-100">
+                       <div class="space-y-8">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center">
+                                <span class="w-6 h-px bg-slate-200 mr-4"></span>
+                                Evaluation Components
+                            </h4>
                             <div class="space-y-4">
-                                 <div v-for="skill in attempt.skills" :key="skill.id" class="flex items-center space-x-4">
-                                      <div class="w-6 h-6 bg-blue-50 text-[#004a99] rounded-lg flex items-center justify-center text-[8px] font-black border border-blue-100">MT</div>
-                                      <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">{{ skill.name }}</span>
+                                 <div v-for="skill in attempt.skills" :key="skill.id" class="flex items-center space-x-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm group hover:border-brand-primary/20 transition-all">
+                                      <div class="w-10 h-10 bg-rose-50 text-brand-primary rounded-xl flex items-center justify-center text-xl shadow-sm italic transition-transform group-hover:scale-110">
+                                          {{ getSkillIcon(skill.name) }}
+                                      </div>
+                                      <div>
+                                          <span class="text-xs font-black text-slate-800 uppercase tracking-widest block leading-none mb-1">{{ skill.name }}</span>
+                                          <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest opacity-60">Verified Domain</span>
+                                      </div>
                                  </div>
                             </div>
                        </div>
-                        <div class="space-y-6">
-                            <h4 class="text-[10px] font-black text-slate-300 uppercase tracking-widest border-l-2 border-[#004a99] pl-4">System Readiness Check</h4>
-                            <ul class="text-xs font-bold text-slate-400 space-y-4 list-none">
+                        <div class="space-y-8">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center">
+                                <span class="w-6 h-px bg-slate-200 mr-4"></span>
+                                Integrity Prerequisites
+                            </h4>
+                            <ul class="space-y-4">
                                  <li v-for="req in systemRequirements" :key="req.id" 
-                                     class="flex items-center group rounded-xl transition-colors"
-                                     :class="autoVerifiedIds.includes(req.id) ? 'opacity-100' : 'cursor-pointer'"
-                                     @click="toggleRequirement(req.id)">
-                                      <!-- Checkbox / Auto-check indicator -->
+                                      class="flex items-start group rounded-2xl p-4 transition-all bg-white border border-slate-100 shadow-sm"
+                                      :class="autoVerifiedIds.includes(req.id) ? 'border-emerald-100' : 'cursor-pointer hover:border-brand-primary/20'"
+                                      @click="toggleRequirement(req.id)">
+                                      
                                       <div class="relative mr-4 shrink-0">
                                           <div :class="checkedRequirements.includes(req.id) 
-                                              ? (autoVerifiedIds.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-[#004a99] border-[#004a99]') 
-                                              : 'border-slate-200 bg-white group-hover:border-slate-300'" 
-                                               class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
-                                               <i v-if="checkedRequirements.includes(req.id)" class="pi pi-check text-[10px] text-white"></i>
+                                              ? (autoVerifiedIds.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-brand-primary border-brand-primary') 
+                                              : 'border-slate-200 bg-slate-50 group-hover:border-slate-300'" 
+                                               class="w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all shadow-sm">
+                                               <i v-if="checkedRequirements.includes(req.id)" class="pi pi-check text-xs text-white"></i>
                                           </div>
                                       </div>
-                                      <!-- Text -->
-                                      <div class="flex-1">
-                                           <div class="flex items-center gap-2">
-                                               <span :class="checkedRequirements.includes(req.id) ? (autoVerifiedIds.includes(req.id) ? 'text-emerald-600' : 'text-[#004a99]') : 'text-slate-600'" 
-                                                     class="transition-colors font-bold">{{ req.title }}</span>
-                                               <span v-if="autoVerifiedIds.includes(req.id)" class="text-[8px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                                   ✓ Auto-Verified
+                                      
+                                      <div class="flex-1 pt-1">
+                                           <div class="flex flex-wrap items-center gap-2">
+                                               <span :class="checkedRequirements.includes(req.id) ? (autoVerifiedIds.includes(req.id) ? 'text-emerald-700' : 'text-brand-primary') : 'text-slate-600'" 
+                                                     class="transition-colors font-black uppercase text-[11px] tracking-tight">{{ req.title }}</span>
+                                               <span v-if="autoVerifiedIds.includes(req.id)" class="text-[7px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full font-black uppercase tracking-[0.2em] ml-auto">
+                                                   System Pass ✓
                                                </span>
                                            </div>
-                                           <p class="text-[10px] text-slate-400 mt-0.5">
-                                               <span v-if="autoVerifiedIds.includes(req.id)" class="text-emerald-500">System check passed</span>
-                                               <span v-else-if="req.is_mandatory" class="text-orange-400 uppercase tracking-wider">Confirm manually ↑</span>
-                                               <span v-else>Optional — Please verify</span>
+                                           <p class="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter leading-relaxed">
+                                               {{ req.is_mandatory ? 'Required for Authentication' : 'Recommended Optimization' }}
                                            </p>
                                       </div>
-                                 </li>
-                                 <li v-if="systemRequirements.length === 0" class="flex items-start text-slate-400 italic">
-                                      <i class="pi pi-verified text-[10px] mt-1 mr-3 text-slate-200"></i>
-                                      <div>Standard assessment protocol verified.</div>
                                  </li>
                             </ul>
                        </div>
                   </div>
 
-                  <div class="flex flex-col items-center space-y-10">
+                  <div class="flex flex-col items-center space-y-12">
                        <button @click="beginExam" 
                             :disabled="!canStart"
-                            :class="!canStart ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none grayscale' : 'bg-[#004a99] text-white shadow-2xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1 active:scale-95'"
-                            class="px-16 py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] transition-all duration-300">
-                            Enter Official Session ➜
+                            :class="!canStart ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-brand-primary text-white shadow-2xl shadow-rose-100 hover:shadow-rose-300 hover:-translate-y-2 active:scale-95'"
+                            class="px-20 py-8 rounded-[3rem] font-black uppercase text-[11px] tracking-[0.4em] ml-[0.4em] transition-all duration-500 flex items-center space-x-6">
+                            <span>Initialize Assessment Loop</span>
+                            <i class="pi pi-arrow-right animate-pulse"></i>
                        </button>
-                       <div class="flex items-center space-x-6">
-                           <div class="flex items-center space-x-2 grayscale opacity-40">
-                                <i class="pi pi-lock-open text-[10px]"></i>
-                                <span class="text-[8px] font-black uppercase tracking-widest text-slate-800">Identity Secured</span>
-                           </div>
-                           <div class="w-px h-3 bg-slate-200"></div>
-                           <div class="flex items-center space-x-2 grayscale opacity-40">
-                                <i class="pi pi-globe text-[10px]"></i>
-                                <span class="text-[8px] font-black uppercase tracking-widest text-slate-800">Region Locked</span>
-                           </div>
+                       <div class="flex items-center space-x-8 opacity-40">
+                            <div class="flex items-center space-x-3">
+                                 <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"><i class="pi pi-lock text-[10px]"></i></div>
+                                 <span class="text-[8px] font-black uppercase tracking-[0.2em]">Encrypted</span>
+                            </div>
+                            <div class="w-1 h-1 bg-slate-300 rounded-full"></div>
+                            <div class="flex items-center space-x-3">
+                                 <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"><i class="pi pi-server text-[10px]"></i></div>
+                                 <span class="text-[8px] font-black uppercase tracking-[0.2em]">Validated</span>
+                            </div>
                        </div>
                   </div>
              </div>
         </div>
 
         <!-- THE EXAM VIEW (TOEFL Split Screen Logic) -->
-        <div v-else-if="currentQ" class="h-[calc(100vh-86px)] overflow-hidden">
+        <div v-else-if="currentQ" class="h-[calc(100vh-80px)] overflow-hidden animate-in fade-in duration-1000">
             
             <div :class="[currentQ.passage_content ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1']" class="grid h-full w-full">
                 
                 <!-- Left Pane: Passage (Pinned as in TOEFL) -->
-                <div v-if="currentQ.passage_content" class="bg-white border-r border-slate-200 overflow-y-auto p-12 md:p-20 custom-scrollbar animate-in slide-in-from-left-6 duration-700">
+                <div v-if="currentQ.passage_content" class="bg-white border-r border-slate-100 overflow-y-auto p-12 md:p-24 custom-scrollbar animate-in slide-in-from-left-12 duration-1000 shadow-inner">
                     <div class="max-w-3xl mx-auto">
-                        <div class="flex items-center space-x-3 mb-12">
-                             <div class="w-1 h-6 bg-[#004a99]"></div>
-                             <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Reading Passage</span>
+                        <div class="flex items-start justify-between mb-16 px-4">
+                             <div class="flex items-center space-x-4">
+                                  <div class="w-1.5 h-10 bg-brand-primary rounded-full shadow-sm shadow-brand-primary/20"></div>
+                                  <div>
+                                       <span class="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em] block mb-1">Contextual Resource</span>
+                                       <h3 class="text-xl font-black text-slate-800 uppercase tracking-tight italic">Reading Passage Matrix</h3>
+                                  </div>
+                             </div>
+                             <div class="text-[9px] font-black text-brand-primary uppercase tracking-[0.2em] bg-rose-50 px-4 py-2 rounded-xl border border-rose-100">Academic Scroll</div>
                         </div>
                         <div class="prose prose-slate max-w-none">
-                             <div class="text-2xl font-medium text-slate-800 leading-[1.8] whitespace-pre-wrap font-serif text-justify dir-rtl pr-6">
+                             <div class="text-2xl font-medium text-slate-800 leading-[2.1] whitespace-pre-wrap font-serif text-justify dir-rtl pr-10 border-r-2 border-slate-50 transition-all hover:border-brand-primary/10">
                                  {{ currentQ.passage_content }}
                              </div>
                         </div>
@@ -385,140 +400,165 @@ onMounted(fetchData);
                 </div>
 
                 <!-- Right Pane: Question & Answers -->
-                <div :class="{'bg-[#F8FAFC]': currentQ.passage_content}" class="overflow-y-auto p-12 md:p-20 flex flex-col items-center justify-start animate-in slide-in-from-right-6 duration-700">
-                    <div class="w-full max-w-2xl">
+                <div :class="{'bg-white': !currentQ.passage_content, 'bg-slate-50/30': currentQ.passage_content}" class="overflow-y-auto p-12 md:p-24 flex flex-col items-center justify-start animate-in slide-in-from-right-12 duration-1000">
+                    <div class="w-full max-w-2xl bg-white p-12 md:p-16 rounded-[3.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.03)] border border-slate-100">
                         
                         <!-- Question Header -->
-                        <div class="mb-12 flex items-center justify-between">
-                             <div class="text-[10px] font-black text-[#004a99] bg-blue-50 px-4 py-1.5 rounded-lg border border-blue-100 uppercase tracking-widest">
-                                 {{ currentSkill?.name }} Task
+                        <div class="mb-14 flex items-center justify-between border-b border-slate-50 pb-8">
+                             <div class="text-[10px] font-black text-brand-primary bg-rose-50 px-4 py-2 rounded-xl border border-rose-100 uppercase tracking-[0.2em]">
+                                 {{ currentSkill?.name }} Protocol
                              </div>
-                             <div class="text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Difficulty Verified</div>
+                             <div class="flex items-center space-x-2">
+                                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                 <div class="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Synapse Active</div>
+                             </div>
                         </div>
 
                         <!-- Question Content -->
-                        <div class="space-y-6 mb-16">
-                            <h2 class="text-2xl md:text-3xl font-black text-slate-800 leading-tight tracking-tight">
+                        <div class="space-y-10 mb-20">
+                            <h2 class="text-3xl md:text-4xl font-black text-slate-900 leading-[1.25] tracking-tighter">
                                 {{ currentQ.content }}
                             </h2>
 
                             <!-- Audio Player -->
-                            <div v-if="currentQ.media_url" class="p-6 bg-white border-2 border-slate-100 rounded-3xl shadow-sm flex items-center space-x-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                                    <i class="pi pi-volume-up text-xl"></i>
+                            <div v-if="currentQ.media_url" class="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-sm flex flex-col space-y-6 animate-in slide-in-from-top-6 duration-700">
+                                <div class="flex items-center justify-between">
+                                     <div class="flex items-center space-x-4">
+                                          <div class="w-12 h-12 bg-white text-brand-primary rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
+                                              <i class="pi pi-volume-up text-xl"></i>
+                                          </div>
+                                          <span class="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">Audio Transceiver</span>
+                                     </div>
+                                     <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest italic opacity-60">High-Fidelity Stream</span>
                                 </div>
-                                <div class="flex-1">
-                                    <audio :src="currentQ.media_url" controls class="w-full h-10"></audio>
-                                    <p class="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest pl-2">Listening Resource Attached</p>
-                                </div>
+                                <audio :src="currentQ.media_url" controls class="w-full h-12 rounded-full opacity-90 hover:opacity-100 transition-opacity"></audio>
                             </div>
                         </div>
 
                         <!-- A. MCQ (Clean Professional List) -->
-                        <div v-if="currentQ.type === 'mcq'" class="space-y-4" :class="questionSubmitted ? 'pointer-events-none' : ''">
+                        <div v-if="currentQ.type === 'mcq'" class="space-y-5" :class="questionSubmitted ? 'pointer-events-none' : ''">
                             <label v-for="(option, idx) in currentQ.options" :key="option.id" 
                                 :class="[
-                                    answers[currentIndex].option_id === option.id ? 'border-[#004a99] bg-white ring-4 ring-blue-50' : 'border-slate-200 bg-white',
-                                    questionSubmitted && answers[currentIndex].option_id !== option.id ? 'opacity-40' : '',
-                                    !questionSubmitted ? 'hover:border-slate-300 cursor-pointer' : 'cursor-default'
+                                    answers[currentIndex].option_id === option.id ? 'border-brand-primary bg-rose-50/10 ring-8 ring-rose-50/30' : 'border-slate-100 bg-white hover:border-slate-200',
+                                    questionSubmitted && answers[currentIndex].option_id !== option.id ? 'opacity-30' : '',
+                                    !questionSubmitted ? 'cursor-pointer' : 'cursor-default'
                                 ]"
-                                class="flex items-center p-6 rounded-2xl border-2 transition-all duration-300 group shadow-sm">
+                                class="flex items-center p-8 rounded-[1.75rem] border-2 transition-all duration-500 group relative">
                                 <input type="radio" :value="option.id" v-model="answers[currentIndex].option_id" class="hidden" :disabled="questionSubmitted">
                                 
-                                <div :class="answers[currentIndex].option_id === option.id ? 'bg-[#004a99] border-[#004a99] text-white' : 'bg-white border-slate-200 text-slate-400 group-hover:border-slate-300'"
-                                     class="w-10 h-10 rounded-xl border-2 flex items-center justify-center mr-6 transition-all duration-300 flex-shrink-0 font-black text-xs">
+                                <div :class="answers[currentIndex].option_id === option.id ? 'bg-brand-primary border-brand-primary text-white shadow-lg shadow-rose-100' : 'bg-slate-50 border-slate-100 text-slate-300 group-hover:border-slate-200'"
+                                     class="w-12 h-12 rounded-xl border-2 flex items-center justify-center mr-6 transition-all duration-500 flex-shrink-0 font-black text-xs italic tracking-tighter">
                                     {{ String.fromCharCode(65 + idx) }}
                                 </div>
-                                <span class="text-lg font-bold text-slate-700">{{ option.option_text }}</span>
+                                <span class="text-xl font-bold text-slate-800 leading-tight tracking-tight">{{ option.option_text }}</span>
                             </label>
                         </div>
 
                         <!-- B. True/False -->
-                        <div v-if="currentQ.type === 'true_false'" class="flex gap-6" :class="questionSubmitted ? 'pointer-events-none' : ''">
+                        <div v-if="currentQ.type === 'true_false'" class="grid grid-cols-2 gap-8" :class="questionSubmitted ? 'pointer-events-none' : ''">
                              <label v-for="option in currentQ.options" :key="option.id" 
                                 :class="[
-                                    answers[currentIndex].option_id === option.id ? 'border-[#004a99] bg-white ring-4 ring-blue-50' : 'border-slate-200 bg-white',
+                                    answers[currentIndex].option_id === option.id ? 'border-brand-primary bg-rose-50/10 ring-8 ring-rose-50/30' : 'border-slate-100 bg-white hover:border-slate-200',
                                     questionSubmitted && answers[currentIndex].option_id !== option.id ? 'opacity-30' : '',
-                                    !questionSubmitted ? 'cursor-pointer' : 'cursor-default'
+                                    !questionSubmitted ? 'cursor-pointer transform hover:-translate-y-1' : 'cursor-default'
                                 ]"
-                                class="flex-1 flex flex-col items-center justify-center p-12 rounded-[2.5rem] border-2 transition-all duration-300 group shadow-sm">
+                                class="flex flex-col items-center justify-center p-16 rounded-[2.5rem] border-2 transition-all duration-500 group shadow-sm">
                                  <input type="radio" :value="option.id" v-model="answers[currentIndex].option_id" class="hidden" :disabled="questionSubmitted">
-                                 <i :class="[
-                                       option.option_text === 'True' ? 'pi pi-check-circle text-emerald-500' : 'pi pi-times-circle text-rose-500',
-                                       answers[currentIndex].option_id === option.id ? 'opacity-100 scale-125' : 'opacity-20 grayscale'
-                                 ]" class="text-4xl mb-4 transition-all"></i>
-                                 <span class="font-black text-[10px] uppercase tracking-widest text-[#004a99]">{{ option.option_text }}</span>
+                                 <div class="mb-10 w-20 h-20 bg-slate-50 rounded-[1.5rem] flex items-center justify-center group-hover:bg-white transition-colors duration-500 shadow-sm border border-slate-50">
+                                     <i :class="[
+                                           option.option_text === 'True' || option.option_text === 'صواب' ? 'pi pi-check-circle text-emerald-500' : 'pi pi-times-circle text-rose-500',
+                                           answers[currentIndex].option_id === option.id ? 'opacity-100 scale-125' : 'opacity-20 grayscale'
+                                     ]" class="text-5xl transition-all duration-700"></i>
+                                 </div>
+                                 <span class="font-black text-xs uppercase tracking-[0.3em] ml-[0.3em] text-slate-800">{{ option.option_text }}</span>
                              </label>
                         </div>
 
                         <!-- C. Short Answer -->
-                        <div v-if="currentQ.type === 'short_answer'" class="space-y-4">
-                             <InputText v-model="answers[currentIndex].text_answer" placeholder="Type your answer here..." 
-                                class="w-full rounded-2xl p-6 bg-white border-2 border-slate-200 text-lg font-bold text-slate-700 focus:border-[#004a99] transition-all" />
-                             <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-4">Your response will be verified for master accuracy</p>
+                        <div v-if="currentQ.type === 'short_answer'" class="space-y-6">
+                             <div class="relative group">
+                                 <div class="absolute inset-0 bg-brand-primary/5 rounded-[1.5rem] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+                                 <InputText v-model="answers[currentIndex].text_answer" 
+                                    placeholder="Execute textual response..." 
+                                    class="relative w-full rounded-3xl p-10 bg-slate-50 border-2 border-slate-100 text-2xl font-black text-slate-800 focus:border-brand-primary focus:bg-white outline-none transition-all shadow-inner tracking-tight" />
+                             </div>
+                             <div class="flex items-center space-x-3 px-6 opacity-30">
+                                 <i class="pi pi-shield text-[10px]"></i>
+                                 <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Responses are encrypted and hashed for validation</p>
+                             </div>
                         </div>
 
                         <!-- D. Writing (Report/Essay) -->
-                        <div v-if="currentQ.type === 'writing'" class="space-y-6">
-                            <div class="flex justify-between items-center mb-2 px-4">
-                                <div class="flex items-center space-x-4">
-                                     <div class="flex items-center space-x-2">
-                                          <span class="text-[10px] font-black text-slate-400 uppercase">Words:</span>
-                                          <span :class="isWordCountValid ? 'text-emerald-600' : 'text-amber-500'" class="text-xs font-black">{{ wordCount }}</span>
+                        <div v-if="currentQ.type === 'writing'" class="space-y-8">
+                            <div class="flex justify-between items-center bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
+                                <div class="flex items-center space-x-8">
+                                     <div class="flex flex-col">
+                                          <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Metric</span>
+                                          <div class="flex items-center space-x-3">
+                                               <span :class="isWordCountValid ? 'text-emerald-600' : 'text-amber-500'" class="text-lg font-black tracking-tighter">{{ wordCount }} Words</span>
+                                               <div v-if="isWordCountValid" class="w-6 h-6 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-[10px]"><i class="pi pi-check"></i></div>
+                                          </div>
                                      </div>
-                                     <div v-if="currentQ.min_words" class="text-[9px] font-bold text-slate-300 uppercase">Min: {{ currentQ.min_words }}</div>
-                                     <div v-if="currentQ.max_words" class="text-[9px] font-bold text-slate-300 uppercase">Max: {{ currentQ.max_words }}</div>
+                                     <div class="w-px h-10 bg-slate-200"></div>
+                                     <div class="flex flex-col">
+                                          <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Threshold</span>
+                                          <span class="text-xs font-black text-slate-700 tracking-wider">Min: {{ currentQ.min_words || 0 }} / Max: {{ currentQ.max_words || '∞' }}</span>
+                                     </div>
                                 </div>
-                                <div v-if="currentQ.min_words && wordCount < currentQ.min_words" class="text-[8px] font-black text-amber-500 uppercase bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-                                    {{ currentQ.min_words - wordCount }} more words required
-                                </div>
-                                <div v-else-if="isWordCountValid" class="text-[8px] font-black text-emerald-600 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                                    Requirement Met ✓
+                                <div v-if="currentQ.min_words && wordCount < currentQ.min_words" class="flex items-center space-x-2 text-amber-500">
+                                     <i class="pi pi-info-circle animate-pulse"></i>
+                                     <span class="text-[9px] font-black uppercase tracking-widest">+{{ currentQ.min_words - wordCount }} Required</span>
                                 </div>
                             </div>
 
-                            <textarea v-model="answers[currentIndex].text_answer" 
-                                      rows="12" 
-                                      class="w-full rounded-[2rem] p-8 bg-white border-2 border-slate-200 text-lg font-medium leading-[1.6] text-slate-700 focus:border-[#004a99] transition-all resize-none shadow-sm"
-                                      placeholder="Compose your report here..."></textarea>
+                            <div class="relative group">
+                                <div class="absolute inset-0 bg-brand-primary/5 rounded-[2.5rem] blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+                                <textarea v-model="answers[currentIndex].text_answer" 
+                                          rows="14" 
+                                          class="relative w-full rounded-[2.5rem] p-12 bg-slate-50/50 border-2 border-slate-100 text-xl font-medium leading-[1.8] text-slate-900 focus:border-brand-primary focus:bg-white outline-none transition-all resize-none shadow-inner"
+                                          placeholder="Synthesize your institutional report here..."></textarea>
+                            </div>
                             
-                            <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex items-start space-x-4">
-                                <i class="pi pi-info-circle text-indigo-400 mt-0.5"></i>
-                                <p class="text-[10px] font-medium text-indigo-700 leading-relaxed">
-                                    Structure your report with a clear introduction, supporting paragraphs, and a conclusion. Ensure your arguments are logical and well-supported.
+                            <div class="bg-rose-50/30 p-8 rounded-[2rem] border border-rose-100/50 flex items-start space-x-6">
+                                <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-brand-primary shadow-sm flex-shrink-0"><i class="pi pi-bolt"></i></div>
+                                <p class="text-[11px] font-bold text-slate-500 leading-relaxed italic opacity-80 uppercase tracking-tighter transition-opacity">
+                                    Strategic Tip: Ensure your logical structure adheres to the provided rubric. Maintain high lexical diversity for maximum score density.
                                 </p>
                             </div>
                         </div>
 
                         <!-- Footer: Two-Step Submit then Next -->
-                        <div class="mt-20 pt-10 border-t border-slate-100">
+                        <div class="mt-24 pt-12 border-t border-slate-50">
 
                             <!-- STEP 1: Not yet submitted — show Submit button -->
                             <div v-if="!questionSubmitted" class="flex items-center justify-between">
-                                <div class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                                    سؤال {{ displayNumber }} من {{ displayTotal }}
+                                <div class="flex flex-col">
+                                    <span class="text-[8px] font-black text-slate-300 uppercase tracking-[0.4em] mb-1">Index Point</span>
+                                    <div class="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] italic">
+                                        سؤال <span class="text-brand-primary">{{ displayNumber }}</span> من <span class="text-slate-400">{{ displayTotal }}</span>
+                                    </div>
                                 </div>
                                 <button @click="submitAnswer"
                                     :disabled="(!answers[currentIndex]?.option_id && !answers[currentIndex]?.text_answer) || !isWordCountValid"
-                                    class="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all duration-300 shadow-xl hover:-translate-y-0.5 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 bg-[#004a99] text-white shadow-blue-100">
-                                    <i class="pi pi-check-circle"></i>
+                                    class="flex items-center gap-4 px-12 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.3em] ml-[0.3em] transition-all duration-500 shadow-[0_20px_50px_rgba(159,18,57,0.15)] hover:shadow-[0_25px_60px_rgba(159,18,57,0.25)] hover:-translate-y-1 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none bg-brand-primary text-white">
+                                    <i class="pi pi-check-circle text-base"></i>
                                     <span>تأكيد الإجابة</span>
                                 </button>
                             </div>
 
                             <!-- STEP 2: Submitted — show Next or Finish -->
-                            <div v-else class="flex items-center justify-between">
-                                <div class="flex items-center gap-2 bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2.5 rounded-xl">
-                                    <i class="pi pi-check-circle text-sm"></i>
-                                    <span class="text-[10px] font-black uppercase tracking-widest">تم تسجيل الإجابة</span>
+                            <div v-else class="flex items-center justify-between animate-in zoom-in-95 duration-500">
+                                <div class="flex items-center gap-3 bg-emerald-50 text-emerald-600 border border-emerald-100 px-6 py-4 rounded-2xl shadow-sm">
+                                    <div class="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-[8px] animate-bounce"><i class="pi pi-check"></i></div>
+                                    <span class="text-[10px] font-black uppercase tracking-[0.3em] ml-[0.3em]">Synapse Success</span>
                                 </div>
                                 <button @click="advanceQuestion" :disabled="isSubmittingBatch"
                                     :class="isLastQuestion
                                         ? 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700'
-                                        : 'bg-[#004a99] shadow-blue-100'"
-                                    class="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all duration-300 disabled:opacity-50">
+                                        : 'bg-brand-primary shadow-brand-primary/20'"
+                                    class="flex items-center gap-4 px-12 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.3em] ml-[0.3em] text-white shadow-2xl hover:-translate-y-1 active:scale-95 transition-all duration-500 disabled:opacity-50">
                                     <div v-if="isSubmittingBatch" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-                                    <span>{{ isLastQuestion ? 'إنهاء القسم ➜' : 'السؤال التالي ➜' }}</span>
+                                    <span>{{ isLastQuestion ? 'إنهاء المهارة ➜' : 'السؤال التالي ➜' }}</span>
                                 </button>
                             </div>
                         </div>
@@ -533,6 +573,10 @@ onMounted(fetchData);
 
     </main>
 
+    <!-- Global Sound Waves (Visual Only) -->
+    <div v-if="!isStarting && currentQ" class="fixed bottom-0 left-0 w-full h-1 bg-slate-50 flex items-end pointer-events-none opacity-20">
+         <div v-for="i in 100" :key="i" class="flex-1 bg-brand-primary" :style="{ height: `${Math.random() * 100}%`, transition: 'height 0.3s' }"></div>
+    </div>
   </div>
 </template>
 

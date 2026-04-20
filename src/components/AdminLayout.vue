@@ -35,26 +35,19 @@ const logout = () => {
 
 <template>
     <div
-        class="flex h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 overflow-hidden">
+        class="flex h-screen bg-slate-50 font-sans text-slate-900 selection:bg-rose-100 selection:text-indigo-900 overflow-hidden">
 
         <!-- Sidebar -->
-        <aside
-            class="w-[280px] bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col justify-between hidden lg:flex relative z-20">
+        <aside class="w-[280px] bg-white border-r border-slate-200 shadow-xl flex flex-col justify-between hidden lg:flex relative z-20">
             <div class="flex-1 flex flex-col">
                 <!-- Logo Section -->
-                <div class="h-28 flex items-center px-8 mb-4 border-b border-slate-800/50">
-                    <div
-                        class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center text-white text-lg font-black shadow-lg shadow-indigo-500/30 mr-4">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                <div class="h-28 flex items-center px-8 mb-4 border-b border-slate-100 bg-slate-50/50">
+                    <div class="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white text-lg font-black shadow-md shadow-brand-primary/30 mr-4">
+                        <i class="pi pi-book"></i>
                     </div>
                     <div>
-                        <h1 class="text-xl font-black text-white tracking-tight leading-none mb-1">ArabAcademy<span
-                                class="text-indigo-400">.</span></h1>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Exam
-                            Authority</span>
+                        <h1 class="text-xl font-black text-brand-primary tracking-tight leading-none mb-1">Arab<span class="text-brand-accent">Academy</span></h1>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Management Platform</span>
                     </div>
                 </div>
 
@@ -65,34 +58,31 @@ const logout = () => {
                     </div>
                     <template v-for="item in navigation" :key="item.name">
                         <router-link :to="item.href" :class="[
-                            isActive(item.href) ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white',
-                            'group flex items-center px-4 py-3.5 text-xs font-bold rounded-xl transition-all duration-300'
+                            isActive(item.href) ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-primary',
+                            'group flex items-center px-4 py-3.5 text-xs font-bold rounded-xl transition-all duration-300 border border-transparent hover:border-slate-100'
                         ]">
-                            <i :class="[item.icon, isActive(item.href) ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400']" class="text-lg mr-4 transition-colors"></i>
+                            <i :class="[item.icon, isActive(item.href) ? 'text-white' : 'text-slate-400 group-hover:text-brand-secondary']" class="text-lg mr-4 transition-colors"></i>
                             {{ item.name }}
-                            <div v-if="isActive(item.href)" class="ml-auto w-1.5 h-1.5 bg-white rounded-full"></div>
+                            <div v-if="isActive(item.href)" class="ml-auto w-1.5 h-1.5 bg-brand-accent rounded-full"></div>
                         </router-link>
                     </template>
                 </nav>
             </div>
 
             <!-- User Profile / Bottom Section -->
-            <div class="p-6 border-t border-slate-800/50">
-                <div
-                    class="bg-slate-800/40 rounded-2xl p-4 mb-4 group cursor-pointer hover:bg-slate-800 transition-colors duration-300 border border-slate-700/50">
+            <div class="p-6 border-t border-slate-100 bg-slate-50/50">
+                <div class="bg-white rounded-2xl p-4 mb-4 group cursor-pointer hover:bg-slate-50 transition-colors duration-300 border border-slate-200 shadow-sm">
                     <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-md">
+                        <div class="w-9 h-9 rounded-lg bg-brand-primary flex items-center justify-center text-white shadow-md">
+                            <i class="pi pi-user text-sm"></i>
                         </div>
                         <div>
-                            <p class="text-xs font-black text-white">Admin Staff</p>
-                            <p
-                                class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-400 transition-colors">
-                                Management Portal</p>
+                            <p class="text-xs font-black text-slate-800">Admin Staff</p>
+                            <p class="text-[10px] font-bold text-slate-400 group-hover:text-brand-primary transition-colors">Management Portal</p>
                         </div>
                     </div>
                 </div>
-                <button @click="logout"
-                    class="w-full flex items-center justify-center space-x-2 px-4 py-3 text-[10px] font-black text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                <button @click="logout" class="w-full flex items-center justify-center space-x-2 px-4 py-3 text-[10px] font-black text-rose-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
                     <i class="pi pi-sign-out text-sm"></i>
                     <span>Secure Sign Out</span>
                 </button>
@@ -102,7 +92,7 @@ const logout = () => {
         <!-- Main Content -->
         <main class="flex-1 flex flex-col overflow-hidden relative">
             <div
-                class="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-100/30 rounded-full blur-3xl -mr-64 -mt-64 pointer-events-none">
+                class="absolute top-0 right-0 w-[500px] h-[500px] bg-rose-100/30 rounded-full blur-3xl -mr-64 -mt-64 pointer-events-none">
             </div>
             <div
                 class="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-100/20 rounded-full blur-3xl -ml-64 -mb-64 pointer-events-none">
@@ -113,8 +103,8 @@ const logout = () => {
                 class="h-24 bg-white/40 backdrop-blur-xl border-b border-white/20 flex items-center justify-between px-10 z-10 sticky top-0">
                 <div>
                     <div
-                        class="flex items-center space-x-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-1">
-                        <span class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+                        class="flex items-center space-x-2 text-[10px] font-black text-brand-accent uppercase tracking-[0.2em] mb-1">
+                        <span class="w-2 h-2 bg-brand-accent rounded-full animate-pulse"></span>
                         <span>Operational Hub</span>
                     </div>
                     <h2 class="text-2xl font-black text-slate-800 tracking-tight">
@@ -151,3 +141,4 @@ const logout = () => {
     scrollbar-width: none;
 }
 </style>
+

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -63,18 +63,18 @@ const submit = async () => {
 
         <div class="premium-card p-10 md:p-16 relative overflow-hidden bg-white shadow-2xl rounded-[2.5rem]">
             <!-- Decorative Accent -->
-            <div class="absolute -right-24 -top-24 w-64 h-64 bg-indigo-50/30 rounded-full blur-3xl"></div>
+            <div class="absolute -right-24 -top-24 w-64 h-64 bg-rose-50/30 rounded-full blur-3xl"></div>
 
             <form @submit.prevent="submit" class="relative z-10 space-y-16">
                 
                 <div v-if="Object.keys(errors).length > 0" class="bg-rose-50 border border-rose-100 text-rose-500 text-[10px] font-black uppercase tracking-widest p-5 rounded-2xl animate-in slide-in-from-top-2">
-                    ⚠️ PROVISIONING_ERROR: Please check the highlighted fields.
+                    âš ï¸ PROVISIONING_ERROR: Please check the highlighted fields.
                 </div>
 
-                <!-- ── CORE IDENTITY SECTION ── -->
+                <!-- â”€â”€ CORE IDENTITY SECTION â”€â”€ -->
                 <div class="space-y-8">
                     <div class="flex items-center space-x-4 mb-4">
-                         <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                         <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
                          <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Core Identity</h3>
                     </div>
                     
@@ -96,7 +96,7 @@ const submit = async () => {
                     </div>
                 </div>
 
-                <!-- ── CONTACT DETAILS SECTION ── -->
+                <!-- â”€â”€ CONTACT DETAILS SECTION â”€â”€ -->
                 <div class="space-y-8 p-10 bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
                     <div class="flex items-center space-x-4 mb-4">
                          <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
@@ -126,7 +126,7 @@ const submit = async () => {
                     </div>
                 </div>
 
-                <!-- ── ADDITIONAL METADATA SECTION ── -->
+                <!-- â”€â”€ ADDITIONAL METADATA SECTION â”€â”€ -->
                 <div class="space-y-8">
                     <div class="flex items-center space-x-4 mb-4">
                          <div class="w-1.5 h-6 bg-purple-600 rounded-full"></div>
@@ -159,7 +159,7 @@ const submit = async () => {
                          <div class="w-2 h-2 bg-slate-400 rounded-full"></div>
                          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Endorsed by System Authority</span>
                     </div>
-                    <Button :label="loading ? 'PROVISIONING...' : 'COMMIT PARTNER ➜'" 
+                    <Button :label="loading ? 'PROVISIONING...' : 'COMMIT PARTNER âžœ'" 
                            :loading="loading" 
                            icon="pi pi-check" 
                            size="large" 

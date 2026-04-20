@@ -1,8 +1,15 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
-import { useRouter } from 'vue-router';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import InputText from 'primevue/inputtext';
+import Button from 'primevue/button';
+import Tag from 'primevue/tag';
+import Card from 'primevue/card';
+import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
 const partners = ref([]);
@@ -48,164 +55,133 @@ const toggleHold = async (partner) => {
 
     try {
         await api.post(`/admin/partners/${partner.id}/${action}`);
-        // Update local state
         partner.is_active = !partner.is_active;
-        alert(`Partner ${action}ed successfully.`);
     } catch (err) {
         console.error(err);
         alert(`Failed to ${action} partner`);
     }
 };
 
-const openView = (partner) => {
-   // alert(partner);
-    router.push(`/admin/Partners/${partner.id}/show`);
-};
-
-const openEdit = (partner) => {
-    router.push(`/admin/Partners/${partner.id}/edit`);
-};
-
-
 onMounted(fetchPartners);
 </script>
 
 <template>
     <AdminLayout>
-        <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-
-            <!-- Header -->
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-6 md:space-y-0">
+        <div class="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-24 mt-8 px-4 md:px-12">
+            
+            <!-- Standardized Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 md:space-y-0">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-800 tracking-tight">Manage Partners</h1>
-                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">External institutional nodes</p>
+                    <h1 class="text-3xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Institutional Partners</h1>
+                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Registry of external assessment nodes</p>
                 </div>
-                <router-link to="/admin/partners/create"
-                    class="bg-indigo-600 text-white font-black text-[10px] tracking-widest uppercase px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
-                    Add Partner +
-                </router-link>
+                <Button label="Authorize Partner" icon="pi pi-plus" 
+                    class="px-8 py-3 rounded-2xl bg-brand-primary border-none shadow-lg shadow-rose-100 text-[10px] font-black tracking-widest uppercase transition-all hover:-translate-y-1" 
+                    @click="router.push('/admin/partners/create')" />
             </div>
 
-            <!-- Loading -->
             <div v-if="loading" class="flex flex-col items-center justify-center py-32 space-y-4">
-                <div class="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Loading partners...</p>
+                <ProgressSpinner />
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Querying Partner Registry...</p>
             </div>
 
-            <!-- Table -->
-            <div v-else>
-                <!-- Search & Results Container -->
-                <div v-if="partners.length > 0 || searchQuery" class="bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden">
-                    
-                    <!-- Search Bar -->
-                    <div class="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <div class="relative w-full max-w-md">
-                            <svg class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                            <input v-model="searchQuery" type="text" placeholder="Search partners by name or contact..."
-                                class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs uppercase tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 transition-all placeholder:text-slate-300 font-bold text-slate-700 shadow-sm">
-                        </div>
-                    </div>
+            <!-- Registry Table Card -->
+            <Card v-else class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
+                <template #content>
+                    <DataTable :value="filteredPartners" dataKey="id" paginator :rows="10" 
+                               class="p-datatable-sm text-sm" responsiveLayout="scroll">
+                        
+                        <template #header>
+                            <div class="flex justify-end p-2 pb-4">
+                                <span class="relative">
+                                    <i class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 z-10" />
+                                    <InputText v-model="searchQuery" placeholder="Filter by partner or contact..." class="pl-12 w-full md:w-80 shadow-sm rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white text-[10px] font-black uppercase tracking-widest placeholder:text-slate-300" />
+                                </span>
+                            </div>
+                        </template>
 
-                    <div v-if="filteredPartners.length > 0" class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50/50 text-slate-300 text-[10px] uppercase font-black tracking-[0.2em]">
-                                <tr>
-                                    <th class="px-6 py-8">NAME</th>
-                                    <th class="px-6 py-8">CONTACT</th>
-                                    <th class="px-6 py-8">EMAIL</th>
-                                    <th class="px-6 py-8">COUNTRY</th>
-                                    <th class="px-6 py-8">STATUS</th>
-                                    <th class="px-6 py-8 text-right">ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50 text-sm">
-                                <tr v-for="partner in filteredPartners" :key="partner.id" class="hover:bg-slate-50/50 transition-colors group">
-                                    <td class="px-6 py-4">
-                                        <div class="font-black text-slate-700 uppercase">{{ partner.partner_name }}</div>
-                                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">ID: #{{ String(partner.id).padStart(3, '0') }}</div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="font-bold text-slate-600">{{ partner.fName_contact }} {{ partner.lName_contact }}</div>
-                                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{{ partner.phone || '-' }}</div>
-                                    </td>
-                                    <td class="px-6 py-4 text-xs font-bold text-slate-500">{{ partner.email || '-' }}</td>
-                                    <td class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">{{ partner.country }}</td>
-                                    <!-- <td class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">{{ partner.notes }}</td> -->
-                                    <td class="px-6 py-4">
-                                        <span :class="partner.is_active ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'"
-                                            class="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border">
-                                            {{ partner.is_active ? 'Active' : 'Inactive' }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 text-right space-x-2">
-                                       <div class="flex items-center justify-end space-x-2">
-                                         <button @click="openView(partner)"
-                                            class="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center border border-blue-100 shadow-sm"
-                                            title="View Details">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                        </button>
-                                        <button @click="openEdit(partner)"
-                                            class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center border border-amber-100 shadow-sm"
-                                            title="Edit Profile">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                     
+                        <Column header="Institutional Entity" style="min-width: 250px">
+                            <template #body="{ data }">
+                                <div class="flex items-center space-x-4 py-2">
+                                     <div class="w-11 h-11 rounded-2xl bg-slate-50 text-brand-primary flex items-center justify-center border border-slate-100 shadow-sm">
+                                         <i class="pi pi-briefcase text-lg"></i>
+                                     </div>
+                                     <div>
+                                         <div @click="router.push(`/admin/Partners/${data.id}/show`)" 
+                                              class="font-black text-slate-800 hover:text-brand-primary cursor-pointer uppercase tracking-tight transition-colors">
+                                              {{ data.partner_name }}
+                                         </div>
+                                         <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: #{{ String(data.id).padStart(3, '0') }}</div>
+                                     </div>
+                                </div>
+                            </template>
+                        </Column>
 
-                                        <button @click="toggleHold(partner)"
-                                            :class="partner.is_active ? 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-500 hover:text-white' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-500 hover:text-white'"
-                                            class="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition">
-                                            {{ partner.is_active ? 'Hold' : 'Unhold' }}
-                                        </button>
-                                        <button @click="deletePartner(partner.id)"
-                                             class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center border border-rose-100 shadow-sm"
-                                            title="Purge Identity">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                                    d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <!-- Empty Search Result -->
-                    <div v-else class="p-20 text-center">
-                        <div class="text-4xl mb-4 text-slate-200">🔍</div>
-                        <h4 class="text-lg font-black text-slate-400 uppercase tracking-widest">No matching partners found</h4>
-                        <p class="text-xs text-slate-300 font-bold mt-2">Try adjusting your search query</p>
-                    </div>
-                </div>
+                        <Column header="Primary Liaison" style="min-width: 200px">
+                            <template #body="{ data }">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="font-black text-slate-700 text-[10px] uppercase tracking-tight">{{ data.fName_contact }} {{ data.lName_contact }}</span>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ data.phone || 'NO_CONTACT_DATA' }}</span>
+                                </div>
+                            </template>
+                        </Column>
 
-                <!-- Empty Global State -->
-                <div v-else class="bg-white rounded-[3rem] shadow-[0_32px_120px_rgba(0,0,0,0.02)] border border-slate-100 p-24 text-center group">
-                    <div class="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 text-5xl group-hover:rotate-12 transition-transform duration-500">🤝</div>
-                    <h3 class="text-3xl font-black text-slate-800 mb-4 tracking-tight uppercase">No Partners Registered</h3>
-                    <p class="text-slate-400 font-medium max-w-sm mx-auto mb-12 text-sm leading-relaxed italic">
-                        Start building your institutional ecosystem by adding your first partner.
-                    </p>
-                    <router-link to="/admin/partners/create" class="inline-block bg-indigo-600 text-white font-black py-5 px-12 rounded-2xl shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:bg-indigo-700 transition transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs">
-                        Add First Partner ➜
-                    </router-link>
-                </div>
-            </div>
+                        <Column header="Digital Identifier" style="min-width: 150px">
+                            <template #body="{ data }">
+                                <span class="text-[10px] font-bold text-slate-500 lowercase underline decoration-slate-200 underline-offset-4">{{ data.email || '---' }}</span>
+                            </template>
+                        </Column>
+
+                        <Column header="Jurisdiction" style="min-width: 120px" class="text-center">
+                            <template #body="{ data }">
+                                <Tag :value="data.country || 'Global'" severity="secondary" class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
+                            </template>
+                        </Column>
+
+                        <Column header="Status" style="min-width: 120px" class="text-center">
+                            <template #body="{ data }">
+                                <Tag :value="data.is_active ? 'ACTIVE' : 'ON_HOLD'" 
+                                     :severity="data.is_active ? 'success' : 'warning'" 
+                                     class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
+                            </template>
+                        </Column>
+
+                        <Column :exportable="false" style="min-width: 220px" class="text-right">
+                            <template #body="{ data }">
+                                <div class="flex items-center justify-end space-x-2">
+                                     <Button :icon="data.is_active ? 'pi pi-pause' : 'pi pi-play'" text severity="warning" size="small" @click="toggleHold(data)" v-tooltip.top="data.is_active ? 'Place on Hold' : 'Reactivate'" />
+                                     <Button icon="pi pi-eye" text severity="info" size="small" @click="router.push(`/admin/Partners/${data.id}/show`)" />
+                                     <Button icon="pi pi-pencil" text severity="secondary" size="small" @click="router.push(`/admin/Partners/${data.id}/edit`)" />
+                                     <Button icon="pi pi-trash" text severity="danger" size="small" @click="deletePartner(data.id)" />
+                                </div>
+                            </template>
+                        </Column>
+
+                        <template #empty>
+                            <div class="p-16 text-center text-slate-300 font-bold uppercase tracking-widest text-xs italic">No partner network discovered in system.</div>
+                        </template>
+                    </DataTable>
+                </template>
+            </Card>
         </div>
     </AdminLayout>
 </template>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+:deep(.p-datatable-thead > tr > th) {
+    background: #fbfcfe;
+    border-bottom: 2px solid #f1f5f9;
+    padding: 1.5rem 1rem;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+}
+:deep(.p-datatable-tbody > tr:hover) {
+    background: #fbfcfe;
 }
 </style>

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -153,7 +153,7 @@ const downloadTemplate = async () => {
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
                 <div>
                     <h1 class="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                        <i class="pi pi-cloud-upload text-indigo-500"></i>
+                        <i class="pi pi-cloud-upload text-brand-accent"></i>
                         Batch Student Import
                     </h1>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 ml-10">Upload Student Roster Automatically</p>
@@ -171,7 +171,7 @@ const downloadTemplate = async () => {
                                 <!-- Partner Selection -->
                                 <div class="space-y-4 shadow-sm border border-slate-100 p-6 rounded-3xl bg-white">
                                     <div class="flex items-center gap-3 mb-2">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                             <i class="pi pi-users text-xs"></i>
                                         </div>
                                         <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">1. Select Target Partner</label>
@@ -189,7 +189,7 @@ const downloadTemplate = async () => {
                                 <!-- Package Selection -->
                                 <div class="space-y-4 shadow-sm border border-slate-100 p-6 rounded-3xl bg-white">
                                     <div class="flex items-center gap-3 mb-2">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                             <i class="pi pi-box text-xs"></i>
                                         </div>
                                         <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">2. Global Package Selection</label>
@@ -209,16 +209,16 @@ const downloadTemplate = async () => {
                             <div class="max-w-4xl mx-auto space-y-4 shadow-sm border border-slate-100 p-8 rounded-3xl bg-white">
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-lg bg-brand-primary text-white flex items-center justify-center">
                                             <i class="pi pi-verified text-xs"></i>
                                         </div>
                                         <label class="text-xs font-black text-slate-800 uppercase tracking-widest pl-2">3. Global Skill Selection (Override)</label>
                                     </div>
-                                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">Apply to all Students</span>
+                                    <span class="text-[9px] font-black text-brand-primary uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-lg">Apply to all Students</span>
                                 </div>
                                 <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     <label v-for="skill in skills" :key="skill.id" 
-                                        :class="assigned_skills.includes(skill.short_code) ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 bg-slate-50'"
+                                        :class="assigned_skills.includes(skill.short_code) ? 'border-brand-primary bg-rose-50/30' : 'border-slate-100 bg-slate-50'"
                                         class="flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer hover:border-indigo-200">
                                         <Checkbox :value="skill.short_code" v-model="assigned_skills" />
                                         <span class="mt-2 text-[10px] font-black text-slate-700 uppercase tracking-tighter">
@@ -240,7 +240,7 @@ const downloadTemplate = async () => {
                                     </template>
                                     <template v-else>
                                         <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center w-full max-w-sm mb-4">
-                                            <i class="pi pi-file text-indigo-500 text-2xl mr-4"></i>
+                                            <i class="pi pi-file text-brand-accent text-2xl mr-4"></i>
                                             <div class="flex-1 overflow-hidden">
                                                 <p class="text-sm font-bold text-slate-700 truncate">{{ selectedFile.name }}</p>
                                                 <p class="text-[10px] uppercase font-bold text-slate-400 mt-1">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
@@ -319,3 +319,4 @@ const downloadTemplate = async () => {
     display: none;
 }
 </style>
+

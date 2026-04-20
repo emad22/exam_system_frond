@@ -82,19 +82,19 @@ const saveInstructions = async () => {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         alert('Instructions saved successfully!');
-        fetchData(); // Refresh to get updated instructions
+        fetchData();
     } catch (err) {
         console.error('Failed to save instructions', err);
-        alert('Error saving instructions.');
     } finally {
         isSavingInst.value = false;
     }
 };
 
-const getDifficultyStyles = (level) => {
-    if (level <= 3) return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-    if (level <= 6) return 'bg-amber-50 text-amber-600 border-amber-100';
-    return 'bg-rose-50 text-rose-600 border-rose-100';
+const getDifficultySeverity = (level) => {
+    if (level <= 2) return 'success';
+    if (level <= 4) return 'info';
+    if (level <= 6) return 'warn';
+    return 'danger';
 };
 
 const filteredQuestions = computed(() => {
@@ -117,202 +117,241 @@ onMounted(fetchData);
 
 <template>
   <AdminLayout>
-    <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-        <!-- Header & HUD Filter Bar -->
-        <div class="flex flex-col space-y-8">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-6 md:space-y-0">
-                <div>
-                     <h1 class="text-3xl font-black text-slate-800 tracking-tight">Questions Bank</h1>
-                     <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Manage all exam questions</p>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <Button label="Manage Instructions" icon="pi pi-cog" severity="secondary" outlined size="small" @click="openInstructions" />
-                    <Button label="Import Batch (CSV)" icon="pi pi-file-excel" severity="secondary" outlined size="small" />
-                    <Button label="Add Question" icon="pi pi-plus" size="small" @click="$router.push('/admin/questions/create')" />
-                </div>
+    <div class="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-24 mt-8 px-4 md:px-12">
+        
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 md:space-y-0">
+            <div>
+                 <h1 class="text-3xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Item Foundry</h1>
+                 <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Registry of all cognitive assessment items</p>
             </div>
+            <div class="flex items-center space-x-3">
+                <Button label="Level Guides" icon="pi pi-cog" severity="secondary" outlined class="text-[10px] font-black uppercase tracking-widest px-6" @click="openInstructions" />
+                <Button label="Batch Upload" icon="pi pi-file-excel" severity="secondary" outlined class="text-[10px] font-black uppercase tracking-widest px-6" />
+                <Button label="Fabricate Item" icon="pi pi-plus" class="bg-brand-primary border-none text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-rose-100 transition-all hover:-translate-y-1" @click="$router.push('/admin/questions/create')" />
+            </div>
+        </div>
 
-            <!-- Filter HUD -->
-            <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-wrap gap-6 items-center">
-                 <!-- Search -->
-                 <div class="relative flex-1 min-w-[300px]">
-                    <i class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
-                    <InputText v-model="searchQuery" placeholder="Search questions content..." class="w-full pl-12 rounded-2xl shadow-sm" />
-                 </div>
+        <!-- Filter HUD -->
+        <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm flex flex-wrap gap-8 items-end">
+             <!-- Search -->
+             <div class="flex-1 min-w-[300px] space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Content Filter</label>
+                <div class="relative">
+                    <i class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 z-10"></i>
+                    <InputText v-model="searchQuery" placeholder="Search by content fragments..." class="w-full pl-12 rounded-2xl bg-slate-50/50 focus:bg-white border-slate-100 font-bold" />
+                </div>
+             </div>
 
-                 <div class="w-px h-6 bg-slate-100 hidden md:block"></div>
-
-                 <div class="flex items-center space-x-4">
-                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Skill</label>
+             <div class="flex items-center gap-6">
+                <div class="flex flex-col space-y-3">
+                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cognitive Skill</label>
                       <Select v-model="filterSkill" 
-                            :options="[{name:'All Skills', value:''}, ...skills.map(s => ({name:s.name, value:s.name}))]" 
+                            :options="[{name:'All Domains', value:''}, ...skills.map(s => ({name:s.name, value:s.name}))]" 
                             optionLabel="name" 
                             optionValue="value" 
-                            class="w-40 rounded-xl" />
-                 </div>
-                 
-                 <div class="flex items-center space-x-4">
-                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</label>
+                            class="w-44 rounded-2xl bg-slate-50/50 border-slate-100 font-bold text-xs" />
+                </div>
+                
+                <div class="flex flex-col space-y-3">
+                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Format Type</label>
                       <Select v-model="filterType" 
-                            :options="[{label:'All Types', value:''}, {label:'Multiple Choice', value:'mcq'}, {label:'True / False', value:'true_false'}, {label:'Short Text', value:'short_answer'}]" 
+                            :options="[{label:'All Modalities', value:''}, {label:'Choice (MCQ)', value:'mcq'}, {label:'True / False', value:'true_false'}, {label:'Constructed (SA)', value:'short_answer'}]" 
                             optionLabel="label" 
                             optionValue="value" 
-                            class="w-40 rounded-xl" />
-                 </div>
-                 <div class="ml-auto text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                      Matched: {{ filteredQuestions.length }}
-                 </div>
-            </div>
+                            class="w-48 rounded-2xl bg-slate-50/50 border-slate-100 font-bold text-xs" />
+                </div>
+             </div>
+             
+             <div class="ml-auto bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                  <span class="text-[9px] font-black text-brand-primary uppercase tracking-[0.2em]">Live Registry: {{ filteredQuestions.length }} Units</span>
+             </div>
         </div>
 
-        <div v-if="loading" class="flex flex-col items-center justify-center py-32 space-y-4 mt-6">
+        <div v-if="loading" class="flex flex-col items-center justify-center py-32 space-y-4">
             <ProgressSpinner />
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Loading questions...</p>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Querying Question Matrix...</p>
         </div>
 
-        <div v-else>
-            <Card v-if="filteredQuestions.length > 0" class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden mt-6 pb-4">
-                <template #content>
-                    <DataTable :value="filteredQuestions" dataKey="id" paginator :rows="10" 
-                        class="p-datatable-sm text-sm" responsiveLayout="scroll">
+        <Card v-else class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
+            <template #content>
+                <DataTable :value="filteredQuestions" dataKey="id" paginator :rows="10" 
+                    class="p-datatable-sm text-sm" responsiveLayout="scroll">
 
-                        <Column header="Question" style="min-width: 400px">
-                            <template #body="{ data }">
-                                <div class="flex items-start space-x-4">
-                                     <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold shrink-0">
-                                         #{{ data.id }}
-                                     </div>
-                                     <div>
-                                          <p class="font-bold text-slate-700 tracking-tight leading-relaxed line-clamp-2 text-sm">{{ data.content }}</p>
-                                           <div class="flex items-center space-x-3 mt-2">
-                                                <Tag :value="data.skill?.name || 'General'" severity="info" class="text-[9px] uppercase tracking-wider" />
-                                                <Tag v-if="data.media_path" value="Media" icon="pi pi-image" severity="success" class="text-[9px] uppercase tracking-wider" />
-                                           </div>
-                                     </div>
-                                </div>
-                            </template>
-                        </Column>
+                    <Column header="Institutional Asset" style="min-width: 450px">
+                        <template #body="{ data }">
+                            <div class="flex items-start space-x-6 py-4">
+                                 <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black border border-slate-100 shrink-0">
+                                     #{{ data.id }}
+                                 </div>
+                                 <div class="space-y-3">
+                                      <p class="font-black text-slate-800 tracking-tight leading-relaxed line-clamp-2 text-base uppercase first-letter:capitalize">{{ data.content }}</p>
+                                       <div class="flex items-center space-x-4">
+                                            <div class="flex items-center space-x-2 bg-rose-50 text-brand-primary px-3 py-1 rounded-lg border border-brand-primary/5">
+                                                <i class="pi pi-bookmark text-[10px]"></i>
+                                                <span class="text-[9px] font-black uppercase tracking-widest">{{ data.skill?.name || 'GENERAL' }}</span>
+                                            </div>
+                                            <Tag v-if="data.media_path" value="MEDIA_ATTACHED" icon="pi pi-volume-up" severity="info" class="text-[8px] font-black px-2 py-0.5 rounded-full" />
+                                       </div>
+                                 </div>
+                            </div>
+                        </template>
+                    </Column>
 
-                        <Column header="Type" style="min-width: 150px">
-                            <template #body="{ data }">
-                                <Tag :value="data.type" severity="secondary" rounded class="text-[10px] uppercase tracking-wider" />
-                            </template>
-                        </Column>
+                    <Column header="Precision Type" style="width: 150px">
+                        <template #body="{ data }">
+                            <Tag :value="data.type" severity="secondary" class="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" />
+                        </template>
+                    </Column>
 
-                        <Column header="Tag" style="min-width: 120px">
-                            <template #body="{ data }">
-                                <Tag v-if="data.group_tag" :value="data.group_tag" severity="contrast" class="text-[9px] uppercase tracking-widest font-mono" />
-                                <span v-else class="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic">None</span>
-                            </template>
-                        </Column>
-
-                        <Column header="Difficulty" style="min-width: 120px">
-                            <template #body="{ data }">
-                                <span :class="getDifficultyStyles(data.difficulty_level)" class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border">
-                                    Level {{ data.difficulty_level }}
+                    <Column header="Mastery Rank" style="width: 140px">
+                        <template #body="{ data }">
+                            <div class="flex items-center">
+                                <span :class="data.difficulty_level <= 3 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : (data.difficulty_level <= 6 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-brand-primary border-brand-primary/10')" 
+                                      class="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm">
+                                    L{{ data.difficulty_level }}
                                 </span>
-                            </template>
-                        </Column>
+                            </div>
+                        </template>
+                    </Column>
 
-                        <Column header="Points" style="min-width: 100px" class="text-center">
-                            <template #body="{ data }">
+                    <Column header="Weight" style="width: 100px" class="text-center">
+                        <template #body="{ data }">
+                             <div class="flex flex-col items-center">
                                  <div class="font-black text-slate-800 text-lg tracking-tighter">{{ data.points }}</div>
-                            </template>
-                        </Column>
+                                 <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Score</div>
+                             </div>
+                        </template>
+                    </Column>
 
-                        <Column :exportable="false" style="min-width: 120px" class="text-right">
-                            <template #body="{ data }">
-                                <Button icon="pi pi-pencil" outlined rounded severity="warning" size="small" @click="$router.push(`/admin/questions/${data.id}/edit`)" />
-                            </template>
-                        </Column>
-                        
-                    </DataTable>
-                </template>
-            </Card>
+                    <Column :exportable="false" style="width: 100px" class="text-right">
+                        <template #body="{ data }">
+                            <div class="flex items-center justify-end">
+                                <Button icon="pi pi-pencil" text severity="secondary" @click="$router.push(`/admin/questions/${data.id}/edit`)" />
+                            </div>
+                        </template>
+                    </Column>
+                    
+                </DataTable>
+            </template>
+        </Card>
 
-            <!-- Empty State -->
-            <div v-else class="bg-white rounded-[3rem] shadow-[0_32px_120px_rgba(0,0,0,0.02)] border border-slate-100 p-24 text-center mt-6">
-                <i class="pi pi-inbox text-slate-300 text-6xl mb-6"></i>
-                <h3 class="text-3xl font-black text-slate-800 mb-4 tracking-tight uppercase">No Questions Found</h3>
-                <p class="text-slate-400 font-bold mb-8">
-                    Your question bank is empty. Start adding questions or import from CSV.
-                </p>
-                <Button label="Add First Question" icon="pi pi-arrow-right" iconPos="right" @click="$router.push('/admin/questions/create')" />
-            </div>
-        </div>
+        <!-- Dynamic Registry Guide Modal -->
+        <Dialog v-model:visible="showInstructionsModal" :header="'Operational Guide Protocols'" :style="{ width: '85vw', height: '85vh' }" maximizable modal class="rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
+              <template #header>
+                    <div class="flex flex-col">
+                        <h3 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Institutional Protocols</h3>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Configure automated guidance for mastery levels</p>
+                    </div>
+              </template>
 
-        <!-- Level Instructions Modal -->
-        <Dialog v-model:visible="showInstructionsModal" header="Level Instructions" :style="{ width: '80vw', height: '80vh' }" maximizable modal>
-             <div class="flex flex-col md:flex-row h-full w-full">
-                  <!-- Sidebar: Skills & Levels -->
-                  <div class="w-full md:w-64 bg-slate-50 border-r border-slate-100 flex flex-col p-6 space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar rounded-xl">
-                       <div class="space-y-4 pb-10">
-                             <div v-for="skill in skillsWithLevels" :key="skill.id" class="space-y-2">
-                                  <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ skill.name }}</div>
+              <div class="flex flex-col md:flex-row h-full w-full pt-4">
+                  <!-- Sidebar Matrix -->
+                  <div class="w-full md:w-72 bg-slate-50/50 border-r border-slate-50 flex flex-col p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar rounded-3xl">
+                       <div class="space-y-8">
+                             <div v-for="skill in skillsWithLevels" :key="skill.id" class="space-y-4">
+                                  <div class="flex items-center space-x-3">
+                                      <div class="w-1.5 h-4 bg-brand-primary rounded-full"></div>
+                                      <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ skill.name }}</span>
+                                  </div>
                                   <div class="grid grid-cols-3 gap-2">
                                        <button v-for="level in skill.levels" :key="level.id"
                                                @click="selectedSkillForInst = skill; selectLevel(level)"
-                                               :class="selectedLevelForInst?.id === level.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100'"
-                                               class="h-8 rounded-lg font-bold text-xs transition-all active:scale-95 border border-transparent shadow-sm flex items-center justify-center">
-                                           L{{ level.level_number }}
+                                               :class="selectedLevelForInst?.id === level.id ? 'bg-brand-primary text-white shadow-lg shadow-rose-100 scale-105' : 'bg-white text-slate-400 hover:bg-white hover:text-brand-primary hover:shadow-sm'"
+                                               class="h-10 rounded-xl font-black text-[10px] transition-all border border-slate-50 shadow-sm flex items-center justify-center uppercase tracking-tighter">
+                                           LV{{ level.level_number }}
                                        </button>
                                   </div>
                              </div>
                        </div>
                   </div>
 
-                  <!-- Editor Panel -->
-                  <div class="flex-1 flex flex-col min-h-0 bg-white p-6 md:p-10 space-y-8 overflow-y-auto w-full">
-                       <div v-if="selectedLevelForInst">
-                            <div class="flex items-center space-x-6 mb-8">
+                  <!-- Protocol Configuration Panel -->
+                  <div class="flex-1 flex flex-col min-h-0 bg-white p-10 space-y-10 overflow-y-auto w-full no-scrollbar">
+                       <div v-if="selectedLevelForInst" class="animate-in fade-in duration-500">
+                            <div class="flex items-center justify-between mb-10 pb-6 border-b border-slate-50">
                                  <div>
-                                      <h2 class="text-2xl font-black text-slate-800 tracking-tight uppercase">{{ selectedSkillForInst?.name }} — LEVEL {{ selectedLevelForInst.level_number }}</h2>
-                                      <p class="text-xs font-bold text-slate-400 mt-1">Editing instructions for this difficulty</p>
+                                      <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase leading-none">{{ selectedSkillForInst?.name }} • LV{{ selectedLevelForInst.level_number }} MATRIX</h2>
+                                      <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest italic opacity-80">Synchronizing operational metadata for this domain tier</p>
+                                 </div>
+                                 <div class="w-16 h-16 rounded-[1.5rem] bg-brand-primary/5 border border-brand-primary/10 flex items-center justify-center text-brand-primary">
+                                     <i class="pi pi-cog text-2xl animate-spin-slow"></i>
                                  </div>
                             </div>
 
-                            <div class="space-y-8">
-                                 <!-- Text Instructions -->
-                                 <div class="space-y-2">
-                                      <label class="text-xs font-bold text-slate-600 flex items-center"><i class="pi pi-align-left mr-2"></i> Text Instructions</label>
-                                      <Textarea v-model="instructionsText" autoResize rows="6" placeholder="Enter level instructions here..." class="w-full rounded-2xl shadow-sm" />
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                 <!-- Text Protocols -->
+                                 <div class="space-y-4">
+                                      <label class="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center ml-1">
+                                          <i class="pi pi-align-left mr-3 text-brand-primary"></i> Textual Guidance Matrix
+                                      </label>
+                                      <Textarea v-model="instructionsText" autoResize rows="8" 
+                                              placeholder="Initialize textual guidance protocols..." 
+                                              class="w-full rounded-[2rem] border-slate-100 bg-slate-50/50 p-6 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-rose-50/50 focus:border-brand-primary/20 transition-all outline-none" />
                                  </div>
 
-                                 <!-- Audio Instructions -->
-                                 <div class="space-y-3">
-                                      <label class="text-xs font-bold text-slate-600 flex items-center"><i class="pi pi-volume-up mr-2"></i> Audio Guidance</label>
-                                      <div class="flex flex-col space-y-4">
-                                           <div v-if="selectedLevelForInst.instructions_audio_url" class="p-4 bg-emerald-50 rounded-2xl flex items-center justify-between border border-emerald-100">
+                                 <!-- Audio/Sonic Protocols -->
+                                 <div class="space-y-4">
+                                      <label class="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center ml-1">
+                                          <i class="pi pi-volume-up mr-3 text-brand-accent"></i> Sonic Feedback Array
+                                      </label>
+                                      <div class="space-y-6">
+                                           <div v-if="selectedLevelForInst.instructions_audio_url" class="p-6 bg-emerald-50/50 rounded-2xl flex flex-col space-y-4 border border-emerald-100/50 shadow-sm">
                                                 <div class="flex items-center space-x-3">
-                                                     <i class="pi pi-check-circle text-emerald-600 text-xl"></i>
-                                                     <span class="text-xs font-bold text-emerald-700 uppercase tracking-widest">Active Audio Attached</span>
+                                                     <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white"><i class="pi pi-check"></i></div>
+                                                     <span class="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Active Sonic Asset Attached</span>
                                                 </div>
-                                                <audio :src="selectedLevelForInst.instructions_audio_url" controls class="h-8 w-48 no-scrollbar"></audio>
+                                                <audio :src="selectedLevelForInst.instructions_audio_url" controls class="h-10 w-full rounded-full bg-white"></audio>
                                            </div>
-                                           <input type="file" @change="handleAudioUpload" accept="audio/*" 
-                                                  class="block w-full text-xs text-slate-400 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-slate-100 file:text-slate-500 hover:file:bg-slate-200 transition-all font-sans" />
+                                           <div class="relative group">
+                                               <input type="file" @change="handleAudioUpload" accept="audio/*" 
+                                                      class="block w-full text-[10px] font-black uppercase text-slate-400 file:mr-6 file:py-4 file:px-10 file:rounded-2xl file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-[0.2em] file:bg-brand-primary file:text-white hover:file:bg-brand-secondary transition-all cursor-pointer bg-slate-50 border border-slate-100 rounded-2xl" />
+                                               <div class="mt-4 flex items-center space-x-2 px-2">
+                                                   <i class="pi pi-info-circle text-[10px] text-slate-300"></i>
+                                                   <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-loose italic">Uploading a new sonic asset will overwrite the existing protocol in the institutional cloud.</p>
+                                               </div>
+                                           </div>
                                       </div>
                                  </div>
                             </div>
                        </div>
-                       <div v-else class="flex flex-col items-center justify-center h-full space-y-6 text-center">
-                            <i class="pi pi-arrow-circle-left text-slate-300 text-5xl"></i>
-                            <h3 class="text-xl font-bold text-slate-400 uppercase tracking-widest">Select a Level to Edit</h3>
-                       </div>
                   </div>
-             </div>
+              </div>
 
-             <template #footer>
-                <Button label="Discard" icon="pi pi-times" text severity="secondary" @click="showInstructionsModal = false" />
-                <Button label="Save Changes" icon="pi pi-check" :loading="isSavingInst" :disabled="!selectedLevelForInst" @click="saveInstructions" />
-             </template>
+              <template #footer>
+                <div class="flex justify-end p-8 border-t border-slate-50 space-x-4 bg-slate-50/30">
+                    <Button label="Discard Sessions" text severity="secondary" class="text-[10px] font-black uppercase tracking-widest" @click="showInstructionsModal = false" />
+                    <Button label="Persist Configurations" :loading="isSavingInst" :disabled="!selectedLevelForInst" 
+                            class="bg-brand-primary border-none text-[10px] font-black uppercase tracking-widest px-10 shadow-lg shadow-rose-100" @click="saveInstructions" />
+                </div>
+              </template>
         </Dialog>
     </div>
   </AdminLayout>
 </template>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+:deep(.p-datatable-thead > tr > th) {
+    background: #fbfcfe;
+    border-bottom: 2px solid #f1f5f9;
+    padding: 1.5rem 1rem;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+}
+:deep(.p-datatable-tbody > tr:hover) {
+    background: #fbfcfe;
+}
+.animate-spin-slow {
+    animation: rotate 8s linear infinite;
+}
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 </style>
