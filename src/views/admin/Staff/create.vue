@@ -51,8 +51,8 @@ const fetchStaff = async () => {
         const res = await api.get(`/admin/staff/${staffId}`);
         const data = res.data;
         // Map user and partner data to the flat form structure
-        form.value = { 
-            ...data, 
+        form.value = {
+            ...data,
             password: '',
             partner_name: data.partner?.partner_name || '',
             website: data.partner?.website || '',
@@ -97,7 +97,8 @@ onMounted(() => {
         <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 mt-6 px-4 md:px-12">
             <!-- Header -->
             <div class="flex items-center space-x-6">
-                <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded @click="$router.push('/admin/staff')" />
+                <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded
+                    @click="$router.push('/admin/staff')" />
                 <div>
                     <h1 class="text-3xl font-black text-slate-800 tracking-tight">
                         {{ isEditing ? 'Edit Identity' : 'Register Staff' }}
@@ -116,7 +117,7 @@ onMounted(() => {
             <div v-else class="relative">
                 <form @submit.prevent="saveStaff" class="space-y-8">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        
+
                         <!-- Main Details -->
                         <div class="lg:col-span-2 space-y-8">
                             <Card class="border border-slate-100 shadow-sm rounded-[2.5rem]">
@@ -124,42 +125,63 @@ onMounted(() => {
                                     <div class="space-y-8 p-4">
                                         <div class="flex items-center space-x-4">
                                             <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
-                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Core Credentials</h3>
+                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">
+                                                Core Credentials</h3>
                                         </div>
 
-                                        <Message v-if="errorMsg" severity="error" :closable="false">{{ errorMsg }}</Message>
+                                        <Message v-if="errorMsg" severity="error" :closable="false">{{ errorMsg }}
+                                        </Message>
 
                                         <div class="space-y-8">
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                                 <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">First Name</label>
-                                                    <InputText v-model="form.first_name" required placeholder="John" class="w-full shadow-sm rounded-xl uppercase" />
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">First
+                                                        Name</label>
+                                                    <InputText v-model="form.first_name" required placeholder="John"
+                                                        class="w-full shadow-sm rounded-xl uppercase" />
                                                 </div>
                                                 <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Last Name</label>
-                                                    <InputText v-model="form.last_name" required placeholder="Doe" class="w-full shadow-sm rounded-xl uppercase" />
+                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Last
+                                                        Name</label>
+                                                    <InputText v-model="form.last_name" required placeholder="Doe"
+                                                        class="w-full shadow-sm rounded-xl uppercase" />
                                                 </div>
                                             </div>
 
                                             <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Email Channel</label>
-                                                <InputText v-model="form.email" type="email" required placeholder="j.doe@system.com" class="w-full shadow-sm rounded-xl" />
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Email
+                                                    Channel</label>
+                                                <InputText v-model="form.email" type="email" required
+                                                    placeholder="j.doe@system.com"
+                                                    class="w-full shadow-sm rounded-xl" />
                                             </div>
 
                                             <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Security Key (Password)</label>
-                                                <InputText v-model="form.password" type="password" :required="!isEditing" placeholder="••••••••" class="w-full shadow-sm rounded-xl font-mono" />
-                                                <p v-if="isEditing" class="text-xs text-slate-400 mt-2 font-bold italic pl-2">Leave blank to maintain current encryption</p>
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Security
+                                                    Key (Password)</label>
+                                                <InputText v-model="form.password" type="password"
+                                                    :required="!isEditing" placeholder="••••••••"
+                                                    class="w-full shadow-sm rounded-xl font-mono" />
+                                                <p v-if="isEditing"
+                                                    class="text-xs text-slate-400 mt-2 font-bold italic pl-2">Leave
+                                                    blank to maintain current encryption</p>
                                             </div>
 
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                                 <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Global Phone</label>
-                                                    <InputText v-model="form.phone" placeholder="+XX XXX XXX XXXX" class="w-full shadow-sm rounded-xl" />
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">Global
+                                                        Phone</label>
+                                                    <InputText v-model="form.phone" placeholder="+XX XXX XXX XXXX"
+                                                        class="w-full shadow-sm rounded-xl" />
                                                 </div>
                                                 <div class="flex flex-col">
-                                                    <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">National Origin</label>
-                                                    <InputText v-model="form.country" placeholder="EGYPT" class="w-full shadow-sm rounded-xl uppercase" />
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">National
+                                                        Origin</label>
+                                                    <InputText v-model="form.country" placeholder="EGYPT"
+                                                        class="w-full shadow-sm rounded-xl uppercase" />
                                                 </div>
                                             </div>
                                         </div>
@@ -173,79 +195,105 @@ onMounted(() => {
                                     <div class="space-y-6 p-4">
                                         <div class="flex items-center space-x-4">
                                             <div class="w-1.5 h-6 bg-slate-200 rounded-full"></div>
-                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Account Status</h3>
+                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">
+                                                Account Status</h3>
                                         </div>
-                                        
+
                                         <label class="flex items-center cursor-pointer group w-fit">
                                             <Checkbox v-model="form.is_active" :binary="true" />
                                             <div class="ml-4">
-                                                <span class="block text-xs font-bold text-slate-700 uppercase tracking-wider group-hover:text-emerald-600 transition">
+                                                <span
+                                                    class="block text-xs font-bold text-slate-700 uppercase tracking-wider group-hover:text-emerald-600 transition">
                                                     {{ form.is_active ? 'Active Node' : 'Deactivated' }}
                                                 </span>
-                                                <span class="block text-[10px] text-slate-400 font-bold tracking-tight">Access is granted while active</span>
+                                                <span
+                                                    class="block text-[10px] text-slate-400 font-bold tracking-tight">Access
+                                                    is granted while active</span>
                                             </div>
                                         </label>
                                     </div>
                                 </template>
                             </Card>
-                       
 
-                        <!-- Partner Specific Details -->
-                        <div v-if="form.role === 'partner'" class="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500">
-                            <Card class="border border-slate-100 shadow-sm rounded-[2.5rem] bg-indigo-50/10">
-                                <template #content>
-                                    <div class="space-y-8 p-4">
-                                        <div class="flex items-center space-x-4">
-                                            <div class="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Institutional Partner Profile</h3>
+
+                            <!-- Partner Specific Details -->
+                            <div v-if="form.role === 'partner'"
+                                class="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500">
+                                <Card class="border border-slate-100 shadow-sm rounded-[2.5rem] bg-indigo-50/10">
+                                    <template #content>
+                                        <div class="space-y-8 p-4">
+                                            <div class="flex items-center space-x-4">
+                                                <div class="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                                                <h3
+                                                    class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">
+                                                    Institutional Partner Profile</h3>
+                                            </div>
+
+                                            <div class="space-y-8">
+                                                <div class="flex flex-col">
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">Organizational
+                                                        Identity</label>
+                                                    <InputText v-model="form.partner_name"
+                                                        placeholder="ENTER PARTNER NAME"
+                                                        class="w-full shadow-sm rounded-xl uppercase" />
+                                                </div>
+
+                                                <div class="flex flex-col">
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">Digital
+                                                        Portal (Website)</label>
+                                                    <InputText v-model="form.website"
+                                                        placeholder="https://www.example.com"
+                                                        class="w-full shadow-sm rounded-xl" />
+                                                </div>
+
+                                                <div class="flex flex-col">
+                                                    <label
+                                                        class="block text-xs font-bold text-slate-500 mb-2 pl-2">Strategic
+                                                        Notes</label>
+                                                    <InputText v-model="form.note"
+                                                        placeholder="INTERNAL PARTNERSHIP METADATA"
+                                                        class="w-full shadow-sm rounded-xl" />
+                                                </div>
+                                            </div>
                                         </div>
-
-                                        <div class="space-y-8">
-                                            <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Organizational Identity</label>
-                                                <InputText v-model="form.partner_name" placeholder="ENTER PARTNER NAME" class="w-full shadow-sm rounded-xl uppercase" />
-                                            </div>
-
-                                            <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Digital Portal (Website)</label>
-                                                <InputText v-model="form.website" placeholder="https://www.example.com" class="w-full shadow-sm rounded-xl" />
-                                            </div>
-                                            
-                                            <div class="flex flex-col">
-                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Strategic Notes</label>
-                                                <InputText v-model="form.note" placeholder="INTERNAL PARTNERSHIP METADATA" class="w-full shadow-sm rounded-xl" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </Card>
+                                    </template>
+                                </Card>
+                            </div>
                         </div>
-                         </div>
 
                         <!-- Sidebar: Role Selection -->
                         <div class="space-y-8">
                             <div class="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-sm space-y-8">
                                 <div class="flex items-center space-x-4">
                                     <div class="w-1.5 h-6 bg-brand-primary rounded-full"></div>
-                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Permission Tier</h3>
+                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Permission
+                                        Tier</h3>
                                 </div>
 
                                 <div class="space-y-4">
-                                    <label v-for="r in roles" :key="r.value" 
+                                    <label v-for="r in roles" :key="r.value"
                                         class="block p-5 rounded-2xl border-2 transition-all cursor-pointer group flex items-start space-x-4"
                                         :class="form.role === r.value ? 'bg-white border-brand-primary shadow-md' : 'bg-white/50 border-transparent hover:border-slate-200'">
-                                        <RadioButton v-model="form.role" :inputId="r.value" :value="r.value" class="mt-1" />
+                                        <RadioButton v-model="form.role" :inputId="r.value" :value="r.value"
+                                            class="mt-1" />
                                         <div class="flex flex-col">
                                             <span class="text-xs font-bold tracking-wider mb-1"
-                                                :class="form.role === r.value ? 'text-brand-primary' : 'text-slate-600'">{{ r.label }}</span>
+                                                :class="form.role === r.value ? 'text-brand-primary' : 'text-slate-600'">{{
+                                                r.label }}</span>
                                             <span class="text-[10px] font-medium"
-                                                :class="form.role === r.value ? 'text-indigo-400' : 'text-slate-400'">{{ r.desc }}</span>
+                                                :class="form.role === r.value ? 'text-indigo-400' : 'text-slate-400'">{{
+                                                r.desc }}</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            <Button type="submit" :label="isSubmitting ? 'PERSISTING...' : (isEditing ? 'UPDATE NODE' : 'ACTIVE NODE')" :icon="isSubmitting ? 'pi pi-spin pi-spinner' : 'pi pi-check'" size="large" class="w-full text-sm font-bold shadow-md rounded-[1.5rem]" />
+                            <Button type="submit"
+                                :label="isSubmitting ? 'PERSISTING...' : (isEditing ? 'UPDATE NODE' : 'ACTIVE NODE')"
+                                :icon="isSubmitting ? 'pi pi-spin pi-spinner' : 'pi pi-check'" size="large"
+                                class="w-full text-sm font-bold shadow-md rounded-[1.5rem]" />
                         </div>
 
                     </div>
@@ -259,8 +307,8 @@ onMounted(() => {
 .premium-card {
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 .premium-input {
     outline: none;
 }
 </style>
-
