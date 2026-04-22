@@ -12,20 +12,28 @@ import Textarea from 'primevue/textarea';
 import Message from 'primevue/message';
 import Slider from 'primevue/slider';
 import InputNumber from 'primevue/inputnumber';
-import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
 const route = useRoute();
-const questionId = route.params.id;
 
 const skills = ref([]);
+const exams = ref([]);
 const isSubmitting = ref(false);
-const isLoading = ref(true);
 const errorMsg = ref('');
-const successMsg = ref('');
+const loading = ref(true);
+
+const fileInput = ref(null);
+const mediaPreview = ref(null);
+const isImage = ref(false);
+const isAudio = ref(false);
+const isVideo = ref(false);
+
+const questionId = route.params.id;
 
 const form = ref({
     skill_id: '',
+    exam_id: '',
+    media: null,
     type: 'mcq',
     content: '',
     difficulty_level: 5,
@@ -35,43 +43,69 @@ const form = ref({
 });
 
 const fetchSkills = async () => {
-    try {
-        const res = await api.get('/admin/skills');
-        skills.value = res.data;
-    } catch (err) {
-        console.error('Failed to load skills', err);
-    }
+    const res = await api.get('/admin/skills');
+    skills.value = res.data;
+};
+
+const fetchExams = async () => {
+    const res = await api.get('/admin/exams');
+    exams.value = res.data;
+};
+
+const detectMediaType = (url) => {
+    if (!url) return;
+    const clean = url.split('?')[0];
+    const ext = clean.split('.').pop().toLowerCase();
+
+    isImage.value = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
+    isAudio.value = ['mp3', 'wav', 'ogg', 'mpeg'].includes(ext);
+    isVideo.value = ['mp4', 'webm', 'ogg'].includes(ext);
 };
 
 const fetchQuestion = async () => {
     try {
         const res = await api.get(`/admin/questions/${questionId}`);
         const q = res.data;
-        form.value = {
-            skill_id: q.skill_id,
-            type: q.type,
-            content: q.content,
-            difficulty_level: q.difficulty_level,
-            points: q.points,
-            group_tag: q.group_tag || '',
-            options: q.options.map(opt => ({
-                id: opt.id,
-                option_text: opt.option_text,
-                is_correct: opt.is_correct
-            }))
-        };
+
+        form.value.skill_id = q.skill_id;
+        form.value.exam_id = q.exam_id;
+        form.value.type = q.type;
+        form.value.content = q.content;
+        form.value.difficulty_level = q.difficulty_level;
+        form.value.points = q.points;
+
+        if (q.media_url) {
+            mediaPreview.value = q.media_url;
+            detectMediaType(q.media_url);
+        }
+
+        if (q.options && q.options.length) {
+            form.value.options = q.options.map(o => ({
+                option_text: o.option_text,
+                is_correct: !!o.is_correct
+            }));
+        } else {
+            form.value.options = [];
+        }
+
+        loading.value = false;
     } catch (err) {
-        errorMsg.value = 'Failed to load question.';
-        console.error(err);
-    } finally {
-        isLoading.value = false;
+        errorMsg.value = 'Failed to load question';
     }
 };
 
-const setCorrect = (idx) => {
-    form.value.options.forEach((opt, i) => {
-        opt.is_correct = (i === idx);
-    });
+const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    form.value.media = file;
+
+    const url = URL.createObjectURL(file);
+    mediaPreview.value = url;
+
+    isImage.value = file.type.startsWith('image/');
+    isAudio.value = file.type.startsWith('audio/');
+    isVideo.value = file.type.startsWith('video/');
 };
 
 const addOption = () => {
@@ -81,6 +115,12 @@ const addOption = () => {
 const removeOption = (index) => {
     if (form.value.options.length <= 2) return;
     form.value.options.splice(index, 1);
+};
+
+const setCorrect = (idx) => {
+    form.value.options.forEach((opt, i) => {
+        opt.is_correct = (i === idx);
+    });
 };
 
 const handleTypeChange = () => {
@@ -93,16 +133,19 @@ const handleTypeChange = () => {
         form.value.options = [];
     } else if (form.value.type === 'short_answer') {
         form.value.options = [{ option_text: '', is_correct: true }];
+    } else {
+        if (form.value.options.length < 2) {
+            form.value.options = [
+                { option_text: '', is_correct: true },
+                { option_text: '', is_correct: false }
+            ];
+        }
     }
 };
 
-const saveQuestion = async () => {
+const updateQuestion = async () => {
     if (!form.value.content.trim()) {
         errorMsg.value = 'Question content is required.';
-        return;
-    }
-    if (form.value.options.some(opt => !opt.option_text.trim())) {
-        errorMsg.value = 'All options must have text.';
         return;
     }
 
@@ -110,11 +153,32 @@ const saveQuestion = async () => {
     errorMsg.value = '';
 
     try {
-        await api.patch(`/admin/questions/${questionId}`, form.value);
-        successMsg.value = 'Question updated successfully!';
-        setTimeout(() => router.push('/admin/questions'), 1500);
+        const fd = new FormData();
+
+        fd.append('_method', 'PUT');
+        fd.append('skill_id', form.value.skill_id);
+        fd.append('exam_id', form.value.exam_id);
+        fd.append('type', form.value.type);
+        fd.append('content', form.value.content);
+        fd.append('difficulty_level', form.value.difficulty_level);
+        fd.append('points', form.value.points);
+
+        if (form.value.media) {
+            fd.append('media_file', form.value.media);
+        }
+
+        form.value.options.forEach((opt, index) => {
+            fd.append(`options[${index}][option_text]`, opt.option_text);
+            fd.append(`options[${index}][is_correct]`, opt.is_correct ? 1 : 0);
+        });
+
+        await api.post(`/admin/questions/${questionId}`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        router.push('/admin/questions');
+
     } catch (err) {
-        console.error(err);
         errorMsg.value = err.response?.data?.message || 'Failed to update question.';
     } finally {
         isSubmitting.value = false;
@@ -122,130 +186,127 @@ const saveQuestion = async () => {
 };
 
 onMounted(async () => {
-    await fetchSkills();
-    await fetchQuestion();
+    await Promise.all([fetchSkills(), fetchExams(), fetchQuestion()]);
 });
 </script>
 
 <template>
-  <AdminLayout>
-    <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 mt-6 px-4 md:px-12">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-6">
-                <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded @click="router.push('/admin/questions')" />
-                <div>
-                     <h1 class="text-3xl font-black text-slate-800 tracking-tight">Edit Question #{{ questionId }}</h1>
-                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Modify this question in the bank</p>
+    <AdminLayout>
+        <div class="space-y-10 pb-20 mt-6 px-4 md:px-12">
+
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-6">
+                    <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded
+                        @click="router.push('/admin/questions')" />
+                    <div>
+                        <h1 class="text-3xl font-black text-slate-800">Edit Question</h1>
+                        <p class="text-[10px] font-black text-slate-400 uppercase">Update existing question</p>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div v-if="isLoading" class="flex flex-col items-center justify-center py-32 space-y-4">
-            <ProgressSpinner />
-        </div>
-
-        <form v-else @submit.prevent="saveQuestion" class="space-y-8">
             <Message v-if="errorMsg" severity="error" :closable="false">{{ errorMsg }}</Message>
-            <Message v-if="successMsg" severity="success" :closable="false">{{ successMsg }}</Message>
 
-            <!-- Core Settings -->
-            <Card class="border border-slate-100 shadow-sm rounded-[2rem]">
-                <template #content>
-                    <div class="p-4 space-y-6">
-                        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
-                            <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">1</span>
-                            Basic Configuration
-                        </h3>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div class="flex flex-col">
-                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Target Skill</label>
-                                <Select v-model="form.skill_id" :options="skills" optionLabel="name" optionValue="id" placeholder="Select a skill" class="w-full rounded-xl shadow-sm" />
+            <form v-if="!loading" @submit.prevent="updateQuestion" class="space-y-8">
+
+                <!-- BASIC SETTINGS -->
+                <Card>
+                    <template #content>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Exam</label>
+                                <Select v-model="form.exam_id" :options="exams" optionLabel="title" optionValue="id"
+                                    placeholder="Select exam" class="w-full" />
                             </div>
-                            <div class="flex flex-col">
-                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Question Type</label>
-                                <Select v-model="form.type" @change="handleTypeChange" :options="[{label:'Multiple Choice (MCQ)', value:'mcq'}, {label:'True / False', value:'true_false'}, {label:'Short Answer', value:'short_answer'}, {label:'Writing Prompt', value:'writing'}, {label:'Speaking Prompt', value:'speaking'}]" optionLabel="label" optionValue="value" class="w-full rounded-xl shadow-sm" />
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Skill</label>
+                                <Select v-model="form.skill_id" :options="skills" optionLabel="name" optionValue="id"
+                                    placeholder="Select skill" class="w-full" />
                             </div>
-                            <div class="flex flex-col">
-                                <label class="block text-xs font-bold text-slate-500 mb-3 pl-2">Difficulty Level ({{ form.difficulty_level }})</label>
-                                <Slider v-model="form.difficulty_level" :min="1" :max="9" :step="1" class="w-full mb-3" />
-                                <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                                    <span>Beginner</span><span>Expert</span>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Type</label>
+                                <Select v-model="form.type" @change="handleTypeChange" :options="[
+                                    { label: 'MCQ', value: 'mcq' },
+                                    { label: 'True/False', value: 'true_false' },
+                                    { label: 'Short Answer', value: 'short_answer' },
+                                    { label: 'Writing', value: 'writing' },
+                                    { label: 'Speaking', value: 'speaking' }
+                                ]" optionLabel="label" optionValue="value" class="w-full" />
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Difficulty Level ({
+                                    form.difficulty_level })</label>
+                                <Slider v-model="form.difficulty_level" :min="1" :max="9" />
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Points</label>
+                                <InputNumber v-model="form.points" :min="1" class="w-full" />
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block">Media</label>
+                                <input type="file" ref="fileInput" class="hidden" @change="handleFileChange" />
+                                <Button label="Upload Media" @click="fileInput.click()" class="w-full" />
+
+                                <div v-if="mediaPreview" class="mt-3 space-y-2">
+                                    <div class="text-xs font-bold text-slate-500">Current Media</div>
+                                    <img v-if="isImage" :src="mediaPreview" class="max-h-40 rounded-xl" />
+                                    <audio v-if="isAudio" :src="mediaPreview" controls class="w-full" />
+                                    <video v-if="isVideo" :src="mediaPreview" controls class="max-h-60 w-full" />
                                 </div>
                             </div>
-                            <div class="flex flex-col">
-                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Points</label>
-                                <InputNumber v-model="form.points" :min="1" showButtons class="w-full rounded-xl shadow-sm" />
-                            </div>
-                            <div class="flex flex-col md:col-span-2">
-                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Group Tag (Exam Identifier)</label>
-                                <InputText v-model="form.group_tag" placeholder="e.g. exam1" class="w-full rounded-xl shadow-sm" />
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </Card>
 
-            <!-- Content -->
-            <Card class="border border-slate-100 shadow-sm rounded-[2rem]">
-                <template #content>
-                    <div class="p-4">
-                        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
-                            <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">2</span>
-                            Question Content
-                        </h3>
-                        <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Question Text</label>
-                        <Textarea v-model="form.content" required rows="4" placeholder="Enter the question text here..." class="w-full rounded-2xl shadow-sm" autoResize />
-                    </div>
-                </template>
-            </Card>
-
-            <!-- Options -->
-            <Card v-if="!['writing', 'speaking'].includes(form.type)" class="border border-slate-100 shadow-sm rounded-[2rem]">
-                <template #content>
-                    <div class="p-4">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-lg font-bold text-slate-800 flex items-center">
-                                <span class="w-8 h-8 bg-rose-50 text-brand-primary rounded-lg flex items-center justify-center mr-3 text-sm font-black">3</span>
-                                Answer Options
-                            </h3>
-                            <Button v-if="['mcq', 'short_answer'].includes(form.type)" type="button" @click="addOption" icon="pi pi-plus" label="Add Option" text size="small" rounded />
                         </div>
+                    </template>
+                </Card>
+
+                <!-- CONTENT -->
+                <Card>
+                    <template #content>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 mb-2 block">Question Text</label>
+                            <Textarea v-model="form.content" rows="4" class="w-full" />
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- OPTIONS -->
+                <Card v-if="!['writing', 'speaking'].includes(form.type)">
+                    <template #content>
                         <div class="space-y-4">
-                            <div v-for="(option, idx) in form.options" :key="idx" class="flex items-center space-x-4 p-4 rounded-xl border bg-slate-50/50 group transition-all"
-                                :class="option.is_correct ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100'">
-                                <div v-if="form.type !== 'short_answer'" class="flex-shrink-0">
-                                    <button
-                                        type="button"
-                                        @click="setCorrect(idx)"
-                                        :class="option.is_correct ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white border-slate-200 text-transparent'"
-                                        class="w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-200"
-                                    >
-                                        <i class="pi pi-check text-xs"></i>
-                                    </button>
-                                </div>
-                                <div class="flex-grow">
-                                    <InputText v-model="option.option_text" :disabled="form.type === 'true_false'" :placeholder="'Option ' + (idx + 1)" class="w-full bg-white shadow-sm rounded-xl font-bold text-slate-700" />
-                                </div>
-                                <div v-if="['mcq', 'short_answer'].includes(form.type)" class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
-                                    <Button v-if="form.options.length > 2" type="button" @click="removeOption(idx)" icon="pi pi-times" severity="danger" text rounded />
-                                </div>
+
+                            <div v-for="(opt, idx) in form.options" :key="idx" class="flex gap-3 items-center">
+
+                                <button type="button" @click="setCorrect(idx)">
+                                    {{ opt.is_correct ? '✔' : '○' }}
+                                </button>
+
+                                <InputText v-model="opt.option_text" class="w-full" />
+
+                                <Button v-if="form.options.length > 1" icon="pi pi-times" text
+                                    @click="removeOption(idx)" />
+
                             </div>
-                        </div>
-                        <div class="mt-6 p-4 bg-rose-50 text-brand-secondary rounded-xl border border-indigo-100 text-xs font-bold tracking-wide flex items-center">
-                            <i class="pi pi-info-circle mr-3 text-lg"></i> Click the circle next to an option to mark it as correct.
-                        </div>
-                    </div>
-                </template>
-            </Card>
 
-            <!-- Submit -->
-            <div class="flex justify-end pt-4 pb-10">
-                <Button type="submit" :loading="isSubmitting" :label="isSubmitting ? 'Saving...' : 'Save Changes'" icon="pi pi-check" size="large" class="shadow-xl rounded-2xl px-10 font-bold tracking-widest uppercase" />
-            </div>
-        </form>
-    </div>
-  </AdminLayout>
+                            <Button label="Add Option" @click="addOption" />
+
+                        </div>
+                    </template>
+                </Card>
+
+                <div class="flex justify-end">
+                    <Button type="submit" :loading="isSubmitting" label="Update Question" />
+                </div>
+
+            </form>
+
+            <div v-else>Loading...</div>
+
+        </div>
+    </AdminLayout>
 </template>
-

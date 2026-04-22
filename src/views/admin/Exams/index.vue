@@ -69,9 +69,8 @@ const openRules = async (exam) => {
             is_optional: !!skill.pivot.is_optional,
             rules: (fullExam.question_rules || []).filter(r => r.skill_id === skill.id).map(r => ({
                 id: r.id,
-                difficulty_level: r.difficulty_level,
-                quantity: r.quantity,
-                group_tag: r.group_tag
+                level_id: r.level_id,
+                quantity: r.quantity
             }))
         }));
     } catch (err) {
@@ -141,7 +140,6 @@ onMounted(fetchExams);
                      <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Institutional examination matrix blueprints</p>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <Button label="Import Template" icon="pi pi-download" severity="secondary" outlined class="text-[10px] font-black uppercase tracking-widest px-8" @click="router.push('/admin/exams/import')" />
                     <Button label="Initialize Matrix" icon="pi pi-plus" class="bg-brand-primary border-none text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-rose-100 transition-all hover:-translate-y-1" @click="router.push('/admin/exams/create')" />
                 </div>
             </div>
@@ -178,27 +176,62 @@ onMounted(fetchExams);
                             <DataTable :value="filteredExams" dataKey="id" paginator :rows="10" 
                                 class="p-datatable-sm" responsiveLayout="scroll">
 
-                                <Column header="Institutional Asset" style="min-width: 400px">
+                                <Column header="Institutional Asset" style="min-width: 350px">
                                     <template #body="{ data }">
                                         <div class="flex items-center space-x-6 py-4">
                                             <div :class="data.is_default ? 'bg-brand-primary text-white shadow-lg shadow-rose-100' : 'bg-slate-50 text-slate-400 border border-slate-100'"
-                                                class="w-14 h-14 rounded-3xl flex items-center justify-center transition-all transform group-hover:scale-105">
+                                                class="w-14 h-14 rounded-3xl flex items-center justify-center transition-all transform group-hover:scale-105 shrink-0">
                                                  <i :class="data.is_default ? 'pi pi-star-fill' : 'pi pi-file-edit'" class="text-xl"></i>
                                             </div>
-                                            <div>
+                                            <div class="min-w-0">
                                                  <div class="flex items-center gap-3">
-                                                     <div class="font-black text-slate-800 uppercase tracking-tight text-lg">{{ data.title }}</div>
-                                                     <Tag v-if="data.is_default" value="DEFAULT_GATEWAY" severity="success" class="text-[8px] font-black px-2 py-0.5 rounded-full" />
+                                                     <div class="font-black text-slate-800 uppercase tracking-tight text-lg truncate">{{ data.title }}</div>
+                                                     <Tag v-if="data.is_default" value="DEFAULT" severity="success" class="text-[7px] font-black px-2 py-0.5 rounded-full" />
                                                  </div>
-                                                 <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest line-clamp-1 italic opacity-80 mt-1">{{ data.description || 'Institutional Metadata Not Defined' }}</div>
+                                                 <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest line-clamp-1 italic opacity-80 mt-1">{{ data.description || 'Institutional Metadata Not Defined' }}</div>
+                                                 
+                                                 <div class="flex items-center space-x-2 mt-4">
+                                                     <span class="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-lg uppercase tracking-widest border border-slate-200">
+                                                         {{ data.language?.name || 'UNIVERSAL' }}
+                                                     </span>
+                                                     <span class="text-[8px] font-black bg-rose-50 text-brand-primary px-2 py-1 rounded-lg uppercase tracking-widest border border-rose-100">
+                                                         Target: {{ data.passing_score }}%
+                                                     </span>
+                                                 </div>
                                             </div>
                                         </div>
                                     </template>
                                 </Column>
 
-                                <Column header="Classification" style="width: 180px">
+                                <Column header="Matrix Composition" style="min-width: 320px">
                                     <template #body="{ data }">
-                                        <Tag :value="data.category?.name || 'GENERIC'" :severity="getCategorySeverity(data.category)" class="text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-xl border-none shadow-sm" />
+                                        <div class="space-y-6 py-2">
+                                            <div v-for="skill in data.skills" :key="skill.id" class="space-y-2">
+                                                <div class="flex items-center justify-between border-b border-slate-50 pb-2">
+                                                    <div class="flex items-center space-x-2">
+                                                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                                        <span class="text-[10px] font-black text-slate-800 uppercase tracking-tight">{{ skill.name }}</span>
+                                                    </div>
+                                                    <span class="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                                                        Total: {{ data.breakdown?.filter(b => b.skill_id === skill.id).reduce((acc, curr) => acc + curr.count, 0) || 0 }} Qs
+                                                    </span>
+                                                </div>
+                                                <div class="flex flex-wrap gap-1.5 ml-4">
+                                                    <div v-for="lvlBreakdown in data.breakdown?.filter(b => b.skill_id === skill.id).sort((a, b) => a.level_id - b.level_id)" 
+                                                         :key="lvlBreakdown.level_id"
+                                                         class="flex items-center bg-white border border-slate-100 px-2 py-1 rounded-md shadow-sm">
+                                                        <span class="text-[8px] font-black text-slate-400 mr-2">L{{ lvlBreakdown.level_id }}</span>
+                                                        <span class="text-[9px] font-black text-brand-primary">{{ lvlBreakdown.count }}</span>
+                                                    </div>
+                                                    <div v-if="!data.breakdown?.some(b => b.skill_id === skill.id)" class="text-[8px] font-bold text-slate-300 italic uppercase">
+                                                        No questions mapped
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div v-if="data.category" class="pt-2 border-t border-slate-50">
+                                                <Tag :value="data.category?.name || 'GENERIC'" :severity="getCategorySeverity(data.category)" class="text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-none shadow-sm" />
+                                            </div>
+                                        </div>
                                     </template>
                                 </Column>
 
@@ -211,11 +244,9 @@ onMounted(fetchExams);
                                     </template>
                                 </Column>
 
-                                <Column :exportable="false" style="min-width: 220px" class="text-right pr-6">
+                                <Column :exportable="false" style="min-width: 120px" class="text-right pr-6">
                                     <template #body="{ data }">
                                         <div class="flex items-center justify-end space-x-2">
-                                            <Button v-if="!data.is_default" icon="pi pi-bookmark" text severity="info" size="small" @click="setDefaultExam(data)" v-tooltip.top="'Promote to Default'" />
-                                            <Button label="STRUCTURE" text severity="warning" class="text-[9px] font-black tracking-widest uppercase hover:bg-rose-50 px-4" @click="openRules(data)" />
                                             <Button icon="pi pi-pencil" text severity="secondary" @click="router.push(`/admin/exams/${data.id}/edit`)" />
                                             <Button icon="pi pi-trash" text severity="danger" @click="deleteExam(data.id)" />
                                         </div>
@@ -263,9 +294,8 @@ onMounted(fetchExams);
                             <div v-for="(rule, rIdx) in skill.rules" :key="rIdx" class="bg-slate-50/50 border border-slate-100 rounded-3xl p-8 flex flex-col space-y-6 transition-all hover:bg-white hover:shadow-md group">
                                 <div class="flex justify-between items-center">
                                         <span class="font-black text-slate-800 text-[11px] uppercase tracking-[0.2em] flex items-center">
-                                            <i class="pi pi-filter mr-3 text-brand-primary opacity-40"></i> LEVEL {{ rule.difficulty_level || 'GENERIC' }}
+                                            <i class="pi pi-filter mr-3 text-brand-primary opacity-40"></i> LEVEL {{ rule.level_id || 'GENERIC' }}
                                         </span>
-                                        <Tag v-if="rule.group_tag" :value="rule.group_tag" class="text-[8px] font-black uppercase tracking-tighter bg-slate-800 text-white border-none px-2 py-1 rounded" />
                                 </div>
                                 <div class="pt-6 border-t border-slate-100">
                                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 block italic">Target Unit Quantity</label>

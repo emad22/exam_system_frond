@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import api from '@/services/api';
+
 
 import DashboardView from '@/views/student/DashboardView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -64,12 +64,14 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: LoginView
+    component: LoginView,
+    meta: { title: 'System Authentication' }
   },
   {
     path: '/register',
     name: 'register',
-    component: PublicRegisterWizard
+    component: PublicRegisterWizard,
+    meta: { title: 'Student Registration' }
   },
   {
     path: '/parent',
@@ -80,17 +82,20 @@ const routes = [
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: DashboardView
+    component: DashboardView,
+    meta: { title: 'Student Dashboard' }
   },
   {
     path: '/admin',
     name: 'admin',
-    component: AdminDashboard
+    component: AdminDashboard,
+    meta: { title: 'Admin Command Center' }
   },
   {
     path: '/admin/packages',
     name: 'admin.packages.index',
-    component: AdminPackagesIndex
+    component: AdminPackagesIndex,
+    meta: { title: 'Package Management' }
   },
   {
     path: '/admin/packages/create',
@@ -105,7 +110,8 @@ const routes = [
   {
     path: '/admin/students',
     name: 'admin.students',
-    component: AdminStudents
+    component: AdminStudents,
+    meta: { title: 'Student Registry' }
   },
   {
     path: '/admin/students/create',
@@ -130,7 +136,8 @@ const routes = [
   {
     path: '/admin/exams',
     name: 'admin.exams',
-    component: AdminExams
+    component: AdminExams,
+    meta: { title: 'Assessment Templates' }
   },
   {
     path: '/admin/partners',
@@ -150,7 +157,8 @@ const routes = [
   {
     path: '/admin/exams/create',
     name: 'admin.exams.create',
-    component: AdminExamCreate
+    component: AdminExamCreate,
+    meta: { title: 'Initialize Assessment' }
   },
   {
     path: '/admin/exams/:id/edit',
@@ -176,7 +184,8 @@ const routes = [
   {
     path: '/admin/questions',
     name: 'admin.questions',
-    component: AdminQuestions
+    component: AdminQuestions,
+    meta: { title: 'Central Bank Query' }
   },
   {
     path: '/admin/questions/create',
@@ -291,22 +300,26 @@ const router = createRouter({
   routes
 })
 
-// Global Navigation Guard
-// router.beforeEach(async (to) => {
-//   const publicPages = ['/login', '/register'];
+router.beforeEach((to) => {
+  const publicPages = ['/login', '/register'];
+  const authRequired = !publicPages.includes(to.path);
+  const token = localStorage.getItem('token');
 
-//   try {
-//     await api.get('/api/user');
+  if (authRequired && !token) {
+    return '/login';
+  }
 
-//     if (publicPages.includes(to.path)) {
-//       return '/admin';
-//     }
+  if (to.path === '/login' && token) {
+    return '/admin';
+  }
+  
+  return true;
+});
 
-//   } catch {
-//     if (!publicPages.includes(to.path)) {
-//       return '/login';
-//     }
-//   }
-// });
+router.afterEach((to) => {
+  const baseTitle = 'ALPH_EVAL';
+  const pageTitle = to.meta.title || (to.name as string)?.split('.').pop() || 'System';
+  document.title = `${pageTitle.toString().toUpperCase()} | ${baseTitle}`;
+});
 
 export default router

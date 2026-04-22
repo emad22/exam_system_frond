@@ -28,6 +28,16 @@ const instructionsAudioFile = ref(null);
 const isSavingInst = ref(false);
 const skillsWithLevels = ref([]);
 
+const deleteItem = async (id) => {
+    if (!confirm('Are you certain you wish to purge this cognitive asset from the registry?')) return;
+    try {
+        await api.delete(`/admin/questions/${id}`);
+        fetchData();
+    } catch (err) {
+        console.error('Purge failure', err);
+    }
+};
+
 const fetchData = async () => {
     loading.value = true;
     try {
@@ -97,6 +107,16 @@ const getDifficultySeverity = (level) => {
     return 'danger';
 };
 
+const isAudio = (url) => {
+    if (!url) return false;
+    return url.match(/\.(mp3|wav|ogg|m4a)$/i);
+};
+
+const isImage = (url) => {
+    if (!url) return false;
+    return url.match(/\.(jpeg|png|jpg|gif|svg|webp)$/i);
+};
+
 const filteredQuestions = computed(() => {
     let filtered = questions.value;
     if (filterSkill.value) {
@@ -107,7 +127,11 @@ const filteredQuestions = computed(() => {
     }
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter(q => q.content.toLowerCase().includes(query));
+        filtered = filtered.filter(q => 
+            q.content.toLowerCase().includes(query) || 
+            (q.instructions && q.instructions.toLowerCase().includes(query)) ||
+            (q.passage && q.passage.title && q.passage.title.toLowerCase().includes(query))
+        );
     }
     return filtered;
 });
@@ -156,7 +180,15 @@ onMounted(fetchData);
                 <div class="flex flex-col space-y-3">
                       <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Format Type</label>
                       <Select v-model="filterType" 
-                            :options="[{label:'All Modalities', value:''}, {label:'Choice (MCQ)', value:'mcq'}, {label:'True / False', value:'true_false'}, {label:'Constructed (SA)', value:'short_answer'}]" 
+                            :options="[
+                                {label:'All Modalities', value:''}, 
+                                {label:'Choice (MCQ)', value:'mcq'}, 
+                                {label:'True/False', value:'true_false'}, 
+                                {label:'Constructed', value:'short_answer'},
+                                {label:'Writing', value:'writing'},
+                                {label:'Speaking', value:'speaking'},
+                                {label:'Upload', value:'upload'}
+                            ]" 
                             optionLabel="label" 
                             optionValue="value" 
                             class="w-48 rounded-2xl bg-slate-50/50 border-slate-100 font-bold text-xs" />
@@ -178,21 +210,46 @@ onMounted(fetchData);
                 <DataTable :value="filteredQuestions" dataKey="id" paginator :rows="10" 
                     class="p-datatable-sm text-sm" responsiveLayout="scroll">
 
-                    <Column header="Institutional Asset" style="min-width: 450px">
+                    <Column header="Institutional Asset" style="min-width: 500px">
                         <template #body="{ data }">
-                            <div class="flex items-start space-x-6 py-4">
-                                 <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black border border-slate-100 shrink-0">
-                                     #{{ data.id }}
+                            <div class="flex items-start space-x-6 py-5">
+                                 <div class="flex flex-col items-center space-y-2 shrink-0">
+                                     <div class="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black border border-slate-100 shadow-sm text-xs">
+                                         #{{ data.id }}
+                                     </div>
+                                     <div class="flex items-center space-x-1">
+                                         <i v-if="data.passage" class="pi pi-book text-[10px] text-amber-500" title="Part of Passage"></i>
+                                         <i v-if="data.media_url" class="pi pi-paperclip text-[10px] text-blue-500" title="Has Media"></i>
+                                     </div>
                                  </div>
-                                 <div class="space-y-3">
-                                      <p class="font-black text-slate-800 tracking-tight leading-relaxed line-clamp-2 text-base uppercase first-letter:capitalize">{{ data.content }}</p>
-                                       <div class="flex items-center space-x-4">
-                                            <div class="flex items-center space-x-2 bg-rose-50 text-brand-primary px-3 py-1 rounded-lg border border-brand-primary/5">
-                                                <i class="pi pi-bookmark text-[10px]"></i>
-                                                <span class="text-[9px] font-black uppercase tracking-widest">{{ data.skill?.name || 'GENERAL' }}</span>
-                                            </div>
-                                            <Tag v-if="data.media_path" value="MEDIA_ATTACHED" icon="pi pi-volume-up" severity="info" class="text-[8px] font-black px-2 py-0.5 rounded-full" />
-                                       </div>
+                                 <div class="space-y-4 flex-1">
+                                      <div class="flex items-center gap-2 flex-wrap">
+                                          <div v-if="data.passage" class="flex items-center gap-2 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
+                                              <span class="text-[8px] font-black text-amber-600 uppercase tracking-widest">Passage: {{ data.passage.title || 'Untitled' }}</span>
+                                          </div>
+                                          <Tag v-if="data.media_url && !isImage(data.media_url) && !isAudio(data.media_url)" value="DOCUMENT" icon="pi pi-file" severity="info" class="text-[8px] font-black px-2 py-0.5 rounded-full" />
+                                      </div>
+                                      
+                                      <div class="flex items-start gap-4">
+                                          <div v-if="data.media_url && isImage(data.media_url)" class="w-24 h-24 rounded-xl overflow-hidden border border-slate-100 shadow-sm shrink-0">
+                                              <img :src="data.media_url" class="w-full h-full object-cover" />
+                                          </div>
+                                          <div class="space-y-2">
+                                              <p class="font-black text-slate-800 tracking-tight leading-tight line-clamp-3 text-lg uppercase first-letter:capitalize">{{ data.content }}</p>
+                                              <div v-if="data.media_url && isAudio(data.media_url)" class="pt-2">
+                                                  <audio :src="data.media_url" controls class="h-6 w-48 opacity-80"></audio>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      <p v-if="data.instructions" class="text-[10px] text-slate-400 font-bold italic line-clamp-1 border-l-2 border-slate-100 pl-3">"{{ data.instructions }}"</p>
+                                      
+                                      <div class="flex items-center space-x-3">
+                                          <div class="flex items-center space-x-2 bg-slate-50 text-slate-500 px-3 py-1 rounded-lg border border-slate-100">
+                                              <i class="pi pi-bookmark text-[10px]"></i>
+                                              <span class="text-[9px] font-black uppercase tracking-widest">{{ data.skill?.name || 'GENERAL' }}</span>
+                                          </div>
+                                      </div>
                                  </div>
                             </div>
                         </template>
@@ -207,9 +264,9 @@ onMounted(fetchData);
                     <Column header="Mastery Rank" style="width: 140px">
                         <template #body="{ data }">
                             <div class="flex items-center">
-                                <span :class="data.difficulty_level <= 3 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : (data.difficulty_level <= 6 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-brand-primary border-brand-primary/10')" 
+                                <span :class="(data.level?.level_number || data.level_id) <= 3 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : ((data.level?.level_number || data.level_id) <= 6 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-brand-primary border-brand-primary/10')" 
                                       class="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm">
-                                    L{{ data.difficulty_level }}
+                                    L{{ data.level?.level_number || data.level_id }}
                                 </span>
                             </div>
                         </template>
@@ -224,10 +281,11 @@ onMounted(fetchData);
                         </template>
                     </Column>
 
-                    <Column :exportable="false" style="width: 100px" class="text-right">
+                    <Column :exportable="false" style="width: 120px" class="text-right">
                         <template #body="{ data }">
-                            <div class="flex items-center justify-end">
-                                <Button icon="pi pi-pencil" text severity="secondary" @click="$router.push(`/admin/questions/${data.id}/edit`)" />
+                            <div class="flex items-center justify-end space-x-1">
+                                <Button icon="pi pi-pencil" text severity="secondary" v-tooltip.top="'Modify Asset'" @click="$router.push(`/admin/questions/${data.id}/edit`)" />
+                                <Button icon="pi pi-trash" text severity="danger" v-tooltip.top="'Purge from Registry'" @click="deleteItem(data.id)" />
                             </div>
                         </template>
                     </Column>
