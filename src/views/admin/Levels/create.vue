@@ -27,8 +27,12 @@ const form = ref({
     max_score: 100,
     pass_threshold: 70,
     default_question_count: 2,
+    default_standalone_quantity: 0,
+    default_passage_quantity: 0,
     instructions: '',
-    is_active: true
+    is_active: true,
+    is_random: false,
+    allows_retry: false
 });
 
 onMounted(async () => {
@@ -56,11 +60,9 @@ const saveLevel = async () => {
     }
 };
 </script>
-
 <template>
     <AdminLayout>
         <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 mt-6 px-4">
-
             <!-- Standardized Header -->
             <div class="flex items-center justify-between bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                 <div class="flex items-center space-x-6">
@@ -75,15 +77,12 @@ const saveLevel = async () => {
                     <span class="text-[10px] font-black text-brand-primary uppercase tracking-widest">Adaptive Logic Engine</span>
                 </div>
             </div>
-
             <div class="max-w-6xl mx-auto">
                 <form @submit.prevent="saveLevel" class="space-y-8">
                     <Message v-if="errorMsg" severity="error" :closable="false" class="mb-4 rounded-2xl">
                         ERROR: {{ errorMsg }}
                     </Message>
-
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        
                         <!-- Left Column: Primary Config -->
                         <div class="lg:col-span-2 space-y-8">
                             <Card class="border border-slate-100 shadow-sm rounded-3xl overflow-hidden">
@@ -170,12 +169,44 @@ const saveLevel = async () => {
                                             <ToggleSwitch v-model="form.is_active" />
                                         </div>
 
+                                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group transition-all duration-300 hover:bg-white hover:border-indigo-100">
+                                            <div class="space-y-0.5">
+                                                <p class="text-[11px] font-black text-slate-800 uppercase tracking-tight">Randomize Questions</p>
+                                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Shuffle question order</p>
+                                            </div>
+                                            <ToggleSwitch v-model="form.is_random" />
+                                        </div>
+
+                                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group transition-all duration-300 hover:bg-white hover:border-amber-100">
+                                            <div class="space-y-0.5">
+                                                <p class="text-[11px] font-black text-slate-800 uppercase tracking-tight">Allow Retry on Fail</p>
+                                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">One extra chance per level</p>
+                                            </div>
+                                            <ToggleSwitch v-model="form.allows_retry" />
+                                        </div>
+
                                         <!-- Default Question Count -->
-                                        <div class="space-y-2">
-                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Questions Per Exam</label>
-                                            <p class="text-[9px] text-slate-400 ml-1 mb-2">عدد الأسئلة الافتراضي المقترح لكل امتحان</p>
-                                            <InputNumber v-model="form.default_question_count" showButtons :min="2" placeholder="e.g. 2"
-                                                class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-indigo-600" />
+                                        <div class="space-y-4 pt-4 border-t border-slate-100">
+                                            <div class="space-y-2">
+                                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Standalone Qs</label>
+                                                <p class="text-[9px] text-slate-400 ml-1 mb-2">العدد الافتراضي للأسئلة المستقلة</p>
+                                                <InputNumber v-model="form.default_standalone_quantity" showButtons :min="0" 
+                                                    class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-emerald-600" />
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Passages</label>
+                                                <p class="text-[9px] text-slate-400 ml-1 mb-2">العدد الافتراضي للقطع (Reading/Listening)</p>
+                                                <InputNumber v-model="form.default_passage_quantity" showButtons :min="0" 
+                                                    class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-brand-primary" />
+                                            </div>
+
+                                            <div class="space-y-2 opacity-50">
+                                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Legacy Total Count</label>
+                                                <p class="text-[9px] text-slate-400 ml-1 mb-2">العدد الإجمالي الافتراضي (في حال عدم تحديد أعلاه)</p>
+                                                <InputNumber v-model="form.default_question_count" showButtons :min="0"
+                                                    class="w-full" inputClass="rounded-xl bg-slate-50 border-slate-100 font-black text-slate-500" />
+                                            </div>
                                         </div>
                                     </div>
                                 </template>

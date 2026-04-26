@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -35,7 +35,7 @@ const form = ref({
     skill_id: '',
     exam_id: '',
     level_id: 5,
-    passage_mode: 'none', 
+    passage_mode: 'none',
     passage_id: '',
     passage_type: 'text',
     passage_title: '',
@@ -44,6 +44,20 @@ const form = ref({
     passage_is_random: false,
     p_media: null,
     questions: []
+});
+
+const filteredSkills = computed(() => {
+    const exam = exams.value.find(e => e.id === form.value.exam_id);
+    return exam?.skills || [];
+});
+
+watch(() => form.value.exam_id, (newVal) => {
+    if (newVal) {
+        const isValid = filteredSkills.value.some(s => s.id === form.value.skill_id);
+        if (!isValid) form.value.skill_id = '';
+    } else {
+        form.value.skill_id = '';
+    }
 });
 
 const pFileInput = ref(null);
@@ -83,8 +97,14 @@ const loadInitialData = async () => {
             api.get('/admin/passages').catch(() => ({ data: [] }))
         ]);
         skills.value = resSkills.data;
-        exams.value = resExams.data;
-        passages.value = resPassages.data;
+        exams.value = resExams.data.map(e => ({
+            ...e,
+            skills: Array.isArray(e.skills) ? e.skills : []
+        }));
+        passages.value = (Array.isArray(resPassages.data) ? resPassages.data : []).map(p => ({
+            ...p,
+            title: p.title || `Untitled Passage (ID: ${p.id})`
+        }));
 
         if (route.query.skill_id) form.value.skill_id = Number(route.query.skill_id);
         if (route.query.exam_id) form.value.exam_id = Number(route.query.exam_id);
@@ -149,6 +169,10 @@ const saveBatch = async () => {
         errorMsg.value = 'Please select an Exam first.';
         return;
     }
+    if (!form.value.skill_id) {
+        errorMsg.value = 'Please select a Skill.';
+        return;
+    }
 
     isSubmitting.value = true;
     errorMsg.value = '';
@@ -206,16 +230,19 @@ onMounted(() => {
     <AdminLayout>
         <div class="space-y-8 pb-32 mt-6 px-4 md:px-12 animate-in fade-in duration-500">
             <!-- Header -->
-            <div class="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+            <div
+                class="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                 <div class="flex items-center gap-6">
-                    <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded @click="router.push('/admin/questions')" />
+                    <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded
+                        @click="router.push('/admin/questions')" />
                     <div>
                         <h1 class="text-2xl font-black text-slate-800 tracking-tight">Create New Questions</h1>
-                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Add content and link properties</p>
+                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Add content and link
+                            properties</p>
                     </div>
                 </div>
                 <!-- Primary Action -->
-                <Button label="Save All Changes" icon="pi pi-check-circle" :loading="isSubmitting" @click="saveBatch" 
+                <Button label="Save All Changes" icon="pi pi-check-circle" :loading="isSubmitting" @click="saveBatch"
                     class="rounded-2xl px-10 py-3 font-black shadow-lg" severity="success" />
             </div>
 
@@ -225,7 +252,8 @@ onMounted(() => {
             <Card class="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-slate-50/50">
                 <template #title>
                     <div class="flex items-center px-4 py-2 gap-4">
-                        <div class="w-10 h-10 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                        <div
+                            class="w-10 h-10 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
                             <i class="pi pi-cog text-xl"></i>
                         </div>
                         <span class="text-lg font-black text-slate-800">Exam & Skill Settings</span>
@@ -234,19 +262,28 @@ onMounted(() => {
                 <template #content>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
                         <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Target Skill</label>
-                            <Select v-model="form.skill_id" :options="skills" optionLabel="name" optionValue="id"
-                                placeholder="Select Skill" class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Linked Exam (Required)</label>
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Linked
+                                Exam (Required)</label>
                             <Select v-model="form.exam_id" :options="exams" optionLabel="title" optionValue="id"
-                                placeholder="Select Exam" class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
+                                placeholder="Select Exam"
+                                class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
                         </div>
                         <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Difficulty Level ({{ form.level_id }})</label>
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Target
+                                Skill (Required)</label>
+                            <Select v-model="form.skill_id" :options="filteredSkills" optionLabel="name"
+                                optionValue="id" placeholder="Select Skill"
+                                class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white"
+                                :disabled="!form.exam_id" :key="form.exam_id" />
+                        </div>
+
+                        <div class="flex flex-col">
+                            <label
+                                class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Difficulty
+                                Level ({{ form.level_id }})</label>
                             <Slider v-model="form.level_id" :min="1" :max="9" :step="1" class="w-full mt-4" />
-                            <div class="flex justify-between text-[10px] text-slate-400 font-black mt-4 uppercase tracking-tighter">
+                            <div
+                                class="flex justify-between text-[10px] text-slate-400 font-black mt-4 uppercase tracking-tighter">
                                 <span>Beginner</span>
                                 <span>Expert</span>
                             </div>
@@ -259,7 +296,8 @@ onMounted(() => {
             <Card class="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-slate-50/50">
                 <template #title>
                     <div class="flex items-center px-4 py-2 gap-4">
-                        <div class="w-10 h-10 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                        <div
+                            class="w-10 h-10 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
                             <i class="pi pi-book text-xl"></i>
                         </div>
                         <span class="text-lg font-black text-slate-800">Passage Context</span>
@@ -268,53 +306,76 @@ onMounted(() => {
                 <template #content>
                     <div class="px-4 space-y-8">
                         <div class="flex flex-wrap gap-4">
-                            <label v-for="mode in [{id:'none', label:'No Passage', icon:'pi-ban'}, {id:'existing', label:'Existing Passage', icon:'pi-search'}, {id:'new', label:'Create New Passage', icon:'pi-plus-circle'}]" 
+                            <label
+                                v-for="mode in [{ id: 'none', label: 'No Passage', icon: 'pi-ban' }, { id: 'existing', label: 'Existing Passage', icon: 'pi-search' }, { id: 'new', label: 'Create New Passage', icon: 'pi-plus-circle' }]"
                                 :key="mode.id"
                                 class="flex-1 flex items-center justify-center gap-4 cursor-pointer p-5 rounded-[1.5rem] border-2 transition-all select-none"
                                 :class="form.passage_mode === mode.id ? 'border-emerald-500 bg-white shadow-md ring-4 ring-emerald-500/10' : 'border-transparent bg-white hover:border-slate-200'">
                                 <input type="radio" v-model="form.passage_mode" :value="mode.id" class="hidden" />
-                                <i :class="[mode.icon, 'text-xl', form.passage_mode === mode.id ? 'text-emerald-600' : 'text-slate-300']"></i>
-                                <span class="font-black" :class="form.passage_mode === mode.id ? 'text-emerald-700' : 'text-slate-600'">{{ mode.label }}</span>
+                                <i
+                                    :class="[mode.icon, 'text-xl', form.passage_mode === mode.id ? 'text-emerald-600' : 'text-slate-300']"></i>
+                                <span class="font-black"
+                                    :class="form.passage_mode === mode.id ? 'text-emerald-700' : 'text-slate-600'">{{
+                                    mode.label }}</span>
                             </label>
                         </div>
 
-                        <div v-if="form.passage_mode === 'existing'" class="animate-in fade-in slide-in-from-top-2 duration-400">
-                            <label class="text-xs font-black text-slate-500 mb-3 block mr-2">Search in Passage Library</label>
+                        <div v-if="form.passage_mode === 'existing'"
+                            class="animate-in fade-in slide-in-from-top-2 duration-400">
+                            <label class="text-xs font-black text-slate-500 mb-3 block mr-2">Search in Passage
+                                Library</label>
                             <Select v-model="form.passage_id" :options="passages" optionLabel="title" optionValue="id"
-                                placeholder="Start typing passage title..." class="w-full md:w-1/2 rounded-2xl border-none shadow-sm" filter />
+                                placeholder="Start typing passage title..."
+                                class="w-full md:w-1/2 rounded-2xl border-none shadow-sm" filter />
                         </div>
 
-                        <div v-if="form.passage_mode === 'new'" class="bg-white p-8 rounded-[2rem] shadow-sm space-y-8 animate-in zoom-in-95 duration-400">
+                        <div v-if="form.passage_mode === 'new'"
+                            class="bg-white p-8 rounded-[2rem] shadow-sm space-y-8 animate-in zoom-in-95 duration-400">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div class="flex flex-col">
                                     <label class="text-xs font-black text-slate-500 mb-3">Passage Content Type</label>
-                                    <Select v-model="form.passage_type" 
-                                        :options="[{label: 'Dynamic Text', value: 'text'}, {label: 'Image / Diagram', value: 'image'}, {label: 'Audio Clip', value: 'audio'}, {label: 'Video Clip', value: 'video'}]"
+                                    <Select v-model="form.passage_type"
+                                        :options="[{ label: 'Dynamic Text', value: 'text' }, { label: 'Image / Diagram', value: 'image' }, { label: 'Audio Clip', value: 'audio' }, { label: 'Video Clip', value: 'video' }]"
                                         optionLabel="label" optionValue="value" class="w-full rounded-2xl" />
                                 </div>
                                 <div class="flex flex-col">
-                                    <label class="text-xs font-black text-slate-500 mb-3">Internal Title (Admin Only)</label>
-                                    <InputText v-model="form.passage_title" placeholder="Unique name for this context..." class="w-full rounded-2xl font-bold" />
+                                    <label class="text-xs font-black text-slate-500 mb-3">Internal Title (Admin
+                                        Only)</label>
+                                    <InputText v-model="form.passage_title"
+                                        placeholder="Unique name for this context..."
+                                        class="w-full rounded-2xl font-bold" />
                                 </div>
                             </div>
 
                             <div v-if="form.passage_type === 'text'" class="flex flex-col">
                                 <label class="text-xs font-black text-slate-500 mb-3">Text Content</label>
-                                <Textarea v-model="form.passage_content" rows="6" placeholder="Paste or write the text content here..." class="w-full rounded-[1.5rem] p-6 font-medium leading-relaxed" autoResize />
+                                <Textarea v-model="form.passage_content" rows="6"
+                                    placeholder="Paste or write the text content here..."
+                                    class="w-full rounded-[1.5rem] p-6 font-medium leading-relaxed" autoResize />
                             </div>
-                            
+
                             <div v-else class="flex flex-col">
-                                <label class="text-xs font-black text-slate-500 mb-4">Upload {{form.passage_type}} File</label>
+                                <label class="text-xs font-black text-slate-500 mb-4">Upload {{ form.passage_type }}
+                                    File</label>
                                 <div class="flex gap-6 items-start">
-                                    <div @click="pFileInput.click()" class="w-40 h-40 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-all group">
-                                        <input type="file" ref="pFileInput" class="hidden" @change="handlePFileChange" accept="image/*,audio/*,video/*" />
-                                        <i class="pi pi-cloud-upload text-3xl text-slate-300 group-hover:text-emerald-500 mb-2"></i>
-                                        <span class="text-[10px] font-black text-slate-400 group-hover:text-emerald-600 uppercase tracking-widest">Select File</span>
+                                    <div @click="pFileInput.click()"
+                                        class="w-40 h-40 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-all group">
+                                        <input type="file" ref="pFileInput" class="hidden" @change="handlePFileChange"
+                                            accept="image/*,audio/*,video/*" />
+                                        <i
+                                            class="pi pi-cloud-upload text-3xl text-slate-300 group-hover:text-emerald-500 mb-2"></i>
+                                        <span
+                                            class="text-[10px] font-black text-slate-400 group-hover:text-emerald-600 uppercase tracking-widest">Select
+                                            File</span>
                                     </div>
-                                    <div v-if="pMediaPreview" class="flex-grow bg-slate-50 p-4 rounded-[2rem] flex items-center justify-center min-h-[10rem]">
-                                        <img v-if="pMediaPreview.type.startsWith('image/')" :src="pMediaPreview.url" class="rounded-2xl max-h-32 shadow-sm" />
-                                        <audio v-if="pMediaPreview.type.startsWith('audio/')" :src="pMediaPreview.url" controls class="w-full"></audio>
-                                        <video v-if="pMediaPreview.type.startsWith('video/')" :src="pMediaPreview.url" controls class="rounded-2xl max-h-32 mb-0"></video>
+                                    <div v-if="pMediaPreview"
+                                        class="flex-grow bg-slate-50 p-4 rounded-[2rem] flex items-center justify-center min-h-[10rem]">
+                                        <img v-if="pMediaPreview.type.startsWith('image/')" :src="pMediaPreview.url"
+                                            class="rounded-2xl max-h-32 shadow-sm" />
+                                        <audio v-if="pMediaPreview.type.startsWith('audio/')" :src="pMediaPreview.url"
+                                            controls class="w-full"></audio>
+                                        <video v-if="pMediaPreview.type.startsWith('video/')" :src="pMediaPreview.url"
+                                            controls class="rounded-2xl max-h-32 mb-0"></video>
                                     </div>
                                 </div>
                             </div>
@@ -325,24 +386,27 @@ onMounted(() => {
 
             <!-- 3. Question List -->
             <div class="space-y-6">
-                <div class="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-50">
+                <div
+                    class="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-50">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                        <div
+                            class="w-10 h-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
                             <i class="pi pi-list text-xl"></i>
                         </div>
                         <span class="text-lg font-black text-slate-800">Draft Questions</span>
                     </div>
-                    <Button label="Add Another Question" icon="pi pi-plus" severity="success" rounded @click="addQuestion" class="font-black text-xs px-6 py-3" />
+
                 </div>
 
-                <div v-for="(q, qIdx) in form.questions" :key="qIdx" 
+                <div v-for="(q, qIdx) in form.questions" :key="qIdx"
                     class="group relative bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2.5rem] p-8 md:p-12 animate-in slide-in-from-bottom-4">
-                    
-                    <div class="absolute -left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-slate-50 text-slate-800 rounded-2xl flex items-center justify-center font-black shadow-xl group-hover:bg-emerald-500 group-hover:text-white transition-all z-10">
+
+                    <div
+                        class="absolute -left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-slate-50 text-slate-800 rounded-2xl flex items-center justify-center font-black shadow-xl group-hover:bg-emerald-500 group-hover:text-white transition-all z-10">
                         {{ qIdx + 1 }}
                     </div>
 
-                    <button v-if="form.questions.length > 1" @click="removeQuestion(qIdx)" 
+                    <button v-if="form.questions.length > 1" @click="removeQuestion(qIdx)"
                         class="absolute -right-3 -top-3 w-10 h-10 bg-white border border-slate-100 text-rose-500 rounded-full shadow-lg opacity-0 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center z-10">
                         <i class="pi pi-times text-xs"></i>
                     </button>
@@ -350,13 +414,19 @@ onMounted(() => {
                     <div class="space-y-10">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="flex flex-col">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Question Type</label>
-                                <Select v-model="q.type" @change="handleTypeChange(qIdx)"
-                                    :options="questionTypes" optionLabel="label" optionValue="value" class="w-full rounded-2xl bg-slate-50/50 border-none px-4 h-14 flex items-center" />
+                                <label
+                                    class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Question
+                                    Type</label>
+                                <Select v-model="q.type" @change="handleTypeChange(qIdx)" :options="questionTypes"
+                                    optionLabel="label" optionValue="value"
+                                    class="w-full rounded-2xl bg-slate-50/50 border-none px-4 h-14 flex items-center" />
                             </div>
                             <div class="flex flex-col">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Instructions</label>
-                                <InputText v-model="q.instructions" placeholder="e.g. Choose the correct answer based on the text, audio or image attached" class="w-full rounded-2xl bg-slate-50/50 border-none px-6 h-14 font-bold" />
+                                <label
+                                    class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Instructions</label>
+                                <InputText v-model="q.instructions"
+                                    placeholder="e.g. Choose the correct answer based on the text, audio or image attached"
+                                    class="w-full rounded-2xl bg-slate-50/50 border-none px-6 h-14 font-bold" />
                             </div>
                         </div>
 
@@ -364,9 +434,11 @@ onMounted(() => {
                         <div class="space-y-4">
                             <!-- Mode Selector -->
                             <div class="flex items-center gap-3">
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question Content</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question
+                                    Content</span>
                                 <div class="flex bg-slate-100 rounded-2xl p-1 gap-1">
-                                    <button type="button" @click="q.content_mode = 'text'; q.q_media = null; q.q_media_preview = null"
+                                    <button type="button"
+                                        @click="q.content_mode = 'text'; q.q_media = null; q.q_media_preview = null"
                                         :class="q.content_mode === 'text' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'"
                                         class="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all flex items-center gap-2">
                                         <i class="pi pi-align-left text-xs"></i> Text
@@ -380,10 +452,10 @@ onMounted(() => {
                             </div>
 
                             <!-- Text Mode -->
-                            <Textarea v-if="q.content_mode === 'text'"
-                                v-model="q.content" rows="2"
+                            <Textarea v-if="q.content_mode === 'text'" v-model="q.content" rows="2"
                                 placeholder="Type your question here..."
-                                class="w-full rounded-[1.5rem] bg-slate-50/50 border-none p-6 font-bold text-lg" autoResize />
+                                class="w-full rounded-[1.5rem] bg-slate-50/50 border-none p-6 font-bold text-lg"
+                                autoResize />
 
                             <!-- Media Mode -->
                             <div v-else class="animate-in zoom-in-95 duration-300">
@@ -394,18 +466,26 @@ onMounted(() => {
                                         <input type="file" :ref="`qFile_${qIdx}`" class="hidden"
                                             @change="(e) => handleQFileChange(e, qIdx)"
                                             accept="image/*,audio/*,video/*" />
-                                        <i v-if="!q.q_media_preview" class="pi pi-cloud-upload text-3xl text-slate-300 group-hover:text-indigo-400 mb-2"></i>
+                                        <i v-if="!q.q_media_preview"
+                                            class="pi pi-cloud-upload text-3xl text-slate-300 group-hover:text-indigo-400 mb-2"></i>
                                         <i v-else class="pi pi-check-circle text-3xl text-emerald-500 mb-2"></i>
                                         <span class="text-[10px] font-black uppercase tracking-widest"
                                             :class="q.q_media_preview ? 'text-emerald-600' : 'text-slate-400 group-hover:text-indigo-500'">
                                             {{ q.q_media_preview ? 'File Selected' : 'Upload File' }}
                                         </span>
                                     </div>
-                                    <div v-if="q.q_media_preview" class="flex-grow bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center min-h-[11rem] gap-3">
-                                        <img v-if="q.q_media_preview.type.startsWith('image/')" :src="q.q_media_preview.url" class="max-h-36 rounded-2xl shadow-sm object-contain" />
-                                        <audio v-else-if="q.q_media_preview.type.startsWith('audio/')" :src="q.q_media_preview.url" controls class="w-full"></audio>
-                                        <video v-else-if="q.q_media_preview.type.startsWith('video/')" :src="q.q_media_preview.url" controls class="max-h-36 rounded-2xl shadow-sm"></video>
-                                        <button type="button" @click="q.q_media = null; q.q_media_preview = null" class="text-[9px] font-black text-rose-400 hover:text-rose-600 uppercase tracking-wide">
+                                    <div v-if="q.q_media_preview"
+                                        class="flex-grow bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center min-h-[11rem] gap-3">
+                                        <img v-if="q.q_media_preview.type.startsWith('image/')"
+                                            :src="q.q_media_preview.url"
+                                            class="max-h-36 rounded-2xl shadow-sm object-contain" />
+                                        <audio v-else-if="q.q_media_preview.type.startsWith('audio/')"
+                                            :src="q.q_media_preview.url" controls class="w-full"></audio>
+                                        <video v-else-if="q.q_media_preview.type.startsWith('video/')"
+                                            :src="q.q_media_preview.url" controls
+                                            class="max-h-36 rounded-2xl shadow-sm"></video>
+                                        <button type="button" @click="q.q_media = null; q.q_media_preview = null"
+                                            class="text-[9px] font-black text-rose-400 hover:text-rose-600 uppercase tracking-wide">
                                             <i class="pi pi-times mr-1"></i>Remove
                                         </button>
                                     </div>
@@ -417,20 +497,28 @@ onMounted(() => {
                             <!-- Options Section -->
                             <div v-if="!['writing', 'speaking', 'upload'].includes(q.type)" class="space-y-6">
                                 <div class="flex items-center justify-between">
-                                    <label class="text-xs font-black text-indigo-500 ml-2 uppercase tracking-wide">Options</label>
-                                    <Button v-if="['mcq', 'short_answer'].includes(q.type)" icon="pi pi-plus" label="Add Option" text rounded @click="addOption(qIdx)" class="text-[10px] font-black text-emerald-600" />
+                                    <label
+                                        class="text-xs font-black text-indigo-500 ml-2 uppercase tracking-wide">Options</label>
+                                    <Button v-if="['mcq', 'short_answer'].includes(q.type)" icon="pi pi-plus"
+                                        label="Add Option" text rounded @click="addOption(qIdx)"
+                                        class="text-[10px] font-black text-emerald-600" />
                                 </div>
                                 <div class="space-y-3">
-                                    <div v-for="(opt, oIdx) in q.options" :key="oIdx" 
+                                    <div v-for="(opt, oIdx) in q.options" :key="oIdx"
                                         class="flex items-center gap-4 p-3 rounded-2xl border-2 transition-all bg-white"
                                         :class="opt.is_correct ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-50'">
-                                        <button v-if="q.type !== 'short_answer'" type="button" @click="setCorrect(qIdx, oIdx)" 
+                                        <button v-if="q.type !== 'short_answer'" type="button"
+                                            @click="setCorrect(qIdx, oIdx)"
                                             class="w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all shrink-0"
                                             :class="opt.is_correct ? 'bg-emerald-500 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-200 text-transparent'">
                                             <i class="pi pi-check text-[10px] font-black"></i>
                                         </button>
-                                        <InputText v-model="opt.option_text" :disabled="q.type === 'true_false'" :placeholder="q.type === 'short_answer' ? 'Accepted variation...' : 'Option value...'" class="w-full border-none bg-transparent font-bold text-slate-800 focus:ring-0" />
-                                        <button v-if="['mcq', 'short_answer'].includes(q.type) && q.options.length > 1" @click="removeOption(qIdx, oIdx)" class="text-slate-300 hover:text-rose-500 p-2">
+                                        <InputText v-model="opt.option_text" :disabled="q.type === 'true_false'"
+                                            :placeholder="q.type === 'short_answer' ? 'Accepted variation...' : 'Option value...'"
+                                            class="w-full border-none bg-transparent font-bold text-slate-800 focus:ring-0" />
+                                        <button v-if="['mcq', 'short_answer'].includes(q.type) && q.options.length > 1"
+                                            @click="removeOption(qIdx, oIdx)"
+                                            class="text-slate-300 hover:text-rose-500 p-2">
                                             <i class="pi pi-trash text-xs"></i>
                                         </button>
                                     </div>
@@ -439,18 +527,19 @@ onMounted(() => {
 
                             <!-- Points & Word Limits -->
                             <div class="flex flex-col space-y-6 bg-slate-50/50 p-6 rounded-[2rem]">
-                                <label class="text-xs font-black text-slate-500 ml-2 uppercase tracking-wide">Scoring</label>
+                                <label
+                                    class="text-xs font-black text-slate-500 ml-2 uppercase tracking-wide">Scoring</label>
                                 <div class="grid grid-cols-2 gap-6 items-end">
                                     <div class="flex flex-col">
                                         <label class="text-[9px] font-black text-slate-400 mb-2 ml-1">Points</label>
                                         <InputNumber v-model="q.points" :min="1" class="w-full" showButtons />
                                     </div>
                                     <div v-if="q.type === 'writing'" class="flex gap-2">
-                                         <div class="grow">
+                                        <div class="grow">
                                             <label class="text-[9px] font-black text-slate-400 mb-2">Min Words</label>
                                             <InputNumber v-model="q.min_words" placeholder="0" class="w-full" />
                                         </div>
-                                         <div class="grow">
+                                        <div class="grow">
                                             <label class="text-[9px] font-black text-slate-400 mb-2">Max Words</label>
                                             <InputNumber v-model="q.max_words" placeholder="200" class="w-full" />
                                         </div>
@@ -460,11 +549,17 @@ onMounted(() => {
                         </div>
                     </div>
                 </div>
+
+
             </div>
+
+            <Button label="Add Another Question" icon="pi pi-plus" severity="success" rounded @click="addQuestion"
+                class="font-black text-xs px-6 py-3" />
 
             <!-- Footer Action -->
             <div class="flex justify-center pt-10 border-t border-slate-100">
-                <Button type="button" :loading="isSubmitting" label="Publish Questions" icon="pi pi-cloud-upload" size="large" @click="saveBatch" 
+                <Button type="button" :loading="isSubmitting" label="Publish Questions" icon="pi pi-cloud-upload"
+                    size="large" @click="saveBatch"
                     class="rounded-[2rem] px-24 py-6 font-black text-xl bg-slate-900 border-none hover:bg-emerald-600 shadow-2xl transition-all hover:scale-105 active:scale-95" />
             </div>
         </div>
@@ -476,6 +571,7 @@ onMounted(() => {
     border: none;
     background: white;
 }
+
 :deep(.p-inputnumber-input) {
     font-weight: 900;
     text-align: center;

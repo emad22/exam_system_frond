@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/services/api';
 import Button from 'primevue/button';
@@ -24,6 +24,8 @@ const isLoading = ref(true);
 const isStarting = ref(true); 
 const isSubmittingBatch = ref(false);
 const questionSubmitted = ref(false);
+const isRetryAttempt = ref(false);
+const showRetryNotification = ref(false);
 const errorMsg = ref('');
 const checkedRequirements = ref([]);
 const autoVerifiedIds = ref([]);
@@ -139,6 +141,12 @@ const fetchNextBatch = async () => {
         errorMsg.value = err.response?.data?.error || "Assessment segment unavailable.";
     } finally {
         isLoading.value = false;
+        // Reset interactive states for the new batch
+        questionSubmitted.value = false;
+        hasListened.value = false;
+        isAudioPlaying.value = false;
+        if (audioRef.value) audioRef.value.pause();
+        
         window.scrollTo(0, 0);
     }
 };
@@ -180,11 +188,24 @@ const submitCurrentBatch = async () => {
             if (ans.recorded_file) formData.append(`answers[${index}][audio_file]`, ans.recorded_file, `voice.webm`);
         });
 
-        const res = await api.post(`/attempts/${attemptId}/submit-batch`, formData);
+        const res = await api.post(`/attempts/${attemptId}/submit-batch`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         if (res.data.finished_exam) router.push(`/exam/${attemptId}/result`);
         else if (res.data.next_step === 'dashboard') router.push('/dashboard');
         else {
-            globalOffset.value += questions.value.length;
+            // Handle retry notification logic
+            if (res.data.retry_attempt) {
+                isRetryAttempt.value = true;
+                showRetryNotification.value = true;
+                // Notification stays visible until student clicks "Proceed" on the notice (or it auto-closes)
+                // For now, we'll just show it and then fetch the next batch
+            } else {
+                isRetryAttempt.value = false;
+                showRetryNotification.value = false;
+                globalOffset.value += questions.value.length;
+            }
+            
             await fetchNextBatch();
         }
     } catch (err) {
@@ -207,60 +228,83 @@ const getSkillIcon = (name) => {
     return '🎯';
 };
 
+// Auto-play media when question changes
+watch(currentQ, (newQ) => {
+    const mediaUrl = newQ?.passage?.media_url || newQ?.media_url;
+    if (mediaUrl) {
+        nextTick(() => {
+            if (audioRef.value) {
+                audioRef.value.play().catch(err => {
+                    console.warn('Autoplay blocked by browser. User interaction required.', err);
+                });
+            }
+        });
+    }
+});
+
 onMounted(fetchData);
 </script>
 
 <template>
-    <div class="min-h-screen bg-[#FDFDFD] font-sans text-slate-900 selection:bg-brand-primary/10">
+    <div class="min-h-screen bg-slate-50 font-sans text-slate-900">
         
-        <!-- TOEFL Header -->
-        <header v-if="!isStarting && currentSkill" class="bg-white border-b border-slate-200 sticky top-0 z-[1000] shadow-sm">
-            <div class="max-w-[1440px] mx-auto px-10 h-24 flex justify-between items-center">
-                <div class="flex items-center space-x-10">
-                    <div class="flex flex-col">
-                        <span class="text-[10px] font-black text-brand-primary uppercase tracking-[0.4em] mb-2 leading-none">Standard Assessment</span>
-                        <h2 class="text-2xl font-black text-slate-800 tracking-tighter uppercase leading-none">
-                            {{ currentSkill?.name || 'Assessment Domain' }}
-                        </h2>
-                    </div>
-                    <div class="h-10 w-px bg-slate-200"></div>
-                    <div class="flex flex-col">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none">Proficiency Band</span>
-                        <span class="text-xs font-bold text-slate-600 uppercase">{{ currentLevel?.name || 'Loading...' }}</span>
-                    </div>
+        <!-- TOEFL Institutional Header -->
+        <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white sticky top-0 z-[1000] shadow-md h-16">
+            <div class="max-w-[1600px] mx-auto px-6 h-full flex justify-between items-center">
+                <!-- Section Title -->
+                <div class="flex items-center space-x-6">
+                    <span class="text-sm font-black uppercase tracking-wider text-slate-400 border-r border-slate-600 pr-6">{{ currentSkill?.name }}</span>
+                    <span class="text-sm font-bold text-white uppercase tracking-tight">Question {{ displayNumber }} of {{ totalSkillQuestions }}</span>
                 </div>
 
-                <div class="flex items-center space-x-10">
-                    <div class="flex items-center space-x-4 bg-slate-50 px-6 py-3 rounded-2xl border border-slate-100">
-                        <i class="pi pi-clock text-brand-primary"></i>
-                        <div class="flex flex-col">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Section Time</span>
-                            <span class="text-xl font-black text-slate-800 tabular-nums mt-1 leading-none">45:00</span>
-                        </div>
+                <!-- Navigation Actions -->
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-4 bg-slate-900/50 px-4 py-1.5 rounded-lg border border-slate-700 mr-6">
+                        <i class="pi pi-clock text-slate-400 text-xs"></i>
+                        <span class="text-lg font-black tabular-nums tracking-tighter">45:00</span>
                     </div>
-                    <button @click="router.push('/dashboard')" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-300 hover:text-rose-500 transition-all flex items-center justify-center border border-slate-100">
-                        <i class="pi pi-times-circle text-xl"></i>
+                    
+                    <button class="h-10 px-6 bg-slate-700 text-slate-300 rounded font-bold text-xs uppercase hover:bg-slate-600 transition-all opacity-50 cursor-not-allowed">Back</button>
+                    <button v-if="!questionSubmitted" @click="submitAnswer" 
+                        class="h-10 px-8 bg-brand-primary text-white rounded font-black text-xs uppercase hover:bg-brand-primary/90 transition-all shadow-lg">Confirm</button>
+                    <button v-else @click="advanceQuestion" 
+                        class="h-10 px-8 bg-emerald-600 text-white rounded font-black text-xs uppercase hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2">
+                        Next <i class="pi pi-chevron-right text-[10px]"></i>
                     </button>
                 </div>
             </div>
         </header>
 
-        <main class="max-w-[1440px] mx-auto px-10 py-12">
+        <main class="max-w-[1600px] mx-auto px-6 py-6">
             
+            <!-- Retry Notification Overlay -->
+            <div v-if="showRetryNotification" class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6">
+                <div class="bg-white rounded-lg p-10 max-w-xl w-full shadow-2xl border border-slate-200 text-center">
+                    <div class="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
+                        <i class="pi pi-refresh"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">Institutional Notification</h3>
+                    <p class="text-slate-600 text-base font-medium leading-relaxed mb-8">
+                        Performance threshold not met. Initializing secondary evaluation cycle with fresh content...
+                    </p>
+                    <button @click="showRetryNotification = false" 
+                        class="w-full py-4 bg-slate-800 text-white rounded font-bold uppercase text-xs tracking-widest hover:bg-slate-700 transition-all">
+                        Begin Retry Phase
+                    </button>
+                </div>
+            </div>
+
             <!-- Loading -->
-            <div v-if="isLoading" class="flex flex-col items-center justify-center py-48">
-                <div class="w-12 h-12 border-4 border-slate-100 border-t-brand-primary rounded-full animate-spin"></div>
-                <p class="mt-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">Propagating Content Matrix...</p>
+            <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
+                <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+                <p class="mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Synchronizing Assessment Matrix...</p>
             </div>
 
             <!-- Start Screen -->
-            <div v-else-if="isStarting" class="max-w-4xl mx-auto py-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                <div class="bg-white rounded-[3.5rem] p-16 md:p-24 border border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.03)] text-center">
-                    <div class="w-20 h-20 bg-brand-primary/5 text-brand-primary rounded-3xl flex items-center justify-center mx-auto mb-10 text-3xl">
-                        <i class="pi pi-shield"></i>
-                    </div>
-                    <h2 class="text-5xl font-black text-slate-900 tracking-tighter mb-6 uppercase">Ready for Evaluation?</h2>
-                    <p class="text-slate-400 text-lg font-medium italic mb-16 leading-relaxed">"System requirements verified. You are entering a strictly timed environment."</p>
+            <div v-else-if="isStarting" class="max-w-4xl mx-auto py-12">
+                <div class="bg-white rounded-xl p-16 border border-slate-200 shadow-xl text-center">
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tight mb-4 uppercase">Assessment Preparation</h2>
+                    <p class="text-slate-500 text-base font-medium mb-12">System requirements verified. You are entering a strictly timed environment.</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left mb-16">
                         <div class="bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
@@ -294,114 +338,120 @@ onMounted(fetchData);
             </div>
 
             <!-- Exam Split Screen -->
-            <div v-else-if="currentQ" class="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700 h-[700px]">
+            <div v-else-if="currentQ" class="grid grid-cols-1 lg:grid-cols-12 gap-px bg-slate-300 border border-slate-300 shadow-lg min-h-[calc(100vh-100px)] animate-in fade-in duration-500 overflow-hidden">
                 
                 <!-- Left: Stimulus -->
-                <div class="lg:col-span-7 bg-white rounded-[3rem] p-12 border border-slate-100 shadow-sm overflow-y-auto custom-scrollbar flex flex-col">
-                    <div class="flex items-center justify-between mb-10 pb-6 border-b border-slate-50">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-2 h-2 bg-brand-primary rounded-full"></div>
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resource Matrix</span>
+                <div class="lg:col-span-7 bg-white p-8 overflow-y-auto custom-scrollbar flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                        <div class="flex items-center space-x-2">
+                            <i class="pi pi-file-edit text-slate-400"></i>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resource Material</span>
                         </div>
-                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Index: {{ displayNumber }} / {{ totalSkillQuestions }}</span>
+                        <div class="flex items-center space-x-4">
+                            <button class="text-slate-400 hover:text-slate-600 transition-colors"><i class="pi pi-volume-up"></i></button>
+                            <button class="text-slate-400 hover:text-slate-600 transition-colors"><i class="pi pi-question-circle"></i></button>
+                        </div>
                     </div>
 
                     <div class="flex-grow prose prose-slate max-w-none">
-                        <div v-if="currentQ.passage" class="space-y-6">
-                            <h3 class="text-3xl font-black text-slate-800 tracking-tight leading-tight">{{ currentQ.passage.title }}</h3>
-                            <p class="text-xs text-slate-300 leading-relaxed font-bold">
+                        <!-- Passage Handling -->
+                        <div v-if="currentQ.passage" class="space-y-8">
+                            <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-tight">{{ currentQ.passage.title }}</h3>
+                            
+                            <!-- Passage Media (Audio/Video) -->
+                            <div v-if="currentQ.passage.media_url" class="bg-slate-50 p-6 border border-slate-200 rounded space-y-4">
+                                <audio ref="audioRef" :src="currentQ.passage.media_url" controls @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-10"></audio>
+                                <p class="text-center text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em]">Audio Resource Stream</p>
+                            </div>
+
+                            <p class="text-xs text-slate-400 font-bold italic leading-relaxed">
                                 {{ currentQ.instructions || 'Review the stimulus carefully and provide your academic response.' }}
                             </p>
-                            <div class="text-xl text-slate-600 leading-[1.8] font-serif text-justify whitespace-pre-wrap">{{ currentQ.passage.content }}</div>
+
+                            <div v-if="currentQ.passage.content" class="text-lg text-slate-700 leading-[1.8] font-serif text-justify whitespace-pre-wrap">{{ currentQ.passage.content }}</div>
                         </div>
 
-                        <div v-else-if="currentQ.media_url" class="flex flex-col items-center justify-center py-20 space-y-12 h-full">
-                            <div class="w-32 h-32 bg-slate-50 rounded-[3rem] flex items-center justify-center text-slate-200 border-2 border-dashed border-slate-200">
-                                <i :class="currentQ.media_url.includes('.mp4') ? 'pi pi-video' : 'pi pi-volume-up'" class="text-5xl"></i>
+                        <!-- Standalone Media Handling -->
+                        <div v-else-if="currentQ.media_url" class="flex flex-col items-center justify-center py-10 space-y-8 h-full bg-slate-50 rounded border border-slate-200 border-dashed">
+                            <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center text-slate-400 border border-slate-200 shadow-sm">
+                                <i :class="currentQ.media_url.includes('.mp4') ? 'pi pi-video' : 'pi pi-volume-up'" class="text-3xl"></i>
                             </div>
-                            <div class="w-full max-w-md bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
-                                <audio ref="audioRef" :src="currentQ.media_url" controls @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-12"></audio>
-                                <p class="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Audio Channel Control</p>
+                            <div class="w-full max-w-sm bg-white p-6 border border-slate-200 shadow-md rounded space-y-4">
+                                <audio ref="audioRef" :src="currentQ.media_url" controls @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-10"></audio>
+                                <p class="text-center text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em]">Institutional Audio Content</p>
                             </div>
                         </div>
 
-                        <div v-else class="flex flex-col items-center justify-center h-full opacity-20">
-                            <i class="pi pi-bolt text-6xl mb-6"></i>
-                            <p class="text-xs font-black uppercase tracking-[0.4em]">Direct Engagement Protocol</p>
+                        <!-- Standalone Placeholder -->
+                        <div v-else class="flex flex-col items-center justify-center h-full space-y-6 py-20 bg-slate-50 border border-dashed border-slate-200 rounded">
+                            <i class="pi pi-shield text-4xl text-slate-200"></i>
+                            <div class="text-center space-y-2">
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Direct Engagement Protocol</p>
+                                <p class="text-xs text-slate-300 font-medium italic">"Stand-alone evaluation phase. Focus on the prompt."</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right: Response -->
-                <div class="lg:col-span-5 bg-slate-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden flex flex-col">
-                    <div class="absolute -right-20 -top-20 w-60 h-60 bg-brand-primary/10 rounded-full blur-[100px]"></div>
-                    
-                    <div class="relative z-10 flex flex-col h-full">
-                        <div class="flex items-center space-x-3 mb-12">
-                            <div class="w-1.5 h-1.5 bg-brand-accent rounded-full"></div>
-                            <span class="text-[10px] font-black text-white/40 uppercase tracking-widest">Response Interface</span>
-                        </div>
+                <div class="lg:col-span-5 bg-white p-8 flex flex-col h-full border-l border-slate-200 shadow-inner">
+                    <div class="flex items-center space-x-2 mb-8 pb-4 border-b border-slate-100">
+                        <i class="pi pi-pencil text-brand-primary"></i>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Question Task</span>
+                    </div>
 
-                        <div class="flex-grow space-y-10">
-                            <h3 class="text-2xl font-black text-white leading-tight tracking-tight">
-                                {{ currentQ.content || 'Academic Prompt Task' }}
-                            </h3>
-                            <p class="text-[11px] font-bold text-slate-400 italic border-l-2 border-brand-accent/30 pl-6 leading-relaxed">
-                                {{ currentQ.instructions || 'Carefully review the provided material and deliver your institutional response accordingly.' }}
-                            </p>
+                    <div class="flex-grow overflow-y-auto custom-scrollbar pr-4 space-y-8">
+                        <h3 class="text-xl font-bold text-slate-900 leading-tight">
+                            {{ currentQ.content || 'Academic Prompt Task' }}
+                        </h3>
+                        <p class="text-[11px] font-bold text-slate-500 italic border-l-2 border-brand-primary/20 pl-4">
+                            {{ currentQ.instructions || 'Carefully review the provided material and deliver your institutional response accordingly.' }}
+                        </p>
 
-                            <div class="pt-6 space-y-4">
-                                <!-- MCQ -->
-                                <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'" class="space-y-3">
-                                    <button v-for="opt in currentQ.options" :key="opt.id"
-                                        @click="answers[currentIndex].option_id = opt.id"
-                                        :disabled="questionSubmitted"
-                                        class="w-full text-left p-6 rounded-2xl border-2 transition-all flex items-center gap-6 group"
-                                        :class="answers[currentIndex].option_id === opt.id 
-                                            ? 'border-brand-accent bg-brand-accent/5' 
-                                            : 'border-white/5 bg-white/5 hover:bg-white/10'">
-                                        <div class="w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all"
-                                            :class="answers[currentIndex].option_id === opt.id ? 'bg-brand-accent border-brand-accent' : 'border-white/20'">
-                                            <i class="pi pi-check text-[10px] text-slate-900 font-black"></i>
-                                        </div>
-                                        <span class="font-bold text-lg">{{ opt.option_text }}</span>
-                                    </button>
-                                </div>
-
-                                <!-- Writing -->
-                                <div v-if="currentQ.type === 'writing'" class="space-y-4">
-                                    <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
-                                        class="w-full bg-white/5 border-2 border-white/10 rounded-3xl p-8 text-lg font-medium focus:border-brand-accent transition-all min-h-[300px] outline-none"
-                                        placeholder="Compose response..."></textarea>
-                                    <div class="flex justify-between text-[10px] font-black text-white/20 uppercase tracking-widest px-4">
-                                        <span>Words: {{ wordCount }}</span>
-                                        <span>Limit: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞' }}</span>
+                        <div class="pt-4 space-y-4">
+                            <!-- MCQ -->
+                            <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'" class="space-y-2">
+                                <button v-for="opt in currentQ.options" :key="opt.id"
+                                    @click="answers[currentIndex].option_id = opt.id"
+                                    :disabled="questionSubmitted"
+                                    class="w-full text-left p-4 rounded border transition-all flex items-start gap-4 group"
+                                    :class="answers[currentIndex].option_id === opt.id 
+                                        ? 'border-brand-primary bg-brand-primary/5' 
+                                        : 'border-slate-200 hover:border-slate-400 bg-white'">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all"
+                                        :class="answers[currentIndex].option_id === opt.id ? 'bg-brand-primary border-brand-primary' : 'border-slate-300'">
+                                        <div v-if="answers[currentIndex].option_id === opt.id" class="w-2 h-2 bg-white rounded-full"></div>
                                     </div>
-                                </div>
+                                    <span class="font-medium text-slate-700 leading-snug">{{ opt.option_text }}</span>
+                                </button>
+                            </div>
 
-                                <!-- Speaking -->
-                                <div v-if="currentQ.type === 'speaking'" class="space-y-6">
-                                    <div v-if="currentQ.media_url && !hasListened" class="p-10 bg-white/5 border border-white/10 rounded-[2.5rem] text-center space-y-6">
-                                        <i class="pi pi-lock text-3xl text-brand-accent animate-pulse"></i>
-                                        <p class="text-[10px] font-black text-brand-accent uppercase tracking-widest">Listen to prompt to unlock recorder</p>
-                                    </div>
-                                    <AudioRecorder v-else @recorded="(blob) => answers[currentIndex].recorded_file = blob"
-                                        class="!bg-white/5 !border-white/10" :disabled="questionSubmitted" />
+                            <!-- Writing -->
+                            <div v-if="currentQ.type === 'writing'" class="space-y-4">
+                                <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-lg p-6 text-base font-medium focus:border-brand-primary transition-all min-h-[300px] outline-none"
+                                    placeholder="Compose response..."></textarea>
+                                <div class="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2">
+                                    <span>Word Count: {{ wordCount }}</span>
+                                    <span>Required: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞' }}</span>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Actions -->
-                        <div class="mt-12 pt-10 border-t border-white/5">
-                            <button v-if="!questionSubmitted" @click="submitAnswer"
-                                class="w-full py-6 bg-brand-accent text-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
-                                Confirm Signal
-                            </button>
-                            <button v-else @click="advanceQuestion"
-                                class="w-full py-6 bg-white text-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4">
-                                <span>Proceed ➜</span>
-                            </button>
+                            <!-- Speaking -->
+                            <div v-if="currentQ.type === 'speaking'" class="space-y-6">
+                                <div v-if="(currentQ.passage?.media_url || currentQ.media_url) && !hasListened" class="p-8 bg-slate-50 border border-slate-200 rounded text-center space-y-4">
+                                    <i class="pi pi-lock text-2xl text-slate-300"></i>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Listen to resource to unlock recorder</p>
+                                </div>
+                                <AudioRecorder v-else @recorded="(blob) => answers[currentIndex].recorded_file = blob"
+                                    class="!bg-slate-50 !border-slate-200" :disabled="questionSubmitted" />
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- Actions moved to Header for TOEFL style, but keeping a placeholder footer if needed -->
+                    <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                        <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Institutional Assessment Protocol 2024</span>
                     </div>
                 </div>
             </div>
@@ -414,4 +464,7 @@ onMounted(fetchData);
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+.custom-scrollbar-dark::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar-dark::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
+.custom-scrollbar-dark::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
 </style>

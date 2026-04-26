@@ -59,20 +59,38 @@ const openRules = async (exam) => {
     selectedExam.value = exam;
     showRulesModal.value = true;
     try {
-        const res = await api.get(`/admin/exams/${exam.id}`);
-        const fullExam = res.data;
+        const [examRes, skillRes] = await Promise.all([
+            api.get(`/admin/exams/${exam.id}`),
+            api.get('/admin/skills-with-levels')
+        ]);
         
-        rulesForm.value.skills = fullExam.skills.map(skill => ({
-            skill_id: skill.id,
-            name: skill.name,
-            duration: skill.pivot.duration,
-            is_optional: !!skill.pivot.is_optional,
-            rules: (fullExam.question_rules || []).filter(r => r.skill_id === skill.id).map(r => ({
-                id: r.id,
-                level_id: r.level_id,
-                quantity: r.quantity
-            }))
-        }));
+        const fullExam = examRes.data;
+        const allSkills = skillRes.data;
+        
+        rulesForm.value.skills = fullExam.skills.map(skill => {
+            const skillDetails = allSkills.find(s => s.id === skill.id);
+            const levelRules = (fullExam.question_rules || []).filter(r => r.skill_id === skill.id);
+            
+            // Map each available level to a rule (existing or new)
+            const rules = (skillDetails?.levels || []).map(lvl => {
+                const existing = levelRules.find(r => r.level_id === lvl.level_number);
+                return {
+                    id: existing?.id || null,
+                    level_id: lvl.level_number,
+                    quantity: existing?.quantity ?? 0,
+                    standalone_quantity: existing?.standalone_quantity ?? 0,
+                    passage_quantity: existing?.passage_quantity ?? 0
+                };
+            });
+
+            return {
+                skill_id: skill.id,
+                name: skill.name,
+                duration: skill.pivot.duration,
+                is_optional: !!skill.pivot.is_optional,
+                rules: rules
+            };
+        });
     } catch (err) {
         console.error('Failed to load exam rules', err);
     }
@@ -228,8 +246,9 @@ onMounted(fetchExams);
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div v-if="data.category" class="pt-2 border-t border-slate-50">
+                                            <div v-if="data.category" class="pt-2 border-t border-slate-50 flex items-center justify-between">
                                                 <Tag :value="data.category?.name || 'GENERIC'" :severity="getCategorySeverity(data.category)" class="text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-none shadow-sm" />
+                                                <Button label="Edit Rules" icon="pi pi-cog" text class="text-[10px] font-black text-indigo-500 p-0" @click="openRules(data)" />
                                             </div>
                                         </div>
                                     </template>
@@ -297,12 +316,39 @@ onMounted(fetchExams);
                                             <i class="pi pi-filter mr-3 text-brand-primary opacity-40"></i> LEVEL {{ rule.level_id || 'GENERIC' }}
                                         </span>
                                 </div>
-                                <div class="pt-6 border-t border-slate-100">
-                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 block italic">Target Unit Quantity</label>
-                                        <InputNumber v-model="rule.quantity" showButtons buttonLayout="horizontal" :step="1" :min="1"
+                                <div class="grid grid-cols-1 gap-6 pt-6 border-t border-slate-100">
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Standalone Qs (No Passage)</label>
+                                            <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded">Priority</span>
+                                        </div>
+                                        <p class="text-[9px] text-slate-400 font-medium italic -mt-2">Number of individual questions (e.g. Grammar MCQ) to pick for this level.</p>
+                                        <InputNumber v-model="rule.standalone_quantity" showButtons buttonLayout="horizontal" :step="1" :min="0"
                                             decrementButtonIcon="pi pi-minus" incrementButtonIcon="pi pi-plus" 
-                                            class="w-full" inputClass="text-center font-black text-base border-none bg-transparent text-brand-primary" 
-                                            buttonClass="bg-white border-slate-100 shadow-sm rounded-xl py-2 px-3 text-slate-400 hover:text-brand-primary" />
+                                            class="w-full" inputClass="text-center font-black text-sm border-none bg-slate-50/50" 
+                                            buttonClass="bg-white border-slate-100 shadow-sm rounded-xl py-2 px-3 text-slate-400" />
+                                    </div>
+
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Passage Count (Groups)</label>
+                                            <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded">Priority</span>
+                                        </div>
+                                        <p class="text-[9px] text-slate-400 font-medium italic -mt-2">Number of reading/listening passages to pick. Each passage brings all its questions.</p>
+                                        <InputNumber v-model="rule.passage_quantity" showButtons buttonLayout="horizontal" :step="1" :min="0"
+                                            decrementButtonIcon="pi pi-minus" incrementButtonIcon="pi pi-plus" 
+                                            class="w-full" inputClass="text-center font-black text-sm border-none bg-slate-50/50" 
+                                            buttonClass="bg-white border-slate-100 shadow-sm rounded-xl py-2 px-3 text-slate-400" />
+                                    </div>
+
+                                    <div class="space-y-4 opacity-40 hover:opacity-100 transition-opacity">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block italic">Legacy Total (Fallback)</label>
+                                        <p class="text-[9px] text-slate-400 font-medium italic -mt-2">Use this only if you don't specify Standalone or Passages.</p>
+                                        <InputNumber v-model="rule.quantity" showButtons buttonLayout="horizontal" :step="1" :min="0"
+                                            decrementButtonIcon="pi pi-minus" incrementButtonIcon="pi pi-plus" 
+                                            class="w-full" inputClass="text-center font-black text-xs border-none bg-transparent" 
+                                            buttonClass="bg-white border-slate-100 shadow-sm rounded-xl py-1 px-2 text-slate-300" />
+                                    </div>
                                 </div>
                             </div>
                     </div>

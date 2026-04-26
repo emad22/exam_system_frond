@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -48,6 +48,18 @@ const form = ref({
     questions: []
 });
 
+const filteredSkills = computed(() => {
+    const exam = exams.value.find(e => e.id === form.value.exam_id);
+    return exam?.skills || [];
+});
+
+watch(() => form.value.exam_id, (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal) {
+        const isValid = filteredSkills.value.some(s => s.id === form.value.skill_id);
+        if (!isValid) form.value.skill_id = '';
+    }
+});
+
 const pFileInput = ref(null);
 const pMediaPreview = ref(null);
 
@@ -86,28 +98,42 @@ const loadInitialData = async () => {
         ]);
 
         skills.value = resSkills.data;
-        exams.value = resExams.data;
-        passages.value = resPassages.data;
+        exams.value = resExams.data.map(e => ({
+            ...e,
+            skills: Array.isArray(e.skills) ? e.skills : []
+        }));
+        passages.value = (Array.isArray(resPassages.data) ? resPassages.data : []).map(p => ({
+            ...p,
+            title: p.title || `Untitled Passage (ID: ${p.id})`
+        }));
 
         const q = resQuestion.data;
-        form.value.skill_id = q.skill_id;
-        form.value.exam_id = q.exam_id;
-        form.value.level_id = q.level?.level_number || 5;
+        if (!q) throw new Error("Question not found");
+
+        console.log("Loading Question:", q.id, "Exam:", q.exam_id, "Skill:", q.skill_id);
+
+        // Batch update to avoid multiple reactivity triggers
+        const updatedForm = {
+            ...form.value,
+            exam_id: q.exam_id,
+            skill_id: q.skill_id,
+            level_id: q.level?.level_number || 5,
+        };
 
         // Passage Handle
         if (q.passage) {
-            form.value.passage_mode = 'existing';
-            form.value.passage_id = q.passage_id;
-            form.value.passage_type = q.passage.type;
-            form.value.passage_title = q.passage.title;
-            form.value.passage_content = q.passage.content;
-            form.value.passage_questions_limit = q.passage.questions_limit;
-            form.value.passage_is_random = q.passage.is_random;
+            updatedForm.passage_mode = 'existing';
+            updatedForm.passage_id = q.passage_id;
+            updatedForm.passage_type = q.passage.type;
+            updatedForm.passage_title = q.passage.title;
+            updatedForm.passage_content = q.passage.content;
+            updatedForm.passage_questions_limit = q.passage.questions_limit;
+            updatedForm.passage_is_random = q.passage.is_random;
             if (q.passage.media_url) {
                 pMediaPreview.value = { url: q.passage.media_url, type: q.passage.media_path?.split('.').pop() || 'image' };
             }
 
-            form.value.questions = q.passage.questions.map(sq => ({
+            updatedForm.questions = q.passage.questions.map(sq => ({
                 id: sq.id,
                 type: sq.type,
                 content_mode: sq.media_url ? 'media' : 'text',
@@ -124,8 +150,8 @@ const loadInitialData = async () => {
                 }))
             }));
         } else {
-            form.value.passage_mode = 'none';
-            form.value.questions = [{
+            updatedForm.passage_mode = 'none';
+            updatedForm.questions = [{
                 id: q.id,
                 type: q.type,
                 content_mode: q.media_url ? 'media' : 'text',
@@ -142,6 +168,8 @@ const loadInitialData = async () => {
                 }))
             }];
         }
+
+       Object.assign(form.value, updatedForm); 
 
         loading.value = false;
     } catch (err) {
@@ -202,6 +230,10 @@ const handleTypeChange = (qIdx) => {
 const updateBatch = async () => {
     if (!form.value.exam_id) {
         errorMsg.value = 'Exam selection is required.';
+        return;
+    }
+    if (!form.value.skill_id) {
+        errorMsg.value = 'Skill selection is required.';
         return;
     }
 
@@ -303,15 +335,17 @@ onMounted(() => {
                 <template #content>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
                         <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Skill</label>
-                            <Select v-model="form.skill_id" :options="skills" optionLabel="name" optionValue="id"
-                                placeholder="Select Skill" class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Exam (Required)</label>
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Linked Exam</label>
                             <Select v-model="form.exam_id" :options="exams" optionLabel="title" optionValue="id"
                                 placeholder="Select Exam" class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
                         </div>
+                        <div class="flex flex-col">
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Target Skill (Required)</label>
+                            <Select v-model="form.skill_id" :options="filteredSkills" optionLabel="name" optionValue="id"
+                                placeholder="Select Skill" class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" 
+                                :disabled="!form.exam_id" :key="form.exam_id" />
+                        </div>
+                        
                         <div class="flex flex-col">
                             <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Difficulty ({{ form.level_id }})</label>
                             <Slider v-model="form.level_id" :min="1" :max="9" :step="1" class="w-full mt-4" />
@@ -336,23 +370,12 @@ onMounted(() => {
                 </template>
                 <template #content>
                     <div class="px-4 space-y-8">
-                        <div class="flex flex-wrap gap-4">
-                            <label v-for="mode in [{id:'none', label:'No Passage', icon:'pi-ban'}, {id:'existing', label:'Switch Passage', icon:'pi-search'}, {id:'new', label:'Create New Passage', icon:'pi-plus-circle'}]" 
-                                :key="mode.id"
-                                class="flex-1 flex items-center justify-center gap-4 cursor-pointer p-5 rounded-[1.5rem] border-2 transition-all select-none"
-                                :class="form.passage_mode === mode.id ? 'border-emerald-500 bg-white shadow-md ring-4 ring-emerald-500/10' : 'border-transparent bg-white hover:border-slate-200'">
-                                <input type="radio" v-model="form.passage_mode" :value="mode.id" class="hidden" />
-                                <i :class="[mode.icon, 'text-xl', form.passage_mode === mode.id ? 'text-emerald-600' : 'text-slate-300']"></i>
-                                <span class="font-black" :class="form.passage_mode === mode.id ? 'text-emerald-700' : 'text-slate-600'">{{ mode.label }}</span>
-                            </label>
+                        <div v-if="form.passage_mode === 'none'" class="bg-slate-50 p-6 rounded-[2rem] text-center border-2 border-dashed border-slate-200">
+                            <i class="pi pi-ban text-3xl text-slate-300 mb-3 block"></i>
+                            <span class="text-sm font-black text-slate-500 uppercase tracking-widest">No Passage Linked to this Question</span>
                         </div>
 
-                        <div v-if="form.passage_mode === 'existing'" class="animate-in fade-in slide-in-from-top-2 duration-400">
-                            <Select v-model="form.passage_id" :options="passages" optionLabel="title" optionValue="id"
-                                placeholder="Select another passage..." class="w-full md:w-1/2 rounded-2xl" filter />
-                        </div>
-
-                        <div v-if="form.passage_mode === 'new' || (form.passage_mode === 'existing' && form.passage_id)" class="bg-white p-8 rounded-[2rem] shadow-sm space-y-8 animate-in zoom-in-95 duration-400">
+                        <div v-if="form.passage_mode === 'existing' && form.passage_id" class="bg-white p-8 rounded-[2rem] shadow-sm space-y-8 animate-in zoom-in-95 duration-400">
                              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div class="flex flex-col">
                                     <label class="text-xs font-black text-slate-500 mb-3 uppercase tracking-wide">Context Type</label>
@@ -378,9 +401,9 @@ onMounted(() => {
                                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Update File</span>
                                     </div>
                                     <div v-if="pMediaPreview" class="flex-grow bg-slate-50 p-4 rounded-[2rem] flex items-center justify-center min-h-[10rem]">
-                                        <img v-if="pMediaPreview.type?.startsWith('image/')" :src="pMediaPreview.url" class="rounded-2xl max-h-32 shadow-sm" />
-                                        <audio v-if="pMediaPreview.type?.startsWith('audio/')" :src="pMediaPreview.url" controls class="w-full"></audio>
-                                        <video v-if="pMediaPreview.type?.startsWith('video/')" :src="pMediaPreview.url" controls class="rounded-2xl max-h-32"></video>
+                                        <img v-if="form.passage_type === 'image' || pMediaPreview.type?.startsWith('image/')" :src="pMediaPreview.url" class="rounded-2xl max-h-32 shadow-sm" />
+                                        <audio v-else-if="form.passage_type === 'audio' || pMediaPreview.type?.startsWith('audio/')" :src="pMediaPreview.url" controls class="w-full"></audio>
+                                        <video v-else-if="form.passage_type === 'video' || pMediaPreview.type?.startsWith('video/')" :src="pMediaPreview.url" controls class="rounded-2xl max-h-32"></video>
                                     </div>
                                 </div>
                             </div>
@@ -398,7 +421,6 @@ onMounted(() => {
                         </div>
                         <span class="text-lg font-black text-slate-800">Questions in this Context</span>
                     </div>
-                    <Button label="Add New Question to Batch" icon="pi pi-plus" severity="success" rounded @click="addQuestion" class="font-black text-xs px-6 py-3" />
                 </div>
 
                 <div v-for="(q, qIdx) in form.questions" :key="qIdx" 
@@ -523,6 +545,9 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            <Button label="Add Another Question" icon="pi pi-plus" severity="success" rounded @click="addQuestion"
+                class="font-black text-xs px-6 py-3" />
 
             <!-- Footer Action -->
             <div class="flex justify-center pt-10 border-t border-slate-100">
