@@ -33,6 +33,63 @@ const audioRef = ref(null);
 const isAudioPlaying = ref(false);
 const hasListened = ref(false);
 
+// Timer State
+const timeLeftSeconds = ref(0);
+const timerInterval = ref(null);
+const timerConfig = ref(null);
+
+const formattedTime = computed(() => {
+    if (timeLeftSeconds.value <= 0) return "00:00:00";
+    const h = Math.floor(timeLeftSeconds.value / 3600);
+    const m = Math.floor((timeLeftSeconds.value % 3600) / 60);
+    const s = timeLeftSeconds.value % 60;
+    if (h > 0) {
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+});
+
+const startTimer = () => {
+    if (!timerConfig.value) return;
+    
+    const config = timerConfig.value;
+    
+    // Use ONLY the per-skill duration logic as requested
+    const limitMinutes = config.skillDuration;
+    let createdStr = config.skillStartedAt;
+
+    if (!createdStr || !limitMinutes) {
+        // If there's no limit for this specific skill, don't show the timer
+        return;
+    }
+    
+    // Parse as UTC to avoid timezone issues
+    if (!createdStr.endsWith('Z') && !createdStr.match(/[+-]\d{2}:\d{2}$/)) {
+        createdStr += 'Z';
+    }
+    
+    const startTime = new Date(createdStr).getTime();
+    const limitMs = limitMinutes * 60 * 1000;
+    
+    const updateTime = () => {
+        const now = new Date().getTime();
+        const elapsed = now - startTime;
+        const remaining = Math.max(0, Math.floor((limitMs - elapsed) / 1000));
+        
+        timeLeftSeconds.value = remaining;
+        
+        if (remaining <= 0) {
+            clearInterval(timerInterval.value);
+            alert("Time is up! Your answers will be submitted automatically.");
+            submitCurrentBatch();
+        }
+    };
+    
+    updateTime(); // Initial call
+    if (timerInterval.value) clearInterval(timerInterval.value);
+    timerInterval.value = setInterval(updateTime, 1000);
+};
+
 const syncAudioState = () => {
     if (audioRef.value) isAudioPlaying.value = !audioRef.value.paused;
 };
@@ -112,6 +169,7 @@ const fetchData = async () => {
 const beginExam = async () => {
     isStarting.value = false;
     await fetchNextBatch();
+    startTimer();
 }
 
 const fetchNextBatch = async () => {
@@ -127,6 +185,14 @@ const fetchNextBatch = async () => {
             currentIndex.value = 0;
             questionSubmitted.value = false;
             hasListened.value = false;
+            
+            // Populate timer configuration
+            timerConfig.value = {
+                type: res.data.timer_type,
+                globalLimit: res.data.time_limit,
+                skillDuration: res.data.skill_duration,
+                skillStartedAt: res.data.current_skill_started_at
+            };
             
             answers.value = questions.value.map(q => ({
                 question_id: q.id,
@@ -223,6 +289,15 @@ const currentQ = computed(() => questions.value[currentIndex.value] || null);
 const displayNumber = computed(() => globalOffset.value + currentIndex.value + 1);
 const wordCount = computed(() => (answers.value[currentIndex.value]?.text_answer || '').trim().split(/\s+/).filter(w => w).length);
 
+const shouldShowQuestion = computed(() => {
+    if (!currentQ.value) return false;
+    const hasAudio = !!(currentQ.value.passage?.audio_url || currentQ.value.passage?.audio_path || currentQ.value.audio_url || currentQ.value.audio_path);
+    if (hasAudio) {
+        return hasListened.value;
+    }
+    return true; // Show immediately if no audio
+});
+
 const resolveUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -241,8 +316,14 @@ const getSkillIcon = (name) => {
     return '🎯';
 };
 
-// Auto-play media when question changes
+// Auto-play media when question changes and update progress
 watch(currentQ, (newQ) => {
+    if (newQ && newQ.id) {
+        // Update last_seen_question_id in background
+        api.post(`/attempts/${attemptId}/update-progress`, { question_id: newQ.id })
+            .catch(err => console.warn('Progress update failed', err));
+    }
+
     const mediaUrl = newQ?.passage?.media_url || newQ?.audio_url || newQ?.media_url;
     if (mediaUrl) {
         nextTick(() => {
@@ -272,9 +353,9 @@ onMounted(fetchData);
 
                 <!-- Navigation Actions -->
                 <div class="flex items-center space-x-2">
-                    <div class="flex items-center space-x-4 bg-slate-900/50 px-4 py-1.5 rounded-lg border border-slate-700 mr-6">
-                        <i class="pi pi-clock text-slate-400 text-xs"></i>
-                        <span class="text-lg font-black tabular-nums tracking-tighter">45:00</span>
+                    <div v-if="timerConfig && timerConfig.skillDuration > 0" :class="['flex items-center space-x-4 px-4 py-1.5 rounded-lg border mr-6 transition-colors', timeLeftSeconds < 300 ? 'bg-rose-900/50 border-rose-500 text-rose-300 animate-pulse' : 'bg-slate-900/50 border-slate-700 text-white']">
+                        <i class="pi pi-clock text-xs" :class="timeLeftSeconds < 300 ? 'text-rose-400' : 'text-slate-400'"></i>
+                        <span class="text-lg font-black tabular-nums tracking-tighter">{{ formattedTime }}</span>
                     </div>
                     
                     <button class="h-10 px-6 bg-slate-700 text-slate-300 rounded font-bold text-xs uppercase hover:bg-slate-600 transition-all opacity-50 cursor-not-allowed">Back</button>
@@ -354,7 +435,7 @@ onMounted(fetchData);
             <div v-else-if="currentQ" class="grid grid-cols-1 lg:grid-cols-12 gap-px bg-slate-300 border border-slate-300 shadow-lg min-h-[calc(100vh-100px)] animate-in fade-in duration-500 overflow-hidden">
                 
                 <!-- Left: Stimulus -->
-                <div class="lg:col-span-7 bg-white p-8 overflow-y-auto custom-scrollbar flex flex-col h-full">
+                <div :class="shouldShowQuestion ? 'lg:col-span-7' : 'lg:col-span-12'" class="bg-white p-8 overflow-y-auto custom-scrollbar flex flex-col h-full transition-all duration-700">
                     <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
                         <div class="flex items-center space-x-2">
                             <i class="pi pi-file-edit text-slate-400"></i>
@@ -388,10 +469,10 @@ onMounted(fetchData);
                                     <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Passage Resource Stream</span>
                                 </div>
 
-                                <audio v-if="currentQ.passage.audio_url || currentQ.passage.audio_path" 
+                                <audio v-if="(currentQ.passage.audio_url || currentQ.passage.audio_path) && !hasListened" 
                                     ref="audioRef" :src="resolveUrl(currentQ.passage.audio_url || currentQ.passage.audio_path)" 
-                                    controls @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" 
-                                    class="w-full h-12"></audio>
+                                    controls autoplay @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" 
+                                    class="w-full h-12 animate-in fade-in duration-500"></audio>
                                 
                                 <video v-if="(currentQ.passage.media_url || currentQ.passage.media_path) && (currentQ.passage.media_url || currentQ.passage.media_path).includes('.mp4')" 
                                     :src="resolveUrl(currentQ.passage.media_url || currentQ.passage.media_path)" 
@@ -414,22 +495,22 @@ onMounted(fetchData);
                             </div>
 
                             <!-- Question Specific Audio -->
-                            <div v-if="currentQ.audio_url || currentQ.audio_path" class="w-full max-w-md bg-white p-8 border border-slate-100 shadow-xl rounded-[2rem] space-y-4">
+                            <div v-if="(currentQ.audio_url || currentQ.audio_path) && !hasListened" class="w-full max-w-md bg-white p-8 border border-slate-100 shadow-xl rounded-[2rem] space-y-4 animate-in fade-in duration-500">
                                 <div class="flex items-center gap-3 mb-2">
                                     <i class="pi pi-microphone text-indigo-500"></i>
                                     <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Question Audio Clip</span>
                                 </div>
-                                <audio ref="audioRef" :src="resolveUrl(currentQ.audio_url || currentQ.audio_path)" controls @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-12"></audio>
+                                <audio ref="audioRef" :src="resolveUrl(currentQ.audio_url || currentQ.audio_path)" controls autoplay @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-12"></audio>
                             </div>
 
                             <!-- Question Specific Video -->
-                            <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4')" class="w-full max-w-xl px-6">
-                                <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls class="w-full rounded-3xl shadow-2xl"></video>
+                            <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4') && !hasListened" class="w-full max-w-xl px-6 animate-in fade-in duration-500">
+                                <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls autoplay @ended="hasListened = true" class="w-full rounded-3xl shadow-2xl"></video>
                             </div>
                         </div>
 
                         <!-- 3. Placeholder (Only if NO passage AND NO media) -->
-                        <div v-else-if="!currentQ.passage" class="flex flex-col items-center justify-center h-full space-y-6 py-20 bg-slate-50 border border-dashed border-slate-200 rounded">
+                        <div v-else-if="!currentQ.passage" class="flex flex-col items-center justify-center h-full space-y-6 py-20 bg-slate-50 border border-dashed border-slate-200 rounded transition-opacity duration-700">
                             <i class="pi pi-shield text-4xl text-slate-200"></i>
                             <div class="text-center space-y-2">
                                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Direct Engagement Protocol</p>
@@ -440,7 +521,7 @@ onMounted(fetchData);
                 </div>
 
                 <!-- Right: Response -->
-                <div class="lg:col-span-5 bg-white p-8 flex flex-col h-full border-l border-slate-200 shadow-inner">
+                <div v-if="shouldShowQuestion" class="lg:col-span-5 bg-white p-8 flex flex-col h-full border-l border-slate-200 shadow-inner animate-in slide-in-from-right-8 duration-700">
                     <div class="flex items-center space-x-2 mb-8 pb-4 border-b border-slate-100">
                         <i class="pi pi-pencil text-brand-primary"></i>
                         <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Question Task</span>

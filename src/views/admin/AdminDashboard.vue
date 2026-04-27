@@ -163,7 +163,7 @@ const getStatusSeverity = (status) => {
                                      <i class="pi pi-id-card text-lg"></i>
                                  </div>
                                  <div class="space-y-1">
-                                      <div class="font-black text-slate-800 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">{{ data.student?.first_name }} {{ data.student?.last_name }}</div>
+                                      <div class="font-black text-slate-800 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">{{ data.student?.user?.first_name }} {{ data.student?.user?.last_name }}</div>
                                       <div class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">Identity #{{ data.student_id }}</div>
                                  </div>
                             </div>
@@ -188,11 +188,13 @@ const getStatusSeverity = (status) => {
                         </template>
                      </Column>
 
-                     <Column header="Mastery Grade" style="width: 120px" class="text-right pr-6">
+                     <Column header="Mastery Grade" style="width: 150px" class="text-right pr-6">
                         <template #body="{ data }">
                              <div class="flex flex-col items-end">
-                                 <div class="text-2xl font-black text-slate-800 tracking-tighter leading-none">{{ data.overall_score || '-' }}%</div>
-                                 <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">Accuracy</div>
+                                 <div class="text-2xl font-black text-slate-800 tracking-tighter leading-none">
+                                    {{ data.total_score || 0 }}
+                                 </div>
+                                 <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">Points Acquired</div>
                              </div>
                         </template>
                      </Column>
