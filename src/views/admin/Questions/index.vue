@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
 
@@ -51,13 +51,20 @@ const deleteItem = async (id) => {
 const fetchData = async () => {
     loading.value = true;
     try {
-        const [qRes, sRes, slRes] = await Promise.all([
-            api.get('/admin/questions'),
+        const params = {};
+        if (filterSkill.value) params.skill_id = filterSkill.value;
+        if (filterExam.value) params.exam_id = filterExam.value;
+        if (filterLevel.value) params.level_id = filterLevel.value;
+
+        const [qRes, sRes, eRes, slRes] = await Promise.all([
+            api.get('/admin/questions', { params }),
             api.get('/admin/skills'),
+            api.get('/admin/exams'),
             api.get('/admin/skills-with-levels').catch(() => ({ data: [] }))
         ]);
         questions.value = qRes.data.data || qRes.data;
         skills.value = sRes.data;
+        exams.value = eRes.data;
         skillsWithLevels.value = slRes.data;
     } catch (err) {
         console.error('Failed to load', err);
@@ -113,9 +120,8 @@ const isImage = (url) => url?.match(/\.(jpeg|png|jpg|gif|svg|webp)$/i);
 
 const filteredQuestions = computed(() => {
     let filtered = questions.value;
-    if (filterSkill.value) filtered = filtered.filter(q => q.skill?.name === filterSkill.value);
+    // Client-side only filters for Search and Type (since they are fast and usually done on the result set)
     if (filterType.value)  filtered = filtered.filter(q => q.type === filterType.value);
-    if (filterLevel.value) filtered = filtered.filter(q => (q.level?.level_number || q.level_id) === Number(filterLevel.value));
     if (searchQuery.value) {
         const q = searchQuery.value.toLowerCase();
         filtered = filtered.filter(item =>
@@ -130,13 +136,16 @@ const filteredQuestions = computed(() => {
         const lvB = b.level?.level_number || b.level_id || 0;
         if (lvA !== lvB) return lvA - lvB;
 
-        // Group by passage (keep questions with same passage_id together)
         const passA = a.passage_id || 0;
         const passB = b.passage_id || 0;
         if (passA !== passB) return passB - passA;
 
-        return (a.id - b.id); // Sequential order within passage
+        return (a.id - b.id);
     });
+});
+
+watch([filterSkill, filterExam, filterLevel], () => {
+    fetchData();
 });
 
 onMounted(fetchData);
@@ -169,10 +178,18 @@ onMounted(fetchData);
             </div>
 
             <div class="flex flex-col gap-2 min-w-[180px]">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Exam</label>
+                <Select v-model="filterExam"
+                    :options="[{title:'All Exams', id:null}, ...exams]"
+                    optionLabel="title" optionValue="id"
+                    class="w-full rounded-xl text-sm font-semibold" />
+            </div>
+
+            <div class="flex flex-col gap-2 min-w-[180px]">
                 <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Skill</label>
                 <Select v-model="filterSkill"
-                    :options="[{name:'All Skills', value:''}, ...skills.map(s => ({name: s.name, value: s.name}))]"
-                    optionLabel="name" optionValue="value"
+                    :options="[{name:'All Skills', id:null}, ...skills]"
+                    optionLabel="name" optionValue="id"
                     class="w-full rounded-xl text-sm font-semibold" />
             </div>
 
@@ -195,7 +212,7 @@ onMounted(fetchData);
             <div class="flex flex-col gap-2 min-w-[120px]">
                 <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Level</label>
                 <Select v-model="filterLevel"
-                    :options="[{label:'All Levels', value:''}, ...Array.from({length:9}, (_,i)=>({label:`Level ${i+1}`, value:i+1}))]"
+                    :options="[{label:'All Levels', value:null}, ...Array.from({length:10}, (_,i)=>({label:`Level ${i+1}`, value:i+1}))]"
                     optionLabel="label" optionValue="value"
                     class="w-full rounded-xl text-sm font-semibold" />
             </div>
