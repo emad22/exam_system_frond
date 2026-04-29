@@ -234,7 +234,7 @@ const logout = () => {
                     </p>
                 </div>
 
-                <!-- Skills Selection List (TOEFL Style) -->
+                <!-- Skills Selection List ( Style) -->
                 <section v-else class="max-w-4xl mx-auto">
                     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 border-b border-slate-100 pb-8">
                         <div class="space-y-4">

@@ -16,11 +16,13 @@ import Textarea from 'primevue/textarea';
 
 const questions = ref([]);
 const loading = ref(true);
-const filterSkill = ref('');
+const filterSkill = ref(null);
+const filterExam = ref(null);
 const filterType = ref('');
 const searchQuery = ref('');
-const filterLevel = ref('');
+const filterLevel = ref(null);
 const skills = ref([]);
+const exams = ref([]);
 const showInstructionsModal = ref(false);
 const selectedSkillForInst = ref(null);
 const selectedLevelForInst = ref(null);

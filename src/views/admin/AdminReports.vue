@@ -1,18 +1,16 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
-import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
 
+const router = useRouter();
 const attempts = ref([]);
 const loading = ref(true);
 const search = ref('');
-const selectedAttempt = ref(null);
-const showDetailModal = ref(false);
-const detailLoading = ref(false);
 
 const fetchReports = async () => {
     loading.value = true;
@@ -26,29 +24,8 @@ const fetchReports = async () => {
     }
 };
 
-const viewDetails = async (id) => {
-    detailLoading.value = true;
-    showDetailModal.value = true;
-    try {
-        const res = await api.get(`/admin/reports/${id}`);
-        selectedAttempt.value = res.data;
-    } catch (err) {
-        console.error('Failed to load attempt details', err);
-    } finally {
-        detailLoading.value = false;
-    }
-};
-
-const voidAttempt = async (id) => {
-    if (!confirm('Are you sure you want to void this attempt? The student will be able to retake the exam.')) return;
-    try {
-        await api.post(`/admin/reports/${id}/reset`);
-        alert('Attempt voided successfully.');
-        fetchReports();
-        showDetailModal.value = false;
-    } catch (err) {
-        alert('Failed to void attempt.');
-    }
+const viewDetails = (id) => {
+    router.push(`/admin/reports/${id}/show`);
 };
 
 const filtered = () => {
@@ -156,141 +133,7 @@ onMounted(fetchReports);
                 <p class="text-slate-400 font-bold mt-4 text-[10px] uppercase tracking-widest max-w-sm mx-auto">Reports will populate automatically upon successful completion of student placement assessments.</p>
             </div>
         </div>
-
-        <!-- Detail Journey Modal -->
-        <Dialog v-model:visible="showDetailModal" modal 
-                class="rounded-[2.5rem] overflow-hidden border-none shadow-2xl"
-                :style="{ width: '1000px' }">
-            <template #header>
-                <div class="flex flex-col">
-                    <h3 class="text-xl font-black text-slate-800 uppercase tracking-tight">Student Journey Matrix</h3>
-                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Detailed level movement & response timeline</p>
-                </div>
-            </template>
-
-            <div v-if="detailLoading" class="p-20 text-center flex flex-col items-center">
-                <ProgressSpinner strokeWidth="4" />
-                <p class="text-[10px] font-black text-slate-400 mt-8 uppercase tracking-widest">Fetching Identity Data...</p>
-            </div>
-
-            <div v-else-if="selectedAttempt" class="space-y-12 py-6">
-                <!-- Summary Card -->
-                <div class="bg-slate-900 rounded-3xl p-8 text-white grid grid-cols-2 md:grid-cols-4 gap-8">
-                    <div>
-                        <p class="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Candidate</p>
-                        <p class="text-xs font-black uppercase truncate">
-                            {{ selectedAttempt.student?.user?.first_name || selectedAttempt.user?.first_name || 'DEMO' }} 
-                            {{ selectedAttempt.student?.user?.last_name || selectedAttempt.user?.last_name || 'USER' }}
-                        </p>
-                    </div>
-                    <div>
-                        <p class="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Efficiency Index</p>
-                        <p class="text-xl font-black italic">{{ selectedAttempt.overall_score }}%</p>
-                    </div>
-                    <div>
-                        <p class="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Execution Date</p>
-                        <p class="text-xs font-black uppercase">{{ selectedAttempt.finished_at ? new Date(selectedAttempt.finished_at).toLocaleString() : 'N/A' }}</p>
-                    </div>
-                    <div class="flex justify-end items-center">
-                         <Button label="Reset / Retry" severity="danger" outlined size="small" class="text-[8px] font-black uppercase tracking-widest px-4" @click="voidAttempt(selectedAttempt.id)" />
-                    </div>
-                </div>
-
-                <!-- Detailed Skill Movement -->
-                <div class="space-y-10">
-                    <div class="flex items-center gap-4">
-                        <h4 class="text-sm font-black text-slate-800 uppercase tracking-wider">Level Progression Matrix</h4>
-                        <div class="flex-1 h-px bg-slate-100"></div>
-                    </div>
-                    <div v-for="skillResult in (selectedAttempt.attempt_skills || [])" :key="skillResult.id" class="space-y-6">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center font-black text-[10px]">{{ skillResult.skill?.short_code || 'S' }}</div>
-                            <h4 class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ skillResult.skill?.name }}</h4>
-                            <Tag :value="'Max Level: ' + skillResult.max_level_reached" severity="secondary" class="text-[7px] font-black uppercase" />
-                        </div>
-
-                        <!-- Movement Timeline -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div v-for="log in (selectedAttempt.attempt_levels || []).filter(l => l.skill_id === skillResult.skill_id)" 
-                                :key="log.id"
-                                class="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-between items-center transition-all">
-                                <div>
-                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Level {{ log.level_number }}</p>
-                                    <p class="text-sm font-black italic" :class="log.status === 'passed' ? 'text-emerald-600' : 'text-rose-600'">{{ log.score }}%</p>
-                                </div>
-                                <div :class="log.status === 'passed' ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'" 
-                                     class="w-6 h-6 rounded-lg flex items-center justify-center text-[10px]">
-                                    <i :class="log.status === 'passed' ? 'pi pi-check' : 'pi pi-times'"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Detailed Response Timeline -->
-                <div class="space-y-8 pt-8 border-t border-slate-100">
-                    <div class="flex items-center gap-4">
-                        <h4 class="text-sm font-black text-slate-800 uppercase tracking-wider">Detailed Response Timeline</h4>
-                        <div class="flex-1 h-px bg-slate-100"></div>
-                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ selectedAttempt.answers?.length || 0 }} Questions Answered</span>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div v-for="(answer, idx) in (selectedAttempt.answers || [])" :key="answer.id" 
-                             class="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                            <div class="flex items-start gap-6">
-                                <div class="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center font-black text-xs"
-                                     :class="answer.is_correct ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'">
-                                    {{ idx + 1 }}
-                                </div>
-                                <div class="grow space-y-4">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <Tag :value="answer.question?.type" severity="secondary" class="text-[8px] font-black uppercase px-2" />
-                                                <span v-if="answer.question?.passage" class="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Part of Passage: {{ answer.question.passage.title }}</span>
-                                            </div>
-                                            <div class="text-sm font-bold text-slate-700 leading-relaxed" v-html="answer.question?.content"></div>
-                                        </div>
-                                        <div class="text-right flex-shrink-0">
-                                            <div class="text-lg font-black italic" :class="answer.is_correct ? 'text-emerald-600' : 'text-rose-600'">
-                                                {{ answer.points_awarded }} Pts
-                                            </div>
-                                            <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">Movement Index</div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Comparison -->
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-                                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                                            <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Student Response</p>
-                                            <div class="text-xs font-bold" :class="answer.is_correct ? 'text-emerald-700' : 'text-rose-700'">
-                                                {{ answer.option?.option_text || answer.text_answer || 'â€”' }}
-                                                <i v-if="answer.is_correct" class="pi pi-check-circle ml-1"></i>
-                                                <i v-else class="pi pi-times-circle ml-1"></i>
-                                            </div>
-                                        </div>
-                                        <div v-if="!answer.is_correct" class="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
-                                            <p class="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-2">Correct Key</p>
-                                            <div class="text-xs font-bold text-emerald-800">
-                                                {{ answer.question?.options?.find(o => o.is_correct)?.option_text || 'â€”' }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Dialog>
     </div>
   </AdminLayout>
 </template>
-
-<style scoped>
-:deep(.p-dialog-content) {
-    padding: 2rem;
-}
-</style>
 

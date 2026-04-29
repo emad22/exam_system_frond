@@ -31,6 +31,7 @@ import AdminSkills from '@/views/admin/Skills/index.vue'
 import AdminSkillCreate from '@/views/admin/Skills/create.vue'
 
 import AdminReports from '@/views/admin/AdminReports.vue'
+import AdminReportShow from '@/views/admin/AdminReportShow.vue'
 
 import AdminPayments from '@/views/admin/AdminPayments.vue'
 
@@ -232,6 +233,11 @@ const routes = [
     path: '/admin/reports',
     name: 'admin.reports',
     component: AdminReports
+  },
+  {
+    path: '/admin/reports/:id/show',
+    name: 'admin.reports.show',
+    component: AdminReportShow
   },
   {
     path: '/admin/payments',
