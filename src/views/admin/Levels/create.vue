@@ -236,6 +236,8 @@ const saveLevel = async () => {
                                             <ToggleSwitch v-model="form.allows_retry" />
                                         </div>
 
+
+
                                         <!-- Default Question Count -->
                                         <div class="space-y-4 pt-4 border-t border-slate-100">
                                             <div class="space-y-2">

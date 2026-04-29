@@ -28,6 +28,7 @@ const categories = ref([]);
 const form = ref({
     first_name: '',
     last_name: '',
+    username: '',
     email: '',
     phone: '',
     gender: 'male',
@@ -40,6 +41,7 @@ const form = ref({
     package_id: null,
     is_active: true,
     partner_id: '',
+    allows_retry: false,
 });
 
 const isSubmitting = ref(false);
@@ -174,9 +176,15 @@ const filteredExams = computed(() => {
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-col">
-                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address (Username)</label>
-                                        <InputText v-model="form.email" type="email" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" placeholder="john.doe@academic.com" />
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div class="flex flex-col">
+                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</label>
+                                            <InputText v-model="form.username" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" placeholder="e.g. johndoe123" />
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                                            <InputText v-model="form.email" type="email" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" placeholder="john.doe@academic.com" />
+                                        </div>
                                     </div>
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -253,8 +261,17 @@ const filteredExams = computed(() => {
                                     </div>
 
                                     <div class="flex flex-col">
-                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
-                                        <InputText v-model="form.phone" class="w-full rounded-xl bg-slate-50 border-slate-100" placeholder="+XX-XXXX-XXXX" />
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Identification Code</label>
+                                        <InputText v-model="form.student_code" class="w-full rounded-xl bg-slate-50 border-slate-100" placeholder="STU-XXXX" />
+                                    </div>
+
+                                    <!-- Retry Logic Control -->
+                                    <div class="flex items-center p-4 bg-rose-50/50 rounded-2xl border border-brand-primary/10">
+                                        <Checkbox v-model="form.allows_retry" :binary="true" inputId="retry_toggle" />
+                                        <label for="retry_toggle" class="ml-4 flex flex-col cursor-pointer">
+                                            <span class="text-xs font-black text-slate-800 uppercase tracking-wider">Allow Level Retry</span>
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Allows second attempt if student fails a level</span>
+                                        </label>
                                     </div>
                                 </div>
                             </template>

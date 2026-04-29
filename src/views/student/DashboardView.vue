@@ -2,12 +2,15 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+import Tag from 'primevue/tag';
 
 const router = useRouter();
 const exams = ref([]);
 const student = ref(null);
 const isLoading = ref(false);
 const startingSkillId = ref(null);
+const selectedLevel = ref(1);
+const isDemo = ref(false);
 
 const fetchDashboard = async () => {
     isLoading.value = true;
@@ -18,6 +21,9 @@ const fetchDashboard = async () => {
         ]);
         student.value = userRes.data;
         exams.value = examsRes.data;
+        // Check role case-insensitively and include typos
+        const userRole = (student.value?.role || '').toLowerCase();
+        isDemo.value = ['demo', 'deom', 'staff'].includes(userRole);
     } catch (err) {
         console.error('Failed to load dashboard', err);
     } finally {
@@ -30,6 +36,9 @@ onMounted(fetchDashboard);
 const skills = () => exams.value?.[0]?.skills || [];
 
 const isSkillCompleted = (skillId) => {
+    // For demo users, we don't show it as "blocked" even if completed
+    if (isDemo.value) return false;
+    
     const exam = exams.value?.[0];
     if (!exam || !exam.completed_skill_ids) return false;
     return exam.completed_skill_ids.includes(skillId);
@@ -37,16 +46,33 @@ const isSkillCompleted = (skillId) => {
 
 const startSkill = async (skillId) => {
     if (!exams.value[0]) return;
-    if (isSkillCompleted(skillId)) return;
+    // Remove the blocking check for demo users
+    if (!isDemo.value && isSkillCompleted(skillId)) return;
     
     startingSkillId.value = skillId;
     try {
-        const res = await api.post(`/exams/${exams.value[0].id}/start`, { skill_id: skillId });
+        const payload = { skill_id: skillId };
+        if (isDemo.value) payload.level_id = selectedLevel.value;
+        
+        const res = await api.post(`/exams/${exams.value[0].id}/start`, payload);
         router.push(`/exam/${res.data.attempt.id}`);
     } catch (err) {
         alert(err.response?.data?.error || 'Failed to start session');
     } finally {
         startingSkillId.value = null;
+    }
+};
+
+const resetDemoProgress = async () => {
+    const examId = exams.value?.[0]?.id;
+    if (!examId || !confirm('Are you sure you want to reset all exam progress? This will delete all your answers and start you fresh. This action cannot be undone.')) return;
+    isLoading.value = true;
+    try {
+        await api.post(`/exams/${examId}/reset-demo`);
+        await fetchDashboard();
+    } catch (err) {
+        alert(err.response?.data?.error || 'Failed to reset progress.');
+        isLoading.value = false;
     }
 };
 
@@ -112,16 +138,42 @@ const logout = () => {
             <div v-else class="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-1000">
 
                 <!-- Greeting Section -->
-                <section class="space-y-4">
-                    <div class="inline-flex items-center space-x-2 bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-lg border border-emerald-100">
-                        <i class="pi pi-verified text-[10px]"></i>
-                        <span class="text-[9px] font-black uppercase tracking-[0.2em]">Credential Integrity Verified</span>
+                <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                    <div class="space-y-4">
+                        <div class="inline-flex items-center space-x-2 bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-lg border border-emerald-100">
+                            <i class="pi pi-verified text-[10px]"></i>
+                            <span class="text-[9px] font-black uppercase tracking-[0.2em]">Credential Integrity Verified</span>
+                        </div>
+                        <div class="flex flex-col space-y-2">
+                            <h2 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                                Hi, <span class="text-brand-primary">{{ student?.first_name || student?.name || 'Candidate' }}</span>
+                            </h2>
+                            <p class="text-slate-500 font-medium text-lg italic opacity-80 uppercase tracking-tighter">"Knowledge is power. Select your cognitive module below."</p>
+                        </div>
                     </div>
-                    <div class="flex flex-col space-y-2">
-                        <h2 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-                            Hi, <span class="text-brand-primary">{{ student?.user?.first_name || 'Candidate' }}</span>
-                        </h2>
-                        <p class="text-slate-500 font-medium text-lg italic opacity-80 uppercase tracking-tighter">"Knowledge is power. Select your cognitive module below."</p>
+
+                    <!-- Demo Tool -->
+                    <div v-if="isDemo" class="bg-amber-50 border border-amber-200 p-6 rounded-[2rem] shadow-sm animate-in zoom-in-95 duration-500 w-full md:w-auto">
+                         <div class="flex items-center gap-3 mb-4">
+                            <div class="w-8 h-8 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md">
+                                <i class="pi pi-bolt text-sm"></i>
+                            </div>
+                            <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Demo Override Tool</span>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-amber-500 uppercase tracking-widest ml-1">Force Starting Level</label>
+                            <div class="flex gap-1.5">
+                                <button v-for="l in 9" :key="l" @click="selectedLevel = l"
+                                    :class="selectedLevel === l ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-amber-600 hover:bg-amber-100'"
+                                    class="w-9 h-9 rounded-xl font-black text-xs transition-all flex items-center justify-center border border-amber-200">
+                                    {{ l }}
+                                </button>
+                            </div>
+                            <p class="text-[8px] font-bold text-amber-400 mt-2 italic">* Demo accounts can bypass adaptive sequencing.</p>
+                        </div>
+                        <button @click="resetDemoProgress" class="mt-5 w-full py-2.5 bg-rose-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all shadow-md flex justify-center items-center gap-2">
+                            <i class="pi pi-refresh"></i> Reset Exam Progress
+                        </button>
                     </div>
                 </section>
 
@@ -132,19 +184,19 @@ const logout = () => {
                         
                         <!-- Identity Avatar -->
                         <div class="w-24 h-24 rounded-3xl bg-slate-900 text-white flex items-center justify-center text-4xl font-black shadow-xl shrink-0">
-                            {{ student?.user?.first_name?.[0] || 'S' }}
+                            {{ student?.first_name?.[0] || 'S' }}
                         </div>
 
                         <div class="flex-1 space-y-6 text-center md:text-left">
                             <div class="space-y-1">
                                 <p class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Institutional Identity</p>
-                                <h3 class="text-3xl font-black text-slate-800 tracking-tight uppercase">{{ student?.user?.first_name }} {{ student?.user?.last_name }}</h3>
+                                <h3 class="text-3xl font-black text-slate-800 tracking-tight uppercase">{{ student?.first_name || student?.name }} {{ student?.last_name || '' }}</h3>
                             </div>
 
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                                 <div>
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Code</p>
-                                    <p class="text-xs font-black uppercase text-brand-primary">{{ student?.student_code || 'UNCODED' }}</p>
+                                    <p class="text-xs font-black uppercase text-brand-primary">{{ student?.student?.student_code || 'DEMO-ACC' }}</p>
                                 </div>
                                 <div>
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
@@ -152,11 +204,11 @@ const logout = () => {
                                 </div>
                                 <div>
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Gender</p>
-                                    <p class="text-xs font-black uppercase text-slate-600">{{ student?.user?.gender || 'N/A' }}</p>
+                                    <p class="text-xs font-black uppercase text-slate-600">{{ student?.gender || 'N/A' }}</p>
                                 </div>
                                 <div>
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Category</p>
-                                    <p class="text-xs font-black uppercase text-brand-accent">{{ student?.category?.name || 'Academic' }}</p>
+                                    <p class="text-xs font-black uppercase text-brand-accent">{{ student?.student?.category?.name || 'Administrative' }}</p>
                                 </div>
                             </div>
                         </div>

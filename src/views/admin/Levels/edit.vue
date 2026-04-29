@@ -196,7 +196,6 @@ const updateLevel = async () => {
                                             <ToggleSwitch v-model="form.is_random" />
                                         </div>
 
-
                                         <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group transition-all duration-300 hover:bg-white hover:border-amber-100">
                                             <div class="space-y-0.5">
                                                 <p class="text-[11px] font-black text-slate-800 uppercase tracking-tight">Allow Retry on Fail</p>
@@ -204,6 +203,9 @@ const updateLevel = async () => {
                                             </div>
                                             <ToggleSwitch v-model="form.allows_retry" />
                                         </div>
+
+
+
                                         <!-- Default Question Count -->
                                         <div class="space-y-4 pt-4 border-t border-slate-100">
                                             <div class="space-y-2">

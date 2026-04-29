@@ -92,8 +92,8 @@ const handleRegister = async () => {
                     </div>
 
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Email Address</label>
-                        <input v-model="form.email" type="email" placeholder="email@example.com" required
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Email or Username</label>
+                        <input v-model="form.email" type="text" placeholder="email or username" required
                                class="premium-input">
                     </div>
 

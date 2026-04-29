@@ -28,10 +28,18 @@ const errorMsg = ref('');
 const questionTypes = [
     { label: 'Multiple Choice (MCQ)', value: 'mcq', icon: 'pi-check-square' },
     { label: 'True / False', value: 'true_false', icon: 'pi-verified' },
+    { label: 'Fill in the Blank', value: 'fill_blank', icon: 'pi-pencil' },
+    { label: 'Drag & Drop', value: 'drag_drop', icon: 'pi-arrows-alt' },
+    { label: 'Click Word', value: 'click_word', icon: 'pi-cursor-click' },
+    { label: 'Matching', value: 'matching', icon: 'pi-link' },
+    { label: 'Ordering', value: 'ordering', icon: 'pi-list' },
+    { label: 'Highlight', value: 'highlight', icon: 'pi-eye' },
+    { label: 'Listening Task', value: 'listening', icon: 'pi-headphones' },
     { label: 'Short Answer', value: 'short_answer', icon: 'pi-pencil' },
     { label: 'Writing Task', value: 'writing', icon: 'pi-file-edit' },
     { label: 'Speaking Task', value: 'speaking', icon: 'pi-microphone' },
-    { label: 'File Upload', value: 'upload', icon: 'pi-upload' }
+    { label: 'File Upload', value: 'upload', icon: 'pi-upload' },
+    { label: 'Word Selection (Legacy)', value: 'word_selection', icon: 'pi-cursor-click' }
 ];
 
 const form = ref({
@@ -55,7 +63,22 @@ const form = ref({
 
 const filteredSkills = computed(() => {
     const exam = exams.value.find(e => e.id === form.value.exam_id);
-    return exam?.skills || [];
+    if (!exam || !exam.skills) return [];
+    
+    // Map the exam skills to include levels_count from the master skills list
+    return exam.skills.map(examSkill => {
+        const masterSkill = skills.value.find(s => s.id === examSkill.id);
+        return {
+            ...examSkill,
+            levels_count: masterSkill ? masterSkill.levels_count : 9
+        };
+    });
+});
+
+const currentSkillMaxLevel = computed(() => {
+    if (!form.value.skill_id) return 9;
+    const selectedSkill = filteredSkills.value.find(s => s.id === form.value.skill_id);
+    return selectedSkill && selectedSkill.levels_count > 0 ? selectedSkill.levels_count : 9;
 });
 
 watch(() => form.value.exam_id, (newVal, oldVal) => {
@@ -232,6 +255,10 @@ const handleQFileChange = (e, index) => {
     form.value.questions[index].q_media_preview = { url: URL.createObjectURL(file), type: file.type };
 };
 
+const triggerQImage = (idx) => document.getElementById(`qImage_${idx}`)?.click();
+const triggerQAudio = (idx) => document.getElementById(`qAudio_${idx}`)?.click();
+const triggerQFile = (idx) => document.getElementById(`qFile_${idx}`)?.click();
+
 const handleQAudioChange = (e, index) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -255,24 +282,79 @@ const removeOption = (qIdx, optIdx) => {
     }
 };
 const setCorrect = (qIdx, optIdx) => {
-    form.value.questions[qIdx].options.forEach((opt, i) => {
-        opt.is_correct = (i === optIdx);
-    });
+    const q = form.value.questions[qIdx];
+    if (['mcq', 'true_false'].includes(q.type)) {
+        q.options.forEach((opt, i) => {
+            opt.is_correct = (i === optIdx);
+        });
+    } else {
+        q.options[optIdx].is_correct = !q.options[optIdx].is_correct;
+    }
 };
 
 const handleTypeChange = (qIdx) => {
     const q = form.value.questions[qIdx];
     if (q.type === 'true_false') {
+        q.instructions = "Select True or False.";
         q.options = [
             { option_text: 'True', is_correct: true },
             { option_text: 'False', is_correct: false }
         ];
     } else if (['writing', 'speaking', 'upload'].includes(q.type)) {
+        q.instructions = "Please write your response.";
         q.options = [];
     } else if (q.type === 'short_answer') {
+        q.instructions = "Please write the answer.";
         if (!q.options.length) q.options = [{ option_text: '', is_correct: true }];
+    } else if (q.type === 'drag_drop') {
+        q.instructions = "Drag the words into the correct boxes to complete the sentence.";
+        if (!q.options || q.options.length < 2) {
+            q.options = [
+                { option_text: '', is_correct: true },
+                { option_text: '', is_correct: true }
+            ];
+        }
+    } else if (q.type === 'fill_blank') {
+        q.instructions = "Fill in the blanks with the correct words.";
+        if (!q.options || q.options.length < 1) {
+            q.options = [
+                { option_text: '', is_correct: true }
+            ];
+        }
+    } else if (['word_selection', 'click_word', 'highlight'].includes(q.type)) {
+        q.instructions = q.type === 'highlight' ? "Highlight the correct segments in the text." : "Select the target words in the text.";
+        if (!q.options || q.options.length < 1) {
+            q.options = [
+                { option_text: '', is_correct: true }
+            ];
+        }
+    } else if (q.type === 'matching') {
+        q.instructions = "Match the items in the first column with the items in the second column.";
+        if (!q.options || q.options.length < 2) {
+            q.options = [
+                { option_text: 'Source 1 | Target 1', is_correct: true },
+                { option_text: 'Source 2 | Target 2', is_correct: true }
+            ];
+        }
+    } else if (q.type === 'ordering') {
+        q.instructions = "Arrange the following items in the correct order.";
+        if (!q.options || q.options.length < 2) {
+            q.options = [
+                { option_text: 'Item 1', is_correct: true },
+                { option_text: 'Item 2', is_correct: true }
+            ];
+        }
+    } else if (q.type === 'listening') {
+        q.instructions = "Listen to the audio and answer the question.";
+        if (!q.options || q.options.length < 2) {
+            q.options = [
+                { option_text: '', is_correct: true },
+                { option_text: '', is_correct: false }
+            ];
+        }
     } else {
         if (!q.options || q.options.length < 2) {
+            q.instructions = "Please select the correct option.";
             q.options = [
                 { option_text: '', is_correct: true },
                 { option_text: '', is_correct: false }
@@ -324,23 +406,27 @@ const updateBatch = async () => {
             if (form.value.p_image) fd.append('p_image_file', form.value.p_image);
         }
 
+        // Clean questions data for JSON stringify (exclude File objects and proxies)
+        const cleanQuestions = form.value.questions.map(q => ({
+            id: q.id || null,
+            type: q.type,
+            content: q.content || '',
+            instructions: q.instructions || '',
+            points: q.points,
+            sort_order: q.sort_order,
+            min_words: q.min_words,
+            max_words: q.max_words,
+            options: q.options.map(opt => ({
+                option_text: opt.option_text,
+                is_correct: opt.is_correct
+            }))
+        }));
+        fd.append('questions', JSON.stringify(cleanQuestions));
+
         form.value.questions.forEach((q, qIdx) => {
-            if (q.id) fd.append(`questions[${qIdx}][id]`, q.id);
-            fd.append(`questions[${qIdx}][type]`, q.type);
-            fd.append(`questions[${qIdx}][content]`, q.content);
-            fd.append(`questions[${qIdx}][instructions]`, q.instructions || '');
-            fd.append(`questions[${qIdx}][points]`, q.points);
-            fd.append(`questions[${qIdx}][sort_order]`, q.sort_order || 0);
-            if (q.min_words) fd.append(`questions[${qIdx}][min_words]`, q.min_words);
-            if (q.max_words) fd.append(`questions[${qIdx}][max_words]`, q.max_words);
             if (q.q_media) fd.append(`questions[${qIdx}][q_media_file]`, q.q_media);
             if (q.q_audio) fd.append(`questions[${qIdx}][q_audio_file]`, q.q_audio);
             if (q.q_image) fd.append(`questions[${qIdx}][q_image_file]`, q.q_image);
-
-            q.options.forEach((opt, oIdx) => {
-                fd.append(`questions[${qIdx}][options][${oIdx}][option_text]`, opt.option_text);
-                fd.append(`questions[${qIdx}][options][${oIdx}][is_correct]`, opt.is_correct ? 1 : 0);
-            });
         });
 
         await api.post(`/admin/questions/${questionId}`, fd, {
@@ -409,7 +495,7 @@ onMounted(() => {
                         
                         <div class="flex flex-col">
                             <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Difficulty ({{ form.level_id }})</label>
-                            <Slider v-model="form.level_id" :min="1" :max="9" :step="1" class="w-full mt-4" />
+                            <Slider v-model="form.level_id" :min="1" :max="currentSkillMaxLevel" :step="1" class="w-full mt-4" />
                             <div class="flex justify-between text-[10px] text-slate-400 font-black mt-4 uppercase tracking-tighter">
                                 <span>Beginner</span>
                                 <span>Expert</span>
@@ -579,9 +665,68 @@ onMounted(() => {
                             </div>
 
                             <!-- Text Mode: Rich Editor -->
-                            <Editor v-if="q.content_mode === 'text'" v-model="q.content" editorStyle="height: 120px" 
-                                class="rounded-[1.5rem] overflow-hidden border border-slate-100 bg-slate-50/50"
-                                placeholder="Type your formatted question here..." />
+                            <div v-if="q.content_mode === 'text'" class="space-y-2">
+                                <Editor v-model="q.content" editorStyle="height: 120px" 
+                                    class="rounded-[1.5rem] overflow-hidden border border-slate-100 bg-slate-50/50"
+                                    placeholder="Type your formatted question here..." />
+
+                                <div v-if="q.type === 'drag_drop'" class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                    <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Drag & Drop Guide
+                                    </p>
+                                    <p class="text-[11px] text-indigo-500 mt-1">
+                                        Use <b>[target]</b> where you want a blank space. Each <b>[target]</b> will be matched to one of the options below in order.
+                                        Example: "The <b>[target]</b> is a <b>[target]</b> animal."
+                                    </p>
+                                </div>
+
+                                <div v-if="q.type === 'word_selection' || q.type === 'click_word'" class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                    <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Word Selection Guide
+                                    </p>
+                                    <p class="text-[11px] text-amber-500 mt-1">
+                                        The system will automatically make the words you add in "Options" clickable. 
+                                        Mark <b>Is Correct</b> for words that the student <b>should</b> click.
+                                    </p>
+                                </div>
+
+                                <div v-if="q.type === 'fill_blank'" class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Fill in the Blank Guide
+                                    </p>
+                                    <p class="text-[11px] text-blue-500 mt-1">
+                                        Use <b>[input]</b> where you want a text box. Each <b>[input]</b> will be checked against the options below in order.
+                                    </p>
+                                </div>
+
+                                <div v-if="q.type === 'matching'" class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                    <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Matching Guide
+                                    </p>
+                                    <p class="text-[11px] text-purple-500 mt-1">
+                                        Add pairs using the pipe symbol. Example: <b>Term | Definition</b>.<br>
+                                        Each pair will be split automatically. To add a distractor (a target with no matching source), simply enter the text without the pipe symbol.
+                                    </p>
+                                </div>
+
+                                <div v-if="q.type === 'ordering'" class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Ordering Guide
+                                    </p>
+                                    <p class="text-[11px] text-slate-500 mt-1">
+                                        Add items in the correct order. Use the <b>Sort Order</b> field to define the sequence if necessary, but typically the order in the list is used.
+                                    </p>
+                                </div>
+
+                                <div v-if="q.type === 'highlight'" class="bg-yellow-50 p-4 rounded-xl border border-yellow-100">
+                                    <p class="text-[10px] font-black text-yellow-600 uppercase tracking-widest flex items-center gap-2">
+                                        <i class="pi pi-info-circle"></i> Highlight Guide
+                                    </p>
+                                    <p class="text-[11px] text-yellow-700 mt-1">
+                                        Add phrases or sentences as options. Mark <b>Is Correct</b> for those that should be highlighted by the student.
+                                    </p>
+                                </div>
+                            </div>
 
                             <!-- Media Mode: Multiple Files Support -->
                             <div v-else class="animate-in zoom-in-95 duration-300">
@@ -590,10 +735,10 @@ onMounted(() => {
                                     <div class="flex flex-col gap-3">
                                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Image Attachment</label>
                                         <div class="flex gap-4 items-center">
-                                            <div @click="$refs[`qImage_${qIdx}`][0].click()"
+                                            <div @click="triggerQImage(qIdx)"
                                                 class="w-32 h-32 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center cursor-pointer transition-all group shrink-0"
                                                 :class="q.q_image_preview ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:border-indigo-400 hover:bg-indigo-50'">
-                                                <input type="file" :ref="`qImage_${qIdx}`" class="hidden"
+                                                <input type="file" :id="`qImage_${qIdx}`" class="hidden"
                                                     @change="(e) => handleQImageChange(e, qIdx)"
                                                     accept="image/*" />
                                                 <i v-if="!q.q_image_preview"
@@ -617,10 +762,10 @@ onMounted(() => {
                                     <div class="flex flex-col gap-3">
                                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Audio Attachment</label>
                                         <div class="flex flex-col gap-4">
-                                            <div @click="$refs[`qAudio_${qIdx}`][0].click()"
+                                            <div @click="triggerQAudio(qIdx)"
                                                 class="w-full h-20 border-2 border-dashed rounded-[1.5rem] flex items-center justify-center gap-4 cursor-pointer transition-all group"
                                                 :class="q.q_audio_preview ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:border-indigo-400 hover:bg-indigo-50'">
-                                                <input type="file" :ref="`qAudio_${qIdx}`" class="hidden"
+                                                <input type="file" :id="`qAudio_${qIdx}`" class="hidden"
                                                     @change="(e) => handleQAudioChange(e, qIdx)"
                                                     accept="audio/*" />
                                                 <i v-if="!q.q_audio_preview"
@@ -645,8 +790,8 @@ onMounted(() => {
                                          <div class="flex items-center gap-4">
                                             <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Other Media (Video/Misc)</label>
                                             <div class="grow h-[1px] bg-slate-50"></div>
-                                            <Button icon="pi pi-plus" label="Add Video/Other" text class="text-[9px] font-black" @click="$refs[`qFile_${qIdx}`][0].click()" />
-                                            <input type="file" :ref="`qFile_${qIdx}`" class="hidden" @change="(e) => handleQFileChange(e, qIdx)" accept="video/*" />
+                                            <Button icon="pi pi-plus" label="Add Video/Other" text class="text-[9px] font-black" @click="triggerQFile(qIdx)" />
+                                            <input type="file" :id="`qFile_${qIdx}`" class="hidden" @change="(e) => handleQFileChange(e, qIdx)" accept="video/*" />
                                          </div>
                                          <div v-if="q.q_media_preview" class="mt-4 p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
                                             <video v-if="q.q_media_preview.url?.match(/\.(mp4|webm)$/i) || q.q_media_preview.type?.startsWith('video/')" :src="q.q_media_preview.url" controls class="max-h-24 rounded-xl"></video>
@@ -663,7 +808,7 @@ onMounted(() => {
                              <div v-if="!['writing', 'speaking', 'upload'].includes(q.type)" class="lg:col-span-8 space-y-6">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-black text-indigo-500 ml-2 uppercase tracking-wide">Options Matrix</label>
-                                    <Button v-if="['mcq', 'short_answer'].includes(q.type)" icon="pi pi-plus" label="Add Option" text rounded @click="addOption(qIdx)" class="text-[10px] font-black text-emerald-600" />
+                                    <Button v-if="['mcq', 'short_answer', 'drag_drop', 'word_selection', 'click_word', 'fill_blank', 'matching', 'ordering', 'highlight', 'listening'].includes(q.type)" icon="pi pi-plus" label="Add Option" text rounded @click="addOption(qIdx)" class="text-[10px] font-black text-emerald-600" />
                                 </div>
                                 <div class="space-y-4">
                                     <div v-for="(opt, oIdx) in q.options" :key="oIdx" 
@@ -675,7 +820,7 @@ onMounted(() => {
                                             <i class="pi pi-check text-sm font-black"></i>
                                         </button>
                                         <InputText v-model="opt.option_text" :disabled="q.type === 'true_false'" class="w-full border-none bg-transparent font-black text-slate-800 text-lg py-2 focus:ring-0" />
-                                        <button v-if="['mcq', 'short_answer'].includes(q.type) && q.options.length > 1" @click="removeOption(qIdx, oIdx)" class="w-10 h-10 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all flex items-center justify-center shrink-0">
+                                        <button v-if="['mcq', 'short_answer', 'drag_drop', 'word_selection', 'click_word', 'fill_blank', 'matching', 'ordering', 'highlight', 'listening'].includes(q.type) && q.options.length > 1" @click="removeOption(qIdx, oIdx)" class="w-10 h-10 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all flex items-center justify-center shrink-0">
                                             <i class="pi pi-trash"></i>
                                         </button>
                                     </div>

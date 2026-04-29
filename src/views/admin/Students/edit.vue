@@ -35,6 +35,7 @@ const generatePassword = () => {
 const editForm = ref({
     first_name: '',
     last_name: '',
+    username: '',
     email: '',
     phone: '',
     gender: 'male',
@@ -46,6 +47,7 @@ const editForm = ref({
     assigned_skills: [],
     partner_id: null,
     is_active: true,
+    allows_retry: false,
 });
 
 const loadData = async () => {
@@ -70,6 +72,7 @@ const loadData = async () => {
         editForm.value = {
             first_name: student.user?.first_name || '',
             last_name: student.user?.last_name || '',
+            username: student.user?.username || '',
             email: student.user?.email || '',
             phone: student.user?.phone || '',
             gender: student.user?.gender || 'male',
@@ -81,6 +84,7 @@ const loadData = async () => {
             partner_id: student.partner_id || null,
             password: '', // Empty initially
             is_active: !!student.user?.is_active,
+            allows_retry: !!student.allows_retry,
         };
         reconcilePackageFromSkills();
     } catch (err) {
@@ -234,9 +238,20 @@ onMounted(() => {
                                         </div>
                                     </div>
 
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div class="flex flex-col">
+                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</label>
+                                            <InputText v-model="editForm.username" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" />
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                                            <InputText v-model="editForm.email" type="email" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" />
+                                        </div>
+                                    </div>
+
                                     <div class="flex flex-col">
-                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address (Identifier)</label>
-                                        <InputText v-model="editForm.email" type="email" required class="w-full rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all" />
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
+                                        <InputText v-model="editForm.phone" class="w-full rounded-xl bg-slate-50 border-slate-100" placeholder="+XX-XXXX-XXXX" />
                                     </div>
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -328,10 +343,19 @@ onMounted(() => {
                                         <InputText v-model="editForm.student_code" class="w-full rounded-xl bg-slate-50 border-slate-100" placeholder="STU-XXXX" />
                                     </div>
 
-                                    <div class="pt-2">
+                                    <div class="pt-2 space-y-3">
                                         <label class="flex items-center cursor-pointer group bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:bg-white transition-all">
                                             <Checkbox v-model="editForm.is_active" :binary="true" />
                                             <span class="ml-4 text-xs font-black text-slate-600 uppercase tracking-widest">Active Enrollment</span>
+                                        </label>
+
+                                        <!-- Retry Logic Control -->
+                                        <label class="flex items-center cursor-pointer group bg-rose-50/50 p-4 rounded-2xl border border-brand-primary/10 hover:bg-white transition-all">
+                                            <Checkbox v-model="editForm.allows_retry" :binary="true" />
+                                            <div class="ml-4 flex flex-col">
+                                                <span class="text-xs font-black text-slate-800 uppercase tracking-wider">Allow Level Retry</span>
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Allows second attempt if student fails a level</span>
+                                            </div>
                                         </label>
                                     </div>
                                 </div>

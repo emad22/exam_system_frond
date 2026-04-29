@@ -158,13 +158,19 @@ const getStatusSeverity = (status) => {
                      
                      <Column header="Institutional Entity" style="min-width: 300px">
                         <template #body="{ data }">
-                            <div class="flex items-center space-x-4 py-3 group cursor-pointer" @click="$router.push(`/admin/students/${data.student_id}/show`)">
+                            <div class="flex items-center space-x-4 py-3 group cursor-pointer" 
+                                 @click="data.student_id ? $router.push(`/admin/students/${data.student_id}/show`) : $router.push('/admin/reports')">
                                  <div class="w-11 h-11 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 shadow-sm transition-all group-hover:bg-brand-primary group-hover:text-white group-hover:rotate-6">
                                      <i class="pi pi-id-card text-lg"></i>
                                  </div>
                                  <div class="space-y-1">
-                                      <div class="font-black text-slate-800 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">{{ data.student?.user?.first_name }} {{ data.student?.user?.last_name }}</div>
-                                      <div class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">Identity #{{ data.student_id }}</div>
+                                      <div class="font-black text-slate-800 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">
+                                          {{ data.student?.user?.first_name || data.user?.first_name || 'DEMO' }} 
+                                          {{ data.student?.user?.last_name || data.user?.last_name || 'USER' }}
+                                      </div>
+                                      <div class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                                          {{ data.student_id ? 'Identity #' + data.student_id : 'STAFF/DEMO ACCOUNT' }}
+                                      </div>
                                  </div>
                             </div>
                         </template>

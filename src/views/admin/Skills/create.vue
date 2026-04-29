@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -9,7 +9,8 @@ const router = useRouter();
 
 const form = ref({
     name: '',
-    short_code: ''
+    short_code: '',
+    levels_count: 0
 });
 
 const isSubmitting = ref(false);
@@ -78,6 +79,13 @@ const addSkill = async () => {
                                 class="premium-input uppercase text-sm placeholder:text-slate-300 w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-slate-800 font-bold tracking-wide" 
                                 placeholder="E.G. R, W, G">
                             <p class="text-[9px] text-slate-400 mt-3 ml-4 font-bold uppercase tracking-widest">Used for bulk enrollment mapping (e.g., 'r' for reading)</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">Initial Tier Capacity (Levels Count)</label>
+                            <input v-model="form.levels_count" type="number" min="0" max="100"
+                                class="premium-input text-sm placeholder:text-slate-300 w-full px-6 py-4 rounded-2xl bg-rose-50/30 border border-rose-100 focus:bg-white focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-brand-primary font-black tracking-wide" 
+                                placeholder="0">
+                            <p class="text-[9px] text-slate-400 mt-3 ml-4 font-bold uppercase tracking-widest">Auto-generate levels upon creation (e.g., Level 1 to 11)</p>
                         </div>
                     </div>
                 </div>

@@ -12,6 +12,7 @@ const categories = ref([]);
 const form = reactive({
     first_name: '',
     last_name: '',
+    username: '',
     email: '',
     phone: '',
     exam_category_id: null,
@@ -163,8 +164,12 @@ const handleRegister = async () => {
 
                         <div class="space-y-6">
                             <div class="space-y-3">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Email Identifier</label>
-                                <input v-model="form.email" type="email" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:ring-4 focus:ring-emerald-50 transition-all outline-none" placeholder="NAME@EXAMPLE.COM">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Username (Required)</label>
+                                <input v-model="form.username" type="text" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:ring-4 focus:ring-emerald-50 transition-all outline-none" placeholder="student_123">
+                            </div>
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Email (Optional)</label>
+                                <input v-model="form.email" type="email" class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:ring-4 focus:ring-emerald-50 transition-all outline-none" placeholder="NAME@EXAMPLE.COM">
                             </div>
                             <div class="space-y-3">
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Secret Access Key</label>

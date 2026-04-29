@@ -21,6 +21,7 @@ const isEditing = ref(!!staffId);
 const form = ref({
     first_name: '',
     last_name: '',
+    username: '',
     email: '',
     password: '',
     role: 'teacher',
@@ -53,6 +54,7 @@ const fetchStaff = async () => {
         // Map user and partner data to the flat form structure
         form.value = {
             ...data,
+            username: data.username || '',
             password: '',
             partner_name: data.partner?.partner_name || '',
             website: data.partner?.website || '',
@@ -147,6 +149,13 @@ onMounted(() => {
                                                     <InputText v-model="form.last_name" required placeholder="Doe"
                                                         class="w-full shadow-sm rounded-xl uppercase" />
                                                 </div>
+                                            </div>
+
+                                            <div class="flex flex-col">
+                                                <label class="block text-xs font-bold text-slate-500 mb-2 pl-2">Username (Identifier)</label>
+                                                <InputText v-model="form.username" required
+                                                    placeholder="j.doe123"
+                                                    class="w-full shadow-sm rounded-xl" />
                                             </div>
 
                                             <div class="flex flex-col">
