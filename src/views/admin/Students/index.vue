@@ -95,10 +95,10 @@ const deleteStudent = async (student) => {
 
 const resetProgress = async (student) => {
     const fullName = `${student.user?.first_name} ${student.user?.last_name}`;
-    if (!confirm(`CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh.`)) return;
+    if (!confirm(`CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh******.`)) return;
 
     try {
-        await api.post(`/admin/students/${student.id}/reset-attempts`);
+        await api.post(`/admin/students/${student.id}/reset`);
         alert('Candidate progress has been successfully reset.');
         fetchStudents();
     } catch (err) {
