@@ -33,11 +33,18 @@ const audioRef = ref(null);
 const isAudioPlaying = ref(false);
 const hasListened = ref(false);
 const isDemo = ref(false);
+const showLevelTransition = ref(false);
+const nextLevelName = ref('');
 
 // Timer State
 const timeLeftSeconds = ref(0);
 const timerInterval = ref(null);
 const timerConfig = ref(null);
+
+// Audio Tracking State
+const audioProgress = ref(0);
+const audioCurrentTime = ref('0:00');
+const audioDuration = ref('0:00');
 
 const formattedTime = computed(() => {
     if (timeLeftSeconds.value <= 0) return "00:00:00";
@@ -91,13 +98,8 @@ const startTimer = () => {
             clearInterval(timerInterval.value);
             
             // --- NEW: Skip auto-submission for Demo users ---
-            if (isDemo.value) {
-                console.log("Time expired, but skipping auto-submit for demo user.");
-                return;
-            }
-
-            alert("Time is up! Your answers will be submitted automatically.");
-            submitCurrentBatch();
+            alert("Time is up! The assessment has ended.");
+            handleTimeout();
         }
     };
     
@@ -108,6 +110,24 @@ const startTimer = () => {
 
 const syncAudioState = () => {
     if (audioRef.value) isAudioPlaying.value = !audioRef.value.paused;
+};
+
+const formatAudioTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+const updateAudioProgress = () => {
+    if (!audioRef.value) return;
+    const current = audioRef.value.currentTime;
+    const total = audioRef.value.duration;
+    if (total) {
+        audioProgress.value = (current / total) * 100;
+        audioCurrentTime.value = formatAudioTime(current);
+        audioDuration.value = formatAudioTime(total);
+    }
 };
 
 const toggleAudioManual = async () => {
@@ -173,7 +193,7 @@ const fetchData = async () => {
         autoVerifyRequirements(reqRes.data);
         
         if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
-            router.push(`/exam/${attemptId}/result`);
+            router.push('/dashboard');
         }
     } catch (err) {
         errorMsg.value = "Session initialization failed.";
@@ -186,15 +206,45 @@ const beginExam = async () => {
     isStarting.value = false;
     await fetchNextBatch();
     startTimer();
-}
+};
+
+const startNextLevel = () => {
+    showLevelTransition.value = false;
+    // Trigger audio playback now that the student is ready
+    nextTick(() => {
+        if (audioRef.value) {
+            const mediaUrl = currentQ.value?.passage?.media_url || currentQ.value?.audio_url || currentQ.value?.media_url;
+            if (mediaUrl) {
+                audioRef.value.play().catch(err => {
+                    console.warn('Manual play failed after transition:', err);
+                });
+            }
+        }
+    });
+};
 
 const fetchNextBatch = async () => {
     isLoading.value = true;
+    
+    // EXPLICITLY stop any playing audio BEFORE fetching new questions
+    if (audioRef.value) {
+        audioRef.value.pause();
+        audioRef.value.currentTime = 0;
+    }
+    isAudioPlaying.value = false;
+
     questions.value = []; // Safety clear
     try {
         const res = await api.get(`/attempts/${attemptId}/next-batch`);
         if (res.data.questions?.length > 0) {
             currentSkill.value = res.data.skill;
+            // Show level transition if level changed
+            if (currentLevel.value && res.data.level && res.data.level.id !== currentLevel.value.id) {
+                nextLevelName.value = res.data.level.name;
+                showLevelTransition.value = true;
+                globalOffset.value = 0; // Reset counter for the new level
+            }
+
             currentLevel.value = res.data.level;
             totalSkillQuestions.value = res.data.total_questions;
             questions.value = res.data.questions;
@@ -266,7 +316,13 @@ const fetchNextBatch = async () => {
         questionSubmitted.value = false;
         hasListened.value = false;
         isAudioPlaying.value = false;
-        if (audioRef.value) audioRef.value.pause();
+        audioProgress.value = 0;
+        audioCurrentTime.value = '0:00';
+        audioDuration.value = '0:00';
+        if (audioRef.value) {
+            audioRef.value.pause();
+            audioRef.value.currentTime = 0;
+        }
         
         window.scrollTo(0, 0);
     }
@@ -462,6 +518,7 @@ const advanceQuestion = async () => {
 };
 
 const submitCurrentBatch = async () => {
+    if (isSubmittingBatch.value) return;
     isSubmittingBatch.value = true;
     try {
         const formData = new FormData();
@@ -512,8 +569,7 @@ const submitCurrentBatch = async () => {
             if (res.data.retry_attempt) {
                 isRetryAttempt.value = true;
                 showRetryNotification.value = true;
-                // Notification stays visible until student clicks "Proceed" on the notice (or it auto-closes)
-                // For now, we'll just show it and then fetch the next batch
+                globalOffset.value = 0; // Reset counter for retry
             } else {
                 isRetryAttempt.value = false;
                 showRetryNotification.value = false;
@@ -529,18 +585,29 @@ const submitCurrentBatch = async () => {
     }
 };
 
+const handleTimeout = async () => {
+    try {
+        await api.post(`/attempts/${attemptId}/timeout`);
+        router.push('/dashboard');
+    } catch (err) {
+        console.error('Timeout finalization failed', err);
+        router.push('/dashboard');
+    }
+};
+
 const currentQ = computed(() => questions.value[currentIndex.value] || null);
 const displayNumber = computed(() => globalOffset.value + currentIndex.value + 1);
 const wordCount = computed(() => (answers.value[currentIndex.value]?.text_answer || '').trim().split(/\s+/).filter(w => w).length);
 
 const shouldShowQuestion = computed(() => {
-    if (!currentQ.value) return false;
-    const hasAudio = !!(currentQ.value.passage?.audio_url || currentQ.value.passage?.audio_path || currentQ.value.audio_url || currentQ.value.audio_path);
-    if (hasAudio) {
-        return hasListened.value;
-    }
-    return true; // Show immediately if no audio
+    return !!currentQ.value; // Show immediately if a question exists
 });
+
+const cleanHtml = (html) => {
+    if (!html) return '';
+    // Replace non-breaking spaces with normal spaces to allow wrapping
+    return html.replace(/&nbsp;/g, ' ');
+};
 
 const resolveUrl = (path) => {
     if (!path) return null;
@@ -562,22 +629,61 @@ const getSkillIcon = (name) => {
 
 // Auto-play media when question changes and update progress
 watch(currentQ, (newQ) => {
+    if (!newQ) return;
+
+    // Reset audio progress when question changes
+    audioProgress.value = 0;
+    audioCurrentTime.value = '0:00';
+    audioDuration.value = '0:00';
+
     if (newQ && newQ.id) {
         // Update last_seen_question_id in background
         api.post(`/attempts/${attemptId}/update-progress`, { question_id: newQ.id })
             .catch(err => console.warn('Progress update failed', err));
     }
 
+    // CRITICAL: Do not play if level transition, retry, or start screen is showing
+    if (showLevelTransition.value || showRetryNotification.value || isStarting.value) {
+        if (audioRef.value) {
+            audioRef.value.pause();
+            audioRef.value.currentTime = 0;
+        }
+        return;
+    }
+
     const mediaUrl = newQ?.passage?.media_url || newQ?.audio_url || newQ?.media_url;
+    
     if (mediaUrl) {
         nextTick(() => {
             if (audioRef.value) {
+                audioRef.value.load(); // Force reload for new source
                 audioRef.value.play().catch(err => {
                     console.warn('Autoplay blocked by browser. User interaction required.', err);
                 });
             }
         });
     }
+});
+
+const hasStimulusContent = computed(() => {
+    if (!currentQ.value) return false;
+    const q = currentQ.value;
+    const p = q.passage;
+    
+    // A passage counts as stimulus only if it has text or visual media
+    const passageHasContent = p && (
+        (p.content && p.content.trim().length > 0) || 
+        p.image_url || p.image_path || 
+        (p.media_url && p.media_url.toLowerCase().includes('.mp4')) ||
+        (p.media_path && p.media_path.toLowerCase().includes('.mp4'))
+    );
+
+    // Question counts as stimulus only if it has visual media (Audio stays in response pane)
+    const questionHasMedia = (q.image_url || q.image_path) || 
+        (q.media_url && q.media_url.toLowerCase().includes('.mp4')) ||
+        (q.media_path && q.media_path.toLowerCase().includes('.mp4'));
+
+    return !!(passageHasContent || questionHasMedia);
 });
 
 onMounted(async () => {
@@ -588,50 +694,89 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div class="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
         
-        <!-- TOEFL Institutional Header -->
-        <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white sticky top-0 z-[1000] shadow-md h-16">
-            <div class="max-w-[1600px] mx-auto px-6 h-full flex justify-between items-center">
-                <!-- Section Title -->
-                <div class="flex items-center space-x-6">
-                    <span class="text-sm font-black uppercase tracking-wider text-slate-400 border-r border-slate-600 pr-6">{{ currentSkill?.name }}</span>
-                    <span class="text-sm font-bold text-white uppercase tracking-tight">Question {{ displayNumber }} of {{ totalSkillQuestions }}</span>
+        
+        <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white shadow-md h-20 px-6 shrink-0" dir="rtl">
+            <div class="max-w-[1600px] mx-auto h-full flex justify-between items-center">
+                
+                <!-- Right Side: Skill Info -->
+                <div class="flex flex-col items-end text-right">
+                    <div class="flex items-center space-x-3 space-x-reverse mb-0.5">
+                        <span class="text-xs font-black uppercase tracking-wider text-slate-400">{{ currentSkill?.name }}</span>
+                    </div>
                 </div>
 
-                <!-- Navigation Actions -->
-                <div class="flex items-center space-x-2">
-                    <div v-if="!isDemo && timerConfig && timerConfig.skillDuration > 0" :class="['flex items-center space-x-4 px-4 py-1.5 rounded-lg border mr-6 transition-colors', timeLeftSeconds < 300 ? 'bg-rose-900/50 border-rose-500 text-rose-300 animate-pulse' : 'bg-slate-900/50 border-slate-700 text-white']">
+                <!-- Left Side: Navigation & Timer -->
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <button @click="currentIndex > 0 ? currentIndex-- : null" 
+                        :class="currentIndex > 0 ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
+                        class="h-10 px-6 rounded-lg font-bold text-xs transition-all">السابق</button>
+                    <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions }}</span>
+                    <button v-if="!questionSubmitted" @click="submitAnswer" 
+                        class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد الإجابة</button>
+                    <button v-else @click="advanceQuestion" :disabled="isSubmittingBatch"
+                        class="h-10 px-8 bg-emerald-600 text-white rounded-lg font-black text-xs hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span v-if="isSubmittingBatch" class="flex items-center gap-2">
+                            <i class="pi pi-spin pi-spinner text-[10px]"></i> جاري الحفظ...
+                        </span>
+                        <template v-else>
+                            <span>السؤال التالي</span> <i class="pi pi-chevron-left text-[10px]"></i>
+                        </template>
+                    </button>
+
+                    <!-- Timer -->
+                    <div v-if="!isDemo && timerConfig && timerConfig.skillDuration > 0" :class="['flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors', timeLeftSeconds < 300 ? 'bg-rose-900/50 border-rose-500 text-rose-300 animate-pulse' : 'bg-slate-900/50 border-slate-700 text-white']">
                         <i class="pi pi-clock text-xs" :class="timeLeftSeconds < 300 ? 'text-rose-400' : 'text-slate-400'"></i>
                         <span class="text-lg font-black tabular-nums tracking-tighter">{{ formattedTime }}</span>
                     </div>
-                    
-                    <button class="h-10 px-6 bg-slate-700 text-slate-300 rounded font-bold text-xs uppercase hover:bg-slate-600 transition-all opacity-50 cursor-not-allowed">Back</button>
-                    <button v-if="!questionSubmitted" @click="submitAnswer" 
-                        class="h-10 px-8 bg-brand-primary text-white rounded font-black text-xs uppercase hover:bg-brand-primary/90 transition-all shadow-lg">Confirm</button>
-                    <button v-else @click="advanceQuestion" 
-                        class="h-10 px-8 bg-emerald-600 text-white rounded font-black text-xs uppercase hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2">
-                        Next <i class="pi pi-chevron-right text-[10px]"></i>
-                    </button>
                 </div>
             </div>
         </header>
+        
+        <!-- TOEFL-Style Sub-header for Level Name -->
+        <div v-if="!isStarting && currentSkill" class="bg-white border-b border-slate-200 h-10 px-8 flex justify-end items-center shrink-0 z-20">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                
+                <div class="px-3 py-1 bg-slate-100 rounded-md border border-slate-200">
+                    <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name }}</span>
+                </div>
+            </div>
+        </div>
 
-        <main class="max-w-[1600px] mx-auto px-6 py-6">
+        <main class="flex-grow overflow-hidden relative">
             
             <!-- Retry Notification Overlay -->
             <div v-if="showRetryNotification" class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6">
-                <div class="bg-white rounded-lg p-10 max-w-xl w-full shadow-2xl border border-slate-200 text-center">
+                <div class="bg-white rounded-lg p-10 max-w-xl w-full shadow-2xl border border-slate-200 text-center" dir="rtl">
                     <div class="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
                         <i class="pi pi-refresh"></i>
                     </div>
-                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">Institutional Notification</h3>
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">إشعار النظام</h3>
                     <p class="text-slate-600 text-base font-medium leading-relaxed mb-8">
-                        Performance threshold not met. Initializing secondary evaluation cycle with fresh content...
+                        لم يتم استيفاء الحد الأدنى للدرجة المطلوبة. جاري بدء دورة تقييم ثانية بمحتوى جديد...
                     </p>
                     <button @click="showRetryNotification = false" 
                         class="w-full py-4 bg-slate-800 text-white rounded font-bold uppercase text-xs tracking-widest hover:bg-slate-700 transition-all">
-                        Begin Retry Phase
+                        بدء محاولة جديدة
+                    </button>
+                </div>
+            </div>
+
+            <!-- Level Transition Modal -->
+            <div v-if="showLevelTransition" class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-6">
+                <div class="bg-white rounded-3xl p-12 max-w-2xl w-full shadow-2xl border border-slate-200 text-center animate-in zoom-in-95 duration-300">
+                    <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-3xl">
+                        <i class="pi pi-check-circle"></i>
+                    </div>
+                    <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-4">أحسنت! لقد أتممت المستوى</h3>
+                    <p class="text-slate-600 text-lg font-medium leading-relaxed mb-10">
+                        أنت الآن جاهز للانتقال إلى المستوى التالي: <br/>
+                        <span class="text-brand-primary font-black text-2xl mt-2 block">{{ nextLevelName }}</span>
+                    </p>
+                    <button @click="startNextLevel" 
+                        class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-brand-primary transition-all shadow-xl shadow-slate-200">
+                        بدء المستوى التالي
                     </button>
                 </div>
             </div>
@@ -639,27 +784,18 @@ onMounted(async () => {
             <!-- Loading -->
             <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
                 <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-                <p class="mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Synchronizing Assessment Matrix...</p>
+                <p class="mt-6 text-sm font-bold text-slate-500 uppercase tracking-widest">جاري تحميل المحتوى...</p>
             </div>
 
             <!-- Start Screen -->
-            <div v-else-if="isStarting" class="max-w-4xl mx-auto py-12">
+            <div v-else-if="isStarting" class="max-w-4xl mx-auto py-12" dir="rtl">
                 <div class="bg-white rounded-xl p-16 border border-slate-200 shadow-xl text-center">
-                    <h2 class="text-4xl font-black text-slate-900 tracking-tight mb-4 uppercase">Assessment Preparation</h2>
-                    <p class="text-slate-500 text-base font-medium mb-12">System requirements verified. You are entering a strictly timed environment.</p>
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tight mb-4 uppercase">System Readiness Check</h2>
+                    <p class="text-slate-500 text-base font-medium mb-12">The system has verified your system requirements. You are now about to enter a timed testing environment.</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left mb-16">
-                        <div class="bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
-                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Components</h4>
-                            <div class="space-y-4">
-                                <div v-for="skill in attempt?.skills" :key="skill.id" class="flex items-center space-x-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                                    <span class="text-xl">{{ getSkillIcon(skill.name) }}</span>
-                                    <span class="text-[11px] font-black text-slate-700 uppercase tracking-widest">{{ skill.name }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
-                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Prerequisites</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-1 gap-8 text-right mb-16">
+                        <div class="bg-slate-100/100 p-8 rounded-3xl border border-slate-100">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام</h4>
                             <div class="space-y-4">
                                 <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req.id)"
                                     class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
@@ -667,421 +803,279 @@ onMounted(async () => {
                                     <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-50 border-slate-200'" class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
                                         <i v-if="checkedRequirements.includes(req.id)" class="pi pi-check text-[8px] text-white"></i>
                                     </div>
-                                </div>
+                               </div>
                             </div>
                         </div>
                     </div>
 
                     <button @click="beginExam" :disabled="!canStart"
-                        class="w-full py-8 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-[0.4em] shadow-2xl hover:bg-brand-primary hover:shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-30">
-                        Launch Assessment Cycle
+                        class="w-full py-8 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-brand-primary hover:shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-30">
+                        بدء الاختبار الآن
                     </button>
                 </div>
             </div>
 
             <!-- Error State -->
-            <div v-else-if="errorMsg" class="max-w-xl mx-auto py-32 text-center space-y-8">
+            <div v-else-if="errorMsg" class="max-w-xl mx-auto py-32 text-center space-y-8" dir="rtl">
                 <div class="w-20 h-20 bg-rose-50 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto text-3xl shadow-lg shadow-rose-100">
                     <i class="pi pi-exclamation-circle"></i>
                 </div>
                 <div class="space-y-2">
-                    <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Institutional Alert</h2>
+                    <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">تنبيه النظام</h2>
                     <p class="text-slate-500 font-medium leading-relaxed">{{ errorMsg }}</p>
                 </div>
                 <button @click="router.push('/dashboard')" 
-                    class="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-brand-primary transition-all active:scale-95">
-                    Return to Command Center
+                    class="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-brand-primary transition-all active:scale-95">
+                    العودة للوحة التحكم
                 </button>
             </div>
+            
+           
 
-            <!-- Exam Split Screen -->
-            <div v-else-if="currentQ" class="grid grid-cols-1 lg:grid-cols-12 gap-px bg-slate-300 border border-slate-300 shadow-lg min-h-[calc(100vh-100px)] animate-in fade-in duration-500 overflow-hidden">
+            <!-- Exam Split Screen (Dynamic Layout) -->
+            <div v-else-if="currentQ" class="flex flex-row h-full gap-px bg-slate-300 border-t border-slate-300 animate-in fade-in duration-500 overflow-hidden">
                 
-                <!-- Left: Stimulus -->
-                <div :class="shouldShowQuestion ? 'lg:col-span-7' : 'lg:col-span-12'" class="bg-white p-8 overflow-y-auto custom-scrollbar flex flex-col h-full transition-all duration-700">
-                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
-                        <div class="flex items-center space-x-2">
-                            <i class="pi pi-file-edit text-slate-400"></i>
-                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resource Material</span>
+                <!-- Right Side: Response (Question and Choices) - Now on the Left Side of the viewport -->
+                <div :class="hasStimulusContent ? 'w-2/5 bg-white' : 'w-full bg-slate-50'" class="flex flex-col h-full border-r border-slate-200 shadow-inner animate-in slide-in-from-left-8 duration-700 overflow-hidden">
+                    <div :class="hasStimulusContent ? 'w-full p-4' : 'max-w-5xl mx-auto w-full bg-white my-4 rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col max-h-[calc(100vh-120px)] overflow-hidden'">
+                        <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100" dir="rtl">
+                            <i class="pi pi-pencil text-brand-primary"></i>
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المهمة المطلوبة</span>
+                           
                         </div>
-                        <div class="flex items-center space-x-4">
-                            <button class="text-slate-400 hover:text-slate-600 transition-colors"><i class="pi pi-volume-up"></i></button>
-                            <button class="text-slate-400 hover:text-slate-600 transition-colors"><i class="pi pi-question-circle"></i></button>
-                        </div>
-                    </div>
 
-                    <div class="flex-grow prose prose-slate max-w-none">
-                        <!-- 1. Passage Content (Stimulus) -->
-                        <div v-if="currentQ.passage" class="space-y-8 mb-12 pb-12 border-b border-slate-100 border-dashed">
-                            <h3 v-if="currentQ.passage.title" class="text-2xl font-black text-slate-900 tracking-tight leading-tight">{{ currentQ.passage.title }}</h3>
+                        <!-- Audio Player Integrated (One-time playback, no controls) -->
+                        <div v-if="currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path" 
+                            class="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
+                            <div class="flex items-center gap-3 mb-2" dir="rtl">
+                                <div class="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center text-brand-primary text-[10px]">
+                                    <i class="pi pi-volume-up" :class="isAudioPlaying ? 'animate-pulse' : ''"></i>
+                                </div>
+                                <span class="text-[20px] font-black text-slate-400 uppercase tracking-widest">المقطع الصوتي قيد التشغيل (مرة واحدة فقط)</span>
+                            </div>
                             
-                            <!-- Passage Image -->
-                            <div v-if="currentQ.passage.image_url || currentQ.passage.image_path" class="w-full animate-in zoom-in-95 duration-500 mb-8">
-                                <img :src="resolveUrl(currentQ.passage.image_url || currentQ.passage.image_path)" 
-                                    class="w-full h-auto rounded-3xl shadow-xl border border-slate-100" alt="Passage Resource" />
+                            <audio ref="audioRef" 
+                                :src="resolveUrl(currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path)" 
+                                autoplay 
+                                @play="isAudioPlaying = true" 
+                                @pause="isAudioPlaying = false" 
+                                @ended="hasListened = true"
+                                @timeupdate="updateAudioProgress"
+                                class="hidden"></audio>
+                            
+                            <!-- Custom Progress Bar (Non-interactive) -->
+                            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mt-1">
+                                <div class="bg-brand-primary h-full transition-all duration-150 ease-linear" :style="{ width: audioProgress + '%' }"></div>
+                            </div>
+                            <div class="flex justify-between mt-1.5 text-[8px] font-bold text-slate-400 font-mono">
+                                <span class="text-brand-primary">{{ audioCurrentTime }}</span>
+                                <span>{{ audioDuration }}</span>
                             </div>
 
-                            <!-- Passage Media (Audio/Video/General) -->
-                            <div v-if="currentQ.passage.audio_url || currentQ.passage.audio_path || currentQ.passage.media_url || currentQ.passage.media_path" 
-                                class="bg-slate-50 p-8 border border-slate-200 rounded-3xl space-y-6 shadow-inner mb-8">
-                                
-                                <div class="flex items-center gap-4 mb-2">
-                                    <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-500">
-                                        <i class="pi pi-volume-up"></i>
+                            <p v-if="hasListened" class="text-[9px] text-emerald-600 font-bold mt-2 text-center" dir="rtl">✓ تم الاستماع للمقطع بالكامل</p>
+                        </div>
+
+                        <div class="flex-grow flex flex-col space-y-4 overflow-hidden">
+                            <div v-if="currentQ.content && !['fill_blank', 'drag_drop', 'word_selection', 'click_word', 'highlight', 'matching', 'ordering'].includes(currentQ.type)" 
+                                class="text-lg font-black text-slate-900 leading-snug interactive-content-area rtl-support" 
+                                v-html="cleanHtml(currentQ.content)" dir="auto">
+                            </div>
+                            <h3 v-else class="text-base font-bold text-slate-800 leading-tight" dir="rtl">
+                                يرجى الإجابة على السؤال التالي:
+                            </h3>
+
+                            <div class="bg-slate-50 border border-slate-100 p-3 rounded-lg" dir="rtl">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <i class="pi pi-question-circle text-brand-primary text-[9px]"></i>
+                                    <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">تعليمات المهمة</span>
+                                </div>
+                                <p class="text-[10px] font-bold text-slate-600 leading-relaxed" dir="auto">
+                                    {{ currentQ.instructions || 'يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً عليها.' }}
+                                </p>
+                            </div>
+
+                            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pt-2 space-y-2">
+                                <!-- MCQ -->
+                                <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'" class="space-y-1.5">
+                                    <button v-for="(opt, oIdx) in currentQ.options" :key="opt.id"
+                                        @click="answers[currentIndex].option_id = opt.id"
+                                        :disabled="questionSubmitted"
+                                        class="w-full p-3.5 rounded-xl border-2 transition-all flex flex-row-reverse items-center gap-4 group"
+                                        :class="answers[currentIndex].option_id === opt.id 
+                                            ? 'border-brand-primary bg-indigo-50/30 ring-2 ring-indigo-500/5' 
+                                            : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 bg-white shadow-sm'">
+                                        <div class="w-8 h-8 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all shadow-sm"
+                                            :class="answers[currentIndex].option_id === opt.id 
+                                                ? 'bg-brand-primary border-brand-primary scale-105 shadow-md shadow-indigo-200' 
+                                                : 'bg-slate-50 border-slate-100 group-hover:border-slate-200'">
+                                            <span v-if="answers[currentIndex].option_id !== opt.id" class="text-[9px] font-black text-slate-300">{{ String.fromCharCode(65 + oIdx) }}</span>
+                                            <i v-else class="pi pi-check text-[10px] text-white"></i>
+                                        </div>
+                                        <span class="font-black text-slate-700 leading-snug text-base grow text-right" dir="auto">{{ opt.option_text }}</span>
+                                    </button>
+                                </div>
+
+                                <!-- Writing -->
+                                <div v-if="currentQ.type === 'writing'" class="space-y-3" dir="rtl">
+                                    <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm font-medium focus:border-brand-primary transition-all min-h-[180px] outline-none"
+                                        placeholder="اكتب إجابتك هنا..."></textarea>
+                                    <div class="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                                        <span>عدد الكلمات: {{ wordCount }}</span>
+                                        <span>المطلوب: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞' }}</span>
                                     </div>
-                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Passage Resource Stream</span>
                                 </div>
-
-                                <audio v-if="(currentQ.passage.audio_url || currentQ.passage.audio_path) && !hasListened" 
-                                    ref="audioRef" :src="resolveUrl(currentQ.passage.audio_url || currentQ.passage.audio_path)" 
-                                    controls autoplay @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" 
-                                    class="w-full h-12 animate-in fade-in duration-500"></audio>
                                 
-                                <video v-if="(currentQ.passage.media_url || currentQ.passage.media_path) && (currentQ.passage.media_url || currentQ.passage.media_path).includes('.mp4')" 
-                                    :src="resolveUrl(currentQ.passage.media_url || currentQ.passage.media_path)" 
-                                    controls class="w-full rounded-2xl shadow-2xl"></video>
-                            </div>
-
-                            <div v-if="currentQ.passage.content" 
-                                class="text-xl text-slate-700 leading-[2] font-serif text-justify ql-content rtl-support" 
-                                v-html="currentQ.passage.content" dir="auto">
-                            </div>
-                        </div>
-
-                        <!-- 2. Individual Question Media (Always check) -->
-                        <div v-if="currentQ.image_url || currentQ.audio_url || currentQ.media_url || currentQ.image_path || currentQ.audio_path || currentQ.media_path" 
-                            class="flex flex-col items-center justify-center py-12 space-y-8 h-full bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
-                            
-                            <!-- Question Specific Image -->
-                            <div v-if="currentQ.image_url || currentQ.image_path" class="w-full max-w-xl px-6 animate-in zoom-in-95 duration-500">
-                                <img :src="resolveUrl(currentQ.image_url || currentQ.image_path)" class="w-full h-auto rounded-3xl shadow-2xl border border-white" alt="Question Resource" />
-                            </div>
-
-                            <!-- Question Specific Audio -->
-                            <div v-if="(currentQ.audio_url || currentQ.audio_path) && !hasListened" class="w-full max-w-md bg-white p-8 border border-slate-100 shadow-xl rounded-[2rem] space-y-4 animate-in fade-in duration-500">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <i class="pi pi-microphone text-indigo-500"></i>
-                                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Question Audio Clip</span>
+                                <!-- Speaking -->
+                                <div v-if="currentQ.type === 'speaking'" class="space-y-4">
+                                    <AudioRecorder @recorded="(blob) => answers[currentIndex].recorded_file = blob"
+                                        class="!bg-slate-50 !border-slate-200" :disabled="questionSubmitted" />
                                 </div>
-                                <audio ref="audioRef" :src="resolveUrl(currentQ.audio_url || currentQ.audio_path)" controls autoplay @play="isAudioPlaying = true" @pause="isAudioPlaying = false" @ended="hasListened = true" class="w-full h-12"></audio>
-                            </div>
 
-                            <!-- Question Specific Video -->
-                            <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4') && !hasListened" class="w-full max-w-xl px-6 animate-in fade-in duration-500">
-                                <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls autoplay @ended="hasListened = true" class="w-full rounded-3xl shadow-2xl"></video>
+                                <!-- Drag & Drop -->
+                                <div v-if="currentQ.type === 'drag_drop'" class="space-y-6">
+                                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 leading-[2.4] text-base font-medium text-slate-700 interactive-content-area rtl-support" dir="auto">
+                                        <template v-for="(part, pIdx) in parsedDragDropContent(currentQ.content)" :key="pIdx">
+                                            <span v-html="part"></span>
+                                            <span v-if="pIdx < parsedDragDropContent(currentQ.content).length - 1"
+                                                @dragover.prevent @dragenter.prevent @drop="onDrop($event, pIdx, currentIndex)"
+                                                class="inline-flex items-center justify-center min-w-[120px] h-9 mx-1 px-4 rounded-lg border-2 border-dashed transition-all relative top-1.5"
+                                                :class="answers[currentIndex].drag_drop_answers[pIdx] 
+                                                    ? 'bg-indigo-50 border-brand-primary border-solid text-brand-primary font-black text-sm shadow-sm' 
+                                                    : 'bg-white border-slate-300 shadow-inner text-xl font-black text-slate-400 hover:border-brand-primary hover:bg-slate-50'">
+                                                {{ answers[currentIndex].drag_drop_answers[pIdx] || '..........' }}
+                                                <button v-if="answers[currentIndex].drag_drop_answers[pIdx] && !questionSubmitted" @click="clearSlot(pIdx, currentIndex)"
+                                                    class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[7px] shadow-sm">
+                                                    <i class="pi pi-times"></i>
+                                                </button>
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                        <div v-for="opt in currentQ.options" :key="opt.id" draggable="true" @dragstart="onDragStart($event, opt)"
+                                            class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 cursor-grab hover:bg-brand-primary hover:text-white transition-all shadow-sm">
+                                            {{ opt.option_text }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Word Selection -->
+                                <div v-if="currentQ.type === 'word_selection' || currentQ.type === 'click_word'" class="space-y-4">
+                                    <div class="bg-white p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1" dir="auto">
+                                        <button v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx" @click="toggleWord(word, currentIndex)" :disabled="questionSubmitted"
+                                            class="px-1 py-0.5 rounded transition-all font-medium text-lg border-b-2"
+                                            :class="answers[currentIndex].selected_words.includes(word) ? 'border-rose-500 text-rose-600 bg-rose-50' : 'border-transparent text-slate-700 hover:bg-slate-50'">
+                                            {{ word }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Fill in the Blank -->
+                                <div v-if="currentQ.type === 'fill_blank'" class="space-y-4">
+                                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-200 leading-[2.6] text-lg font-medium text-slate-800 shadow-inner interactive-content-area rtl-support" dir="auto">
+                                        <template v-for="(part, pIdx) in parsedFillBlankContent(currentQ.content)" :key="pIdx">
+                                            <span v-html="part"></span>
+                                            <input v-if="pIdx < parsedFillBlankContent(currentQ.content).length - 1" v-model="answers[currentIndex].fill_blank_answers[pIdx]" :disabled="questionSubmitted" type="text"
+                                                class="inline-block w-28 h-8 mx-1 px-2 rounded border-2 border-slate-200 bg-white focus:border-brand-primary outline-none transition-all text-brand-primary font-black text-center text-base relative top-0.5" placeholder="..." />
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Matching -->
+                                <div v-if="currentQ.type === 'matching'" class="space-y-6">
+                                    <div class="grid grid-cols-2 gap-6">
+                                        <div class="space-y-2">
+                                            <button v-for="opt in getMatchingLeft(currentQ)" :key="opt.id" @click="toggleMatchSource(opt.id)" :disabled="questionSubmitted"
+                                                class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 flex justify-between items-center"
+                                                :class="selectedMatchSource === opt.id ? 'border-brand-primary bg-indigo-50 shadow-md' : (answers[currentIndex].matching_answers[opt.id] ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white')">
+                                                <span class="text-right w-full" dir="auto">{{ opt.option_text }}</span>
+                                            </button>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <button v-for="opt in getMatchingRight(currentQ)" :key="opt.id" @click="completeMatch(opt.id)" :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
+                                                class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 text-right"
+                                                :class="isAlreadyMatched(opt.id) ? 'bg-slate-50 opacity-40' : (selectedMatchSource ? 'border-brand-primary/30 bg-white hover:bg-brand-primary hover:text-white' : 'border-slate-100 bg-white')">
+                                                <span dir="auto">{{ opt.option_text }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Ordering -->
+                                <div v-if="currentQ.type === 'ordering'" class="space-y-6">
+                                    <div class="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 items-center justify-center">
+                                        <button v-for="(word, oIdx) in answers[currentIndex].ordering_answers" :key="oIdx" @click="removeFromOrdering(oIdx)" :disabled="questionSubmitted"
+                                            class="px-3 py-2 bg-white border-2 border-brand-primary text-brand-primary font-black rounded-lg text-sm shadow-sm animate-in zoom-in-75">
+                                            {{ word }}
+                                        </button>
+                                    </div>
+                                    <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-wrap gap-2 justify-center">
+                                        <button v-for="(word, wIdx) in getAvailableWords(currentQ, currentIndex)" :key="wIdx" @click="addToOrdering(word)" :disabled="questionSubmitted"
+                                            class="px-3 py-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-lg text-sm hover:bg-brand-primary hover:text-white transition-all shadow-sm">
+                                            {{ word }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Short Answer -->
+                                <div v-if="currentQ.type === 'short_answer'" class="space-y-4">
+                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg flex flex-col items-center gap-6">
+                                        <div class="w-full max-w-sm">
+                                            <input v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted" type="text"
+                                                class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-lg font-black text-slate-800 text-center focus:border-brand-primary outline-none transition-all"
+                                                placeholder="اكتب إجابتك هنا..." dir="auto" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Highlight -->
+                                <div v-if="currentQ.type === 'highlight'" class="space-y-4">
+                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 leading-[2.2] text-lg font-medium text-slate-700 shadow-sm rtl-support" dir="auto">
+                                        <template v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx">
+                                            <span @click="toggleHighlight(word, currentIndex)" :disabled="questionSubmitted"
+                                                class="px-1 py-0.5 rounded cursor-pointer transition-all border-b border-transparent hover:border-slate-300"
+                                                :class="answers[currentIndex].highlight_answers.includes(word) ? 'bg-yellow-200 text-slate-900 border-yellow-400 font-bold shadow-md' : ''">
+                                                {{ word }}
+                                            </span>
+                                            {{ ' ' }}
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- 3. Placeholder (Only if NO passage AND NO media) -->
-                        <div v-else-if="!currentQ.passage" class="flex flex-col items-center justify-center h-full space-y-6 py-20 bg-slate-50 border border-dashed border-slate-200 rounded transition-opacity duration-700">
-                            <i class="pi pi-shield text-4xl text-slate-200"></i>
-                            <div class="text-center space-y-2">
-                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Direct Engagement Protocol</p>
-                                <p class="text-xs text-slate-300 font-medium italic">"Stand-alone evaluation phase. Focus on the prompt."</p>
-                            </div>
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                            <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Institutional Assessment Protocol 2024</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right: Response -->
-                <div v-if="shouldShowQuestion" class="lg:col-span-5 bg-white p-8 flex flex-col h-full border-l border-slate-200 shadow-inner animate-in slide-in-from-right-8 duration-700">
-                    <div class="flex items-center space-x-2 mb-8 pb-4 border-b border-slate-100">
-                        <i class="pi pi-pencil text-brand-primary"></i>
-                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Question Task</span>
+                <!-- Left Side: Stimulus Pane (Material) - Only show if content exists -->
+                <div v-if="hasStimulusContent" class="w-3/5 bg-white p-4 overflow-y-auto custom-scrollbar flex flex-col h-full transition-all duration-700">
+                    <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100" dir="rtl">
+                        <i class="pi pi-file-edit text-slate-400"></i>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المادة العلمية</span>
                     </div>
 
-                    <div class="flex-grow overflow-y-auto custom-scrollbar pr-4 space-y-8">
-                        <div v-if="currentQ.content && !['fill_blank', 'drag_drop', 'word_selection', 'click_word', 'highlight', 'matching', 'ordering'].includes(currentQ.type)" 
-                            class="text-2xl font-black text-slate-900 leading-tight ql-content rtl-support" 
-                            v-html="currentQ.content" dir="auto">
-                        </div>
-                        <h3 v-else class="text-xl font-bold text-slate-900 leading-tight">
-                            Academic Prompt Task
-                        </h3>
-                        <div class="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <i class="pi pi-question-circle text-brand-primary text-[10px]"></i>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Task Instruction</span>
+                    <div class="flex-grow prose prose-slate max-w-none">
+                        <!-- 1. Passage Content -->
+                        <div v-if="currentQ.passage" class="space-y-4 mb-6 pb-6 border-b border-slate-100 border-dashed">
+                            <h3 v-if="currentQ.passage.title" class="text-xl font-black text-slate-900 tracking-tight leading-tight" dir="auto">{{ currentQ.passage.title }}</h3>
+                            <div v-if="currentQ.passage.image_url || currentQ.passage.image_path" class="w-full mb-4">
+                                <img :src="resolveUrl(currentQ.passage.image_url || currentQ.passage.image_path)" class="w-full h-auto rounded-xl shadow-md border border-slate-100" />
                             </div>
-                            <p class="text-[11px] font-bold text-slate-600 leading-relaxed" dir="auto">
-                                {{ currentQ.instructions || 'Carefully review the provided material and deliver your institutional response accordingly.' }}
-                            </p>
+                            <div v-if="currentQ.passage.content" class="text-lg text-slate-700 leading-relaxed font-serif text-justify ql-content rtl-support" v-html="cleanHtml(currentQ.passage.content)" dir="auto"></div>
                         </div>
 
-                        <div class="pt-4 space-y-4">
-                            <!-- MCQ -->
-                            <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'" class="space-y-2">
-                                <button v-for="(opt, oIdx) in currentQ.options" :key="opt.id"
-                                    @click="answers[currentIndex].option_id = opt.id"
-                                    :disabled="questionSubmitted"
-                                    class="w-full p-6 rounded-[1.5rem] border-2 transition-all flex flex-row-reverse items-center gap-5 group"
-                                    :class="answers[currentIndex].option_id === opt.id 
-                                        ? 'border-brand-primary bg-indigo-50/30 ring-4 ring-indigo-500/5' 
-                                        : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 bg-white shadow-sm'">
-                                    
-                                    <!-- Premium Radio Indicator (Now on the Right for RTL) -->
-                                    <div class="w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all shadow-sm"
-                                        :class="answers[currentIndex].option_id === opt.id 
-                                            ? 'bg-brand-primary border-brand-primary scale-110 shadow-lg shadow-indigo-200' 
-                                            : 'bg-slate-50 border-slate-100 group-hover:border-slate-200'">
-                                        <span v-if="answers[currentIndex].option_id !== opt.id" class="text-[10px] font-black text-slate-300">{{ String.fromCharCode(65 + oIdx) }}</span>
-                                        <i v-else class="pi pi-check text-xs text-white"></i>
-                                    </div>
-
-                                    <span class="font-black text-slate-700 leading-snug text-lg grow text-right" dir="auto">{{ opt.option_text }}</span>
-
-                                    <i v-if="answers[currentIndex].option_id === opt.id" class="pi pi-check-circle text-brand-primary animate-in zoom-in-50"></i>
-                                </button>
-                            </div>
-
-                            <!-- Writing -->
-                            <div v-if="currentQ.type === 'writing'" class="space-y-4">
-                                <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
-                                    class="w-full bg-slate-50 border border-slate-200 rounded-lg p-6 text-base font-medium focus:border-brand-primary transition-all min-h-[300px] outline-none"
-                                    placeholder="Compose response..."></textarea>
-                                <div class="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2">
-                                    <span>Word Count: {{ wordCount }}</span>
-                                    <span>Required: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞' }}</span>
-                                </div>
-                            </div>
-
-                            <!-- Speaking -->
-                            <div v-if="currentQ.type === 'speaking'" class="space-y-6">
-                                <div v-if="(currentQ.passage?.media_url || currentQ.media_url) && !hasListened" class="p-8 bg-slate-50 border border-slate-200 rounded text-center space-y-4">
-                                    <i class="pi pi-lock text-2xl text-slate-300"></i>
-                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Listen to resource to unlock recorder</p>
-                                </div>
-                                <AudioRecorder v-else @recorded="(blob) => answers[currentIndex].recorded_file = blob"
-                                    class="!bg-slate-50 !border-slate-200" :disabled="questionSubmitted" />
-                            </div>
-
-                            <!-- Drag & Drop -->
-                            <div v-if="currentQ.type === 'drag_drop'" class="space-y-8">
-                                <div class="bg-slate-50 p-8 rounded-3xl border border-slate-200 leading-[2.8] text-lg font-medium text-slate-700 interactive-content-area rtl-support" dir="auto">
-                                    <template v-for="(part, pIdx) in parsedDragDropContent(currentQ.content)" :key="pIdx">
-                                        <span v-html="part"></span>
-                                        <span v-if="pIdx < parsedDragDropContent(currentQ.content).length - 1"
-                                            @dragover.prevent 
-                                            @dragenter.prevent
-                                            @drop="onDrop($event, pIdx, currentIndex)"
-                                            class="inline-flex items-center justify-center min-w-[160px] h-11 mx-2 px-5 rounded-xl border-2 border-dashed transition-all relative top-2"
-                                            :class="answers[currentIndex].drag_drop_answers[pIdx] 
-                                                ? 'bg-indigo-50 border-brand-primary border-solid text-brand-primary font-black text-base shadow-sm' 
-                                                : 'bg-white border-slate-300 shadow-inner text-2xl font-black text-slate-400 hover:border-brand-primary hover:bg-slate-50'">
-                                            
-                                            {{ answers[currentIndex].drag_drop_answers[pIdx] || '................' }}
-                                            
-                                            <button v-if="answers[currentIndex].drag_drop_answers[pIdx] && !questionSubmitted" 
-                                                @click="clearSlot(pIdx, currentIndex)"
-                                                class="absolute -top-2 -right-2 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center text-[8px] shadow-sm">
-                                                <i class="pi pi-times"></i>
-                                            </button>
-                                        </span>
-                                    </template>
-                                </div>
-
-                                <div class="flex flex-wrap gap-3 p-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
-                                    <div v-for="opt in currentQ.options" :key="opt.id"
-                                        draggable="true" @dragstart="onDragStart($event, opt)"
-                                        class="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-600 cursor-grab active:cursor-grabbing hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all shadow-sm">
-                                        {{ opt.option_text }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Word Selection -->
-                            <div v-if="currentQ.type === 'word_selection' || currentQ.type === 'click_word'" class="space-y-6">
-                                <div class="bg-white p-8 rounded-3xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1" dir="auto">
-                                    <button v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx"
-                                        @click="toggleWord(word, currentIndex)"
-                                        :disabled="questionSubmitted"
-                                        class="px-1 py-0.5 rounded transition-all font-medium text-xl border-b-2"
-                                        :class="answers[currentIndex].selected_words.includes(word)
-                                            ? 'border-rose-500 text-rose-600 bg-rose-50'
-                                            : 'border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-200'">
-                                        {{ word }}
-                                    </button>
-                                </div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center italic">
-                                    "Select all elements that require institutional correction."
-                                </p>
-                            </div>
-
-                            <!-- Fill in the Blank -->
-                            <div v-if="currentQ.type === 'fill_blank'" class="space-y-6">
-                                <div class="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200 leading-[2.8] text-xl font-medium text-slate-800 shadow-inner interactive-content-area rtl-support" dir="auto">
-                                    <template v-for="(part, pIdx) in parsedFillBlankContent(currentQ.content)" :key="pIdx">
-                                        <span v-html="part"></span>
-                                        <input v-if="pIdx < parsedFillBlankContent(currentQ.content).length - 1"
-                                            v-model="answers[currentIndex].fill_blank_answers[pIdx]"
-                                            :disabled="questionSubmitted"
-                                            type="text"
-                                            class="inline-block w-36 h-9 mx-1 px-3 rounded-lg border-2 border-slate-200 bg-white focus:border-brand-primary outline-none transition-all text-brand-primary font-black text-center text-lg relative top-0.5 placeholder:text-slate-300 placeholder:text-xl"
-                                            placeholder="...." />
-                                    </template>
-                                </div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center italic">
-                                    "Complete the technical passage with the correct academic terminology."
-                                </p>
-                            </div>
-
-                            <!-- Matching -->
-                            <div v-if="currentQ.type === 'matching'" class="space-y-10">
-                                <div class="grid grid-cols-2 gap-10">
-                                    <!-- Sources (Left Column) -->
-                                    <div class="space-y-4">
-                                        <div class="flex items-center gap-3 mb-6">
-                                            <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-lg">1</div>
-                                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Primary Matrix</h4>
-                                        </div>
-                                        <button v-for="opt in getMatchingLeft(currentQ)" :key="opt.id"
-                                            @click="toggleMatchSource(opt.id)"
-                                            :disabled="questionSubmitted"
-                                            class="w-full p-5 rounded-2xl border-2 transition-all duration-300 text-base font-black text-slate-700 flex justify-between items-center group relative overflow-hidden"
-                                            :class="selectedMatchSource === opt.id 
-                                                ? 'border-brand-primary bg-indigo-50 shadow-xl shadow-indigo-100/50 -translate-y-1' 
-                                                : (answers[currentIndex].matching_answers[opt.id] ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white hover:border-slate-300 hover:shadow-md')">
-                                            
-                                            <span class="relative z-10 text-right w-full" dir="auto">{{ opt.option_text }}</span>
-                                            
-                                            <div v-if="answers[currentIndex].matching_answers[opt.id]" class="shrink-0 ml-4 relative z-10 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg animate-in zoom-in-50">
-                                                <i class="pi pi-check text-[10px]"></i>
-                                            </div>
-                                        </button>
-                                    </div>
-
-                                    <!-- Targets (Right Column) -->
-                                    <div class="space-y-4">
-                                        <div class="flex items-center gap-3 mb-6">
-                                            <div class="w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center text-[10px] font-black shadow-lg">2</div>
-                                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Target Correlation</h4>
-                                        </div>
-                                        <button v-for="opt in getMatchingRight(currentQ)" :key="opt.id"
-                                            @click="completeMatch(opt.id)"
-                                            :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
-                                            class="w-full p-5 rounded-2xl border-2 transition-all duration-300 text-base font-black text-slate-700 text-right group"
-                                            :class="isAlreadyMatched(opt.id) 
-                                                ? 'bg-slate-50 border-slate-100 opacity-40 grayscale pointer-events-none' 
-                                                : (selectedMatchSource ? 'border-brand-primary/30 bg-white hover:bg-brand-primary hover:text-white hover:border-brand-primary hover:-translate-y-1 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200')">
-                                            <span dir="auto">{{ opt.option_text }}</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Connection Status Display -->
-                                <div v-if="Object.keys(answers[currentIndex].matching_answers).length > 0" 
-                                    class="p-8 bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div class="flex items-center justify-between mb-6">
-                                        <div class="flex items-center gap-3">
-                                            <i class="pi pi-link text-brand-primary"></i>
-                                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Correspondences</span>
-                                        </div>
-                                        <span class="px-3 py-1 bg-brand-primary/20 text-brand-primary rounded-full text-[9px] font-black uppercase">
-                                            {{ Object.keys(answers[currentIndex].matching_answers).length }} Linked
-                                        </span>
-                                    </div>
-                                    <div class="flex flex-wrap gap-3">
-                                        <div v-for="(targetId, sourceId) in answers[currentIndex].matching_answers" :key="sourceId"
-                                            class="pl-4 pr-2 py-2 bg-slate-800/50 border border-slate-700 rounded-xl flex items-center gap-4 group hover:border-brand-primary/50 transition-colors">
-                                            <span class="text-xs font-black text-white" dir="auto">{{ getOptionText(sourceId) }}</span>
-                                            <i class="pi pi-arrow-right text-[8px] text-slate-600"></i>
-                                            <span class="text-xs font-bold text-brand-primary" dir="auto">{{ getOptionText(targetId) }}</span>
-                                            <button @click="removeMatch(sourceId)" v-if="!questionSubmitted" 
-                                                class="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:bg-rose-500 hover:text-white transition-all">
-                                                <i class="pi pi-times text-[10px]"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Ordering (Sentence/Paragraph Builder) -->
-                            <div v-if="currentQ.type === 'ordering'" class="space-y-8">
-                                <!-- Target Construction Area -->
-                                <div class="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-200 min-h-[160px] flex flex-wrap gap-3 items-center justify-center relative transition-all"
-                                    :class="answers[currentIndex].ordering_answers.length > 0 ? 'bg-indigo-50/30 border-brand-primary/30' : ''">
-                                    <div v-if="answers[currentIndex].ordering_answers.length === 0" class="text-slate-300 font-bold text-[10px] uppercase tracking-[0.2em] text-center">
-                                        Tap words below to construct your response
-                                    </div>
-                                    <div class="flex flex-wrap gap-3 justify-center">
-                                        <button v-for="(word, oIdx) in answers[currentIndex].ordering_answers" :key="oIdx"
-                                            @click="removeFromOrdering(oIdx)"
-                                            :disabled="questionSubmitted"
-                                            class="px-5 py-3 bg-white border-2 border-brand-primary text-brand-primary font-black rounded-xl shadow-sm hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition-all animate-in zoom-in-75">
-                                            {{ word }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Word Bank (Scattered Words) -->
-                                <div class="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
-                                    <div class="flex items-center gap-3 mb-6">
-                                        <i class="pi pi-th-large text-slate-300 text-xs"></i>
-                                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Word Bank</h4>
-                                    </div>
-                                    <div class="flex flex-wrap gap-3 justify-center">
-                                        <button v-for="(word, wIdx) in getAvailableWords(currentQ, currentIndex)" :key="wIdx"
-                                            @click="addToOrdering(word)"
-                                            :disabled="questionSubmitted"
-                                            class="px-5 py-3 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-brand-primary hover:text-white hover:border-brand-primary hover:-translate-y-1 transition-all shadow-sm active:scale-95">
-                                            {{ word }}
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center italic">
-                                    "Tap words in sequence to construct the institutional response."
-                                </p>
-                            </div>
-
-                            <!-- Short Answer -->
-                            <div v-if="currentQ.type === 'short_answer'" class="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-                                <div class="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col items-center gap-8">
-                                    <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg rotate-3 group-hover:rotate-0 transition-transform">
-                                        <i class="pi pi-pencil text-white text-xl"></i>
-                                    </div>
-                                    <div class="text-center space-y-2">
-                                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Constructed Response</h4>
-                                        <p class="text-slate-500 text-[11px] font-bold">Please provide a concise, accurate answer below.</p>
-                                    </div>
-                                    <div class="w-full max-w-md relative">
-                                        <input v-model="answers[currentIndex].text_answer"
-                                            :disabled="questionSubmitted"
-                                            type="text"
-                                            class="w-full px-8 py-6 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-800 text-center focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 outline-none transition-all placeholder:text-slate-200"
-                                            placeholder="Type your answer here..."
-                                            dir="auto" />
-                                        <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-white border border-slate-100 rounded-full text-[9px] font-black text-slate-400 shadow-sm uppercase tracking-widest">
-                                            Alpha-Numeric Entry
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Highlight -->
-                            <div v-if="currentQ.type === 'highlight'" class="space-y-6">
-                                <div class="bg-white p-10 rounded-[2.5rem] border border-slate-100 leading-[2.2] text-xl font-medium text-slate-700 shadow-sm rtl-support" dir="auto">
-                                    <template v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx">
-                                        <span @click="toggleHighlight(word, currentIndex)"
-                                            :disabled="questionSubmitted"
-                                            class="px-1 py-0.5 rounded cursor-pointer transition-all border-b border-transparent hover:border-slate-300"
-                                            :class="answers[currentIndex].highlight_answers.includes(word)
-                                                ? 'bg-yellow-200 text-slate-900 border-yellow-400 font-bold shadow-[0_2px_10px_rgba(253,224,71,0.4)]'
-                                                : ''">
-                                            {{ word }}
-                                        </span>
-                                        {{ ' ' }}
-                                    </template>
-                                </div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center italic">
-                                    "Identify and highlight the primary academic arguments within the passage."
-                                </p>
-                            </div>
+                        <!-- 2. Videos -->
+                        <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4')" class="flex flex-col items-center justify-center py-4">
+                            <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls autoplay @ended="hasListened = true" class="w-full rounded-xl shadow-lg"></video>
                         </div>
-                    </div>
 
-                    <!-- Actions moved to Header for TOEFL style, but keeping a placeholder footer if needed -->
-                    <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                        <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Institutional Assessment Protocol 2024</span>
+                        <!-- 3. Question Image -->
+                        <div v-if="currentQ.image_url || currentQ.image_path" class="w-full flex justify-center py-4">
+                            <img :src="resolveUrl(currentQ.image_url || currentQ.image_path)" class="max-w-full h-auto rounded-xl shadow-lg border border-white" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1098,9 +1092,37 @@ onMounted(async () => {
 .custom-scrollbar-dark::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
 .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
 
+/* Academic Paragraph Styling - Scope ONLY to stimulus pane */
+.w-3\/5 .ql-content :deep(p) {
+    margin-bottom: 1.25rem;
+    text-indent: 2.5rem;
+    line-height: 1.8;
+}
+
+/* Ensure images and other elements don't get indented */
+.w-3\/5 .ql-content :deep(img), 
+.w-3\/5 .ql-content :deep(ul), 
+.w-3\/5 .ql-content :deep(ol) {
+    text-indent: 0;
+}
+
+/* Fix Interactive Content Area - Avoid forced inline overlap */
+.interactive-content-area {
+    line-height: 1.8;
+    text-indent: 0 !important;
+    display: block !important;
+    position: relative;
+    margin-top: 1rem;
+}
+
 .interactive-content-area :deep(*) {
-    display: inline !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    text-indent: 0 !important;
+    display: inline; /* Keep words inline for selection types */
+}
+
+/* Specific fix for p tags inside interactive area */
+.interactive-content-area :deep(p) {
+    display: block;
+    margin-bottom: 0.5rem;
 }
 </style>
