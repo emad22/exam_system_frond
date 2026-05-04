@@ -24,6 +24,8 @@ const handleLogin = async () => {
         });
 
         localStorage.setItem('token', res.data.token);
+
+      
         
         if (res.data.role === 'admin' || res.data.role === 'teacher') {
             router.push('/admin');
