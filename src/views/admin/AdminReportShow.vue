@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -73,6 +73,28 @@ const calculateDuration = (start, end) => {
     return `${mins}m ${secs}s`;
 };
 
+const sortedAttemptSkills = computed(() => {
+    if (!selectedAttempt.value || !selectedAttempt.value.attempt_skills) return [];
+    
+    const orderMap = {
+        'listening': 1,
+        'reading': 2,
+        'grammar': 3,
+        'writing': 4,
+        'speaking': 5
+    };
+
+    return [...selectedAttempt.value.attempt_skills].sort((a, b) => {
+        const nameA = a.skill?.name?.toLowerCase() || '';
+        const nameB = b.skill?.name?.toLowerCase() || '';
+        
+        const orderA = orderMap[nameA] || 99;
+        const orderB = orderMap[nameB] || 99;
+        
+        return orderA - orderB;
+    });
+});
+
 onMounted(fetchDetails);
 </script>
 
@@ -133,9 +155,9 @@ onMounted(fetchDetails);
             </div>
 
             <!-- Skills Tabs -->
-            <Tabs v-if="selectedAttempt.attempt_skills?.length" :value="selectedAttempt.attempt_skills[0].skill_id.toString()">
+            <Tabs v-if="sortedAttemptSkills.length" :value="sortedAttemptSkills[0].skill_id.toString()">
                 <TabList class="bg-transparent border-none mb-8 overflow-x-auto hide-scrollbar">
-                    <Tab v-for="skillResult in selectedAttempt.attempt_skills" 
+                    <Tab v-for="skillResult in sortedAttemptSkills" 
                          :key="skillResult.id" 
                          :value="skillResult.skill_id.toString()" 
                          class="mr-4 group shrink-0">
@@ -147,7 +169,7 @@ onMounted(fetchDetails);
                 </TabList>
 
                 <TabPanels class="bg-transparent p-0">
-                    <TabPanel v-for="skillResult in selectedAttempt.attempt_skills" 
+                    <TabPanel v-for="skillResult in sortedAttemptSkills" 
                               :key="skillResult.id" 
                               :value="skillResult.skill_id.toString()">
                         
