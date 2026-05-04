@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
+import { useAdminStore } from '@/stores/admin';
 
 import Button from 'primevue/button';
 import Card from 'primevue/card';
@@ -16,6 +17,7 @@ import Editor from 'primevue/editor';
 
 const router = useRouter();
 const route = useRoute();
+const adminStore = useAdminStore();
 const questionId = route.params.id;
 
 const skills = ref([]);
@@ -432,7 +434,8 @@ const updateBatch = async () => {
         await api.post(`/admin/questions/${questionId}`, fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
-        router.push('/admin/questions');
+        const isTeacher = adminStore.user?.role === 'teacher';
+        router.push({ name: isTeacher ? 'teacher.questions' : 'admin.questions' });
     } catch (err) {
         errorMsg.value = err.response?.data?.message || 'Failed to update questions.';
     } finally {
@@ -456,7 +459,7 @@ onMounted(() => {
             <!-- Header -->
             <div class="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                 <div class="flex items-center gap-6">
-                    <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded @click="router.push('/admin/questions')" />
+                    <Button icon="pi pi-arrow-left" severity="secondary" outlined rounded @click="router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.questions' : 'admin.questions' })" />
                     <div>
                         <h1 class="text-2xl font-black text-slate-800 tracking-tight">Edit Batch Questions</h1>
                         <p class="text-xs font-bold text-orange-500 uppercase tracking-widest mt-1">Sync content across shared context</p>
@@ -675,8 +678,8 @@ onMounted(() => {
                                         <i class="pi pi-info-circle"></i> Drag & Drop Guide
                                     </p>
                                     <p class="text-[11px] text-indigo-500 mt-1">
-                                        Use <b>[target]</b> where you want a blank space. Each <b>[target]</b> will be matched to one of the options below in order.
-                                        Example: "The <b>[target]</b> is a <b>[target]</b> animal."
+                                        Use <b>...............</b> where you want a blank space. Each <b>...............</b> will be matched to one of the options below in order.
+                                        Example: "The <b>...............</b> is a <b>...............</b> animal."
                                     </p>
                                 </div>
 

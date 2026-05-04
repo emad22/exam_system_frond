@@ -18,12 +18,17 @@ const attemptId = route.params.id;
 
 const selectedAttempt = ref(null);
 const loading = ref(true);
+const currentUser = ref(null);
 
 const fetchDetails = async () => {
     loading.value = true;
     try {
-        const res = await api.get(`/admin/reports/${attemptId}`);
-        selectedAttempt.value = res.data;
+        const [reportRes, userRes] = await Promise.all([
+            api.get(`/admin/reports/${attemptId}`),
+            api.get('/user')
+        ]);
+        selectedAttempt.value = reportRes.data;
+        currentUser.value = userRes.data;
     } catch (err) {
         console.error('Failed to load attempt details', err);
     } finally {
@@ -37,7 +42,8 @@ const voidAttempt = async (id) => {
     try {
          await api.post(`/admin/reports/${attemptId}/reset`);   
         alert('Attempt voided successfully.');
-        router.push('/admin/reports');
+        const isTeacher = currentUser.value?.role === 'teacher';
+        router.push({ name: isTeacher ? 'teacher.reports' : 'admin.reports' });
     } catch (err) {
         alert('Failed to void attempt in vue.');
     }
@@ -49,7 +55,8 @@ const resetSkill = async (skillId, skillName) => {
     try {
         await api.post(`/admin/reports/${attemptId}/skills/${skillId}/reset`);   
         alert('Skill Attempt voided successfully.');
-        router.push('/admin/reports');
+        const isTeacher = currentUser.value?.role === 'teacher';
+        router.push({ name: isTeacher ? 'teacher.reports' : 'admin.reports' });
     } catch (err) {
         alert('Failed to reset skill in vue.');
     }
@@ -73,28 +80,6 @@ const calculateDuration = (start, end) => {
     return `${mins}m ${secs}s`;
 };
 
-const sortedAttemptSkills = computed(() => {
-    if (!selectedAttempt.value || !selectedAttempt.value.attempt_skills) return [];
-    
-    const orderMap = {
-        'listening': 1,
-        'reading': 2,
-        'grammar': 3,
-        'writing': 4,
-        'speaking': 5
-    };
-
-    return [...selectedAttempt.value.attempt_skills].sort((a, b) => {
-        const nameA = a.skill?.name?.toLowerCase() || '';
-        const nameB = b.skill?.name?.toLowerCase() || '';
-        
-        const orderA = orderMap[nameA] || 99;
-        const orderB = orderMap[nameB] || 99;
-        
-        return orderA - orderB;
-    });
-});
-
 onMounted(fetchDetails);
 </script>
 
@@ -111,7 +96,7 @@ onMounted(fetchDetails);
                     <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Detailed level movement & response timeline</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3" v-if="selectedAttempt">
+            <div class="flex items-center space-x-3" v-if="selectedAttempt && currentUser?.role === 'admin'">
                  <Button label="Reset / Retry" severity="danger" outlined size="small" class="text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl" @click="voidAttempt(selectedAttempt)" />
             </div>
         </div>
@@ -148,7 +133,7 @@ onMounted(fetchDetails);
                 <div class="space-y-2">
                     <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">Execution Metrics</p>
                     <p class="text-xs font-black uppercase tracking-wider">{{ selectedAttempt.finished_at ? new Date(selectedAttempt.finished_at).toLocaleString() : 'N/A' }}</p>
-                    <div class="mt-2">
+                    <div class="mt-2 flex items-center gap-2">
                         <Tag :value="selectedAttempt.status" :severity="selectedAttempt.status === 'completed' ? 'success' : 'warning'" class="text-[9px] font-black uppercase px-3" />
                     </div>
                 </div>
@@ -202,7 +187,8 @@ onMounted(fetchDetails);
                                                 <p class="text-[11px] font-black text-indigo-600">{{ calculateDuration(skillResult.started_at, skillResult.finished_at) }}</p>
                                             </div>
                                         </div>
-                                        <Button label="Reset Skill" icon="pi pi-refresh" severity="danger" outlined size="small" class="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl" @click="resetSkill(skillResult.skill_id, skillResult.skill?.name)" />
+                                        <Button v-if="currentUser?.role === 'admin'" 
+                                                label="Reset Skill" icon="pi pi-refresh" severity="danger" outlined size="small" class="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl" @click="resetSkill(skillResult.skill_id, skillResult.skill?.name)" />
                                         
                                         <div class="text-right border-l border-slate-100 pl-6 ml-2">
                                             <div class="text-3xl font-black text-emerald-600 italic">
@@ -214,6 +200,11 @@ onMounted(fetchDetails);
                                         <div class="text-right border-l border-slate-100 pl-6 ml-2">
                                             <div class="text-3xl font-black text-slate-800 italic">{{ skillResult.max_level_reached }}</div>
                                             <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peak Tier Reached</p>
+                                        </div>
+
+                                        <div v-if="skillResult.cheat_warnings > 0" class="text-right border-l border-slate-100 pl-6 ml-2">
+                                            <div class="text-3xl font-black text-rose-600 italic">{{ skillResult.cheat_warnings }}</div>
+                                            <p class="text-[9px] font-black text-rose-400 uppercase tracking-widest">Skill Warnings</p>
                                         </div>
                                     </div>
                                 </div>
@@ -279,25 +270,62 @@ onMounted(fetchDetails);
                                                 </div>
 
                                                 <!-- Comparison -->
-                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-50">
-                                                    <div class="p-6 rounded-3xl bg-slate-50 border border-slate-100 relative overflow-hidden">
-                                                        <div class="absolute top-0 right-0 p-4 opacity-5 text-4xl">
-                                                            <i class="pi pi-user"></i>
-                                                        </div>
-                                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Student Input</p>
-                                                        <div class="text-sm font-black" :class="answer.is_correct ? 'text-emerald-700' : 'text-rose-700'">
-                                                            {{ answer.option?.option_text || answer.text_answer || '—' }}
-                                                            <i v-if="answer.is_correct" class="pi pi-check-circle ml-2"></i>
-                                                            <i v-else class="pi pi-times-circle ml-2"></i>
+                                                <div class="grid grid-cols-1 gap-6 pt-6 border-t border-slate-50">
+                                                    <!-- Multi-part Answer Layout (Drag-Drop, etc) -->
+                                                    <div v-if="['drag_drop', 'fill_blank', 'ordering', 'matching', 'word_selection', 'click_word', 'highlight'].includes(answer.question?.type)" 
+                                                         class="space-y-4">
+                                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Detailed Evaluation</p>
+                                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                            <div v-for="(correctVal, pIdx) in getCorrectOptions(answer.question)" :key="pIdx"
+                                                                 class="p-4 rounded-2xl border flex flex-col gap-2 transition-all"
+                                                                 :class="getStudentParts(answer)[pIdx] === correctVal ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'">
+                                                                <div class="flex justify-between items-start">
+                                                                    <span class="text-[8px] font-black uppercase tracking-wider" :class="getStudentParts(answer)[pIdx] === correctVal ? 'text-emerald-400' : 'text-rose-400'">
+                                                                        Part {{ pIdx + 1 }}
+                                                                    </span>
+                                                                    <i :class="getStudentParts(answer)[pIdx] === correctVal ? 'pi pi-check-circle text-emerald-500' : 'pi pi-times-circle text-rose-500'"></i>
+                                                                </div>
+                                                                <div class="space-y-1">
+                                                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Student:</p>
+                                                                    <p class="text-xs font-black" :class="getStudentParts(answer)[pIdx] === correctVal ? 'text-emerald-700' : 'text-rose-700'">
+                                                                        {{ getStudentParts(answer)[pIdx] || '—' }}
+                                                                    </p>
+                                                                </div>
+                                                                <div v-if="getStudentParts(answer)[pIdx] !== correctVal" class="pt-1 border-t border-rose-100 mt-1">
+                                                                    <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">Correct:</p>
+                                                                    <p class="text-xs font-black text-emerald-700">{{ correctVal }}</p>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div v-if="!answer.is_correct" class="p-6 rounded-3xl bg-emerald-50/50 border border-emerald-100 relative overflow-hidden">
-                                                        <div class="absolute top-0 right-0 p-4 opacity-10 text-4xl text-emerald-500">
-                                                            <i class="pi pi-key"></i>
+
+                                                    <!-- Simple Answer Layout (MCQ, Short Answer) -->
+                                                    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div class="p-6 rounded-3xl bg-slate-50 border border-slate-100 relative overflow-hidden">
+                                                            <div class="absolute top-0 right-0 p-4 opacity-5 text-4xl">
+                                                                <i class="pi pi-user"></i>
+                                                            </div>
+                                                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Student Input</p>
+                                                            <div class="text-sm font-black" :class="answer.is_correct ? 'text-emerald-700' : 'text-rose-700'">
+                                                                <template v-if="answer.question?.type === 'speaking'">
+                                                                    <audio v-if="answer.media_answer" :src="resolveUrl(answer.media_answer)" controls class="h-8"></audio>
+                                                                    <span v-else>No recording</span>
+                                                                </template>
+                                                                <template v-else>
+                                                                    {{ answer.option?.option_text || answer.text_answer || '—' }}
+                                                                </template>
+                                                                <i v-if="answer.is_correct" class="pi pi-check-circle ml-2"></i>
+                                                                <i v-else class="pi pi-times-circle ml-2"></i>
+                                                            </div>
                                                         </div>
-                                                        <p class="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-3">System Key</p>
-                                                        <div class="text-sm font-black text-emerald-800">
-                                                            {{ answer.question?.options?.find(o => o.is_correct)?.option_text || '—' }}
+                                                        <div v-if="!answer.is_correct && answer.question?.type !== 'speaking'" class="p-6 rounded-3xl bg-emerald-50/50 border border-emerald-100 relative overflow-hidden">
+                                                            <div class="absolute top-0 right-0 p-4 opacity-10 text-4xl text-emerald-500">
+                                                                <i class="pi pi-key"></i>
+                                                            </div>
+                                                            <p class="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-3">System Key</p>
+                                                            <div class="text-sm font-black text-emerald-800">
+                                                                {{ answer.question?.options?.find(o => o.is_correct)?.option_text || '—' }}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>

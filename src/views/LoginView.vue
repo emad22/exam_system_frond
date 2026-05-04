@@ -24,6 +24,7 @@ const handleLogin = async () => {
         });
 
         localStorage.setItem('token', res.data.token);
+        localStorage.setItem('role', res.data.role);
 
         if (res.data.role === 'admin') {
 

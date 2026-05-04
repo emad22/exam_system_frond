@@ -39,6 +39,12 @@ const autoplayFailed = ref(false);
 const lastAudioUrl = ref('');
 const showTimeoutModal = ref(false);
 const showExitModal = ref(false);
+const showConfirmAnswerModal = ref(false);
+const showCheatModal = ref(false);
+const showFinalCheatModal = ref(false);
+const showInactivityModal = ref(false);
+const cheatWarnings = ref(0);
+const lastActivityAt = ref(Date.now());
 
 // Timer State
 const timeLeftSeconds = ref(0);
@@ -65,7 +71,7 @@ const startTimer = () => {
     // --- FIX: Direct check from localStorage to prevent race conditions ---
     const user = JSON.parse(localStorage.getItem('user'));
     const role = (user?.role || '').toLowerCase();
-    if (['demo', 'deom', 'staff'].includes(role)) {
+    if (['demo', 'staff'].includes(role)) {
         isDemo.value = true;
         return;
     }
@@ -288,6 +294,9 @@ const fetchNextBatch = async () => {
                 skillStartedAt: res.data.current_skill_started_at
             };
 
+            // Set skill-specific cheat warnings
+            cheatWarnings.value = res.data.skill_cheat_warnings || 0;
+
             answers.value = questions.value.map(q => {
                 const base = {
                     question_id: q.id,
@@ -310,7 +319,7 @@ const fetchNextBatch = async () => {
                 const content = q.content || '';
                 if (q.type === 'drag_drop') {
                     // Support [target], [ ], or []
-                    const slotCount = (content.match(/\[\s*target\s*\]|\[\s*\]/gi) || []).length;
+                    const slotCount = (content.match(/\.{10,}|\[\s*target\s*\]|\[\s*\]/gi) || []).length;
                     answers.value[idx].drag_drop_answers = Array(slotCount).fill(null);
                 } else if (q.type === 'word_selection' || q.type === 'click_word') {
                     answers.value[idx].selected_words = [];
@@ -360,7 +369,7 @@ const VALIDATORS = {
     mcq: (ans) => !!ans.option_id,
     true_false: (ans) => !!ans.option_id,
     speaking: (ans) => !!ans.recorded_file,
-    drag_drop: (ans) => ans.drag_drop_answers.some(a => a !== null && a !== ''),
+    drag_drop: (ans) => ans.drag_drop_answers.every(a => a !== null && a !== ''),
     fill_blank: (ans) => ans.fill_blank_answers.every(a => a && a.trim().length > 0),
     matching: (ans, q) => Object.keys(ans.matching_answers).length === q.options.filter(o => o.is_correct).length,
     ordering: (ans, q) => ans.ordering_answers.length === q.options.length,
@@ -377,7 +386,7 @@ const submitAnswer = () => {
     const isValid = VALIDATORS[q.type] ? VALIDATORS[q.type](ans, q) : !!ans.text_answer;
 
     if (!isValid) {
-        alert('يرجى إكمال المهمة قبل المتابعة.');
+        showConfirmAnswerModal.value = true;
         return;
     }
 
@@ -386,11 +395,11 @@ const submitAnswer = () => {
 
 // Word Selection Helpers
 const getWords = (content) => {
-    // Remove HTML tags for word splitting if necessary, or just use textContent
     const tmp = document.createElement("DIV");
     tmp.innerHTML = content;
     const text = tmp.textContent || tmp.innerText || "";
-    return text.split(/\s+/).filter(w => w.length > 0);
+    // Regex that separates words from punctuation marks while ignoring whitespace
+    return text.match(/[\w'-]+|[^\w\s]/g) || [];
 };
 
 const toggleWord = (word, qIdx) => {
@@ -433,8 +442,8 @@ const clearSlot = (slotIdx, qIdx) => {
 
 const parsedDragDropContent = (content) => {
     if (!content) return [];
-    // Split by [target] or []
-    return content.split(/\[\s*target\s*\]|\[\s*\]/gi);
+    // Split by ............... or [target] or []
+    return content.split(/\.{10,}|\[\s*target\s*\]|\[\s*\]/gi);
 };
 
 const parsedFillBlankContent = (content) => {
@@ -455,7 +464,9 @@ const completeMatch = (targetText) => {
     selectedMatchSource.value = null;
 };
 const removeMatch = (sourceId) => {
-    delete answers.value[currentIndex.value].matching_answers[sourceId];
+    const ans = answers.value[currentIndex.value];
+    const { [sourceId]: removed, ...rest } = ans.matching_answers;
+    ans.matching_answers = rest;
 };
 const isAlreadyMatched = (targetText) => {
     return Object.values(answers.value[currentIndex.value].matching_answers).includes(targetText);
@@ -600,6 +611,26 @@ const currentQ = computed(() => questions.value[currentIndex.value] || null);
 const displayNumber = computed(() => globalOffset.value + currentIndex.value + 1);
 const wordCount = computed(() => (answers.value[currentIndex.value]?.text_answer || '').trim().split(/\s+/).filter(w => w).length);
 
+const currentWords = computed(() => {
+    if (!currentQ.value?.content) return [];
+    return getWords(currentQ.value.content);
+});
+
+const currentMatchingLeft = computed(() => {
+    if (!currentQ.value || currentQ.value.type !== 'matching') return [];
+    return getMatchingLeft(currentQ.value);
+});
+
+const currentMatchingRight = computed(() => {
+    if (!currentQ.value || currentQ.value.type !== 'matching') return [];
+    return getMatchingRight(currentQ.value);
+});
+
+const currentAvailableWords = computed(() => {
+    if (!currentQ.value || currentQ.value.type !== 'ordering') return [];
+    return getAvailableWords(currentQ.value, currentIndex.value);
+});
+
 const shouldShowQuestion = computed(() => {
     return !!currentQ.value; // Show immediately if a question exists
 });
@@ -710,21 +741,97 @@ const hasStimulusContent = computed(() => {
     return !!(passageHasContent || questionHasMedia);
 });
 
+// --- ANTI-CHEAT LOGIC ---
+const handleVisibilityChange = async () => {
+    if (document.visibilityState === 'hidden' && !isStarting.value && !showTimeoutModal.value) {
+        cheatWarnings.value++;
+
+        // Log to database
+        try {
+            const res = await api.post(`/attempts/${attemptId}/log-warning`);
+
+            // If backend says we reached 3 warnings for this skill
+            if (res.data.should_terminate_skill) {
+                showFinalCheatModal.value = true;
+                setTimeout(() => {
+                    // Redirect to dashboard as requested
+                    router.push('/dashboard');
+                }, 5000);
+                return;
+            }
+        } catch (err) {
+            console.error('Failed to log cheat warning', err);
+        }
+
+        console.warn(`Cheating attempt detected: Tab switch. Warning count: ${cheatWarnings.value}`);
+        if (cheatWarnings.value >= 3) {
+            showFinalCheatModal.value = true;
+            setTimeout(() => {
+                handleTimeout();
+            }, 5000);
+        } else {
+            showCheatModal.value = true;
+        }
+    }
+};
+
+const preventCopyPaste = (e) => {
+    e.preventDefault();
+    return false;
+};
+
+const updateActivity = () => {
+    lastActivityAt.value = Date.now();
+};
+
+let inactivityInterval = null;
+const checkInactivity = () => {
+    const inactiveSeconds = (Date.now() - lastActivityAt.value) / 1000;
+    if (inactiveSeconds > 300) { // 5 minutes
+        showInactivityModal.value = true;
+        setTimeout(() => {
+            handleTimeout();
+        }, 5000); // Give 5 seconds then terminate
+    }
+};
+
 onMounted(async () => {
     const user = JSON.parse(localStorage.getItem('user'));
     isDemo.value = user && ['demo', 'deom', 'staff'].includes(user.role?.toLowerCase());
     await fetchData();
+
+    // Prevent Cheating
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('copy', preventCopyPaste);
+    document.addEventListener('paste', preventCopyPaste);
+    document.addEventListener('contextmenu', preventCopyPaste);
+
+    // Inactivity tracking
+    document.addEventListener('mousemove', updateActivity);
+    document.addEventListener('keydown', updateActivity);
+    document.addEventListener('click', updateActivity);
+    inactivityInterval = setInterval(checkInactivity, 30000); // Check every 30s
 });
 
 onUnmounted(() => {
     if (timerInterval.value) {
         clearInterval(timerInterval.value);
     }
+    if (inactivityInterval) clearInterval(inactivityInterval);
     if (audioRef.value) {
         audioRef.value.pause();
         audioRef.value.src = "";
         audioRef.value.load();
     }
+
+    // Remove Anti-Cheat listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('copy', preventCopyPaste);
+    document.removeEventListener('paste', preventCopyPaste);
+    document.removeEventListener('contextmenu', preventCopyPaste);
+    document.removeEventListener('mousemove', updateActivity);
+    document.removeEventListener('keydown', updateActivity);
+    document.removeEventListener('click', updateActivity);
 });
 </script>
 
@@ -738,14 +845,14 @@ onUnmounted(() => {
 
                 <!-- Right Side: Skill Info & Exit -->
                 <div class="flex items-center space-x-6 space-x-reverse">
-                    
+
                     <div class="flex flex-col items-end text-right">
                         <div class="flex items-center space-x-3 space-x-reverse mb-0.5">
                             <span class="text-xs font-black uppercase tracking-wider text-slate-400">{{
                                 currentSkill?.name }}</span>
                         </div>
                     </div>
-                    
+
                 </div>
 
                 <!-- Left Side: Navigation & Timer -->
@@ -756,7 +863,7 @@ onUnmounted(() => {
                         <span>السابق</span>
                     </button>
                     <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions
-                    }}</span>
+                        }}</span>
                     <button v-if="!questionSubmitted" @click="submitAnswer"
                         class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد
                         الإجابة</button>
@@ -777,26 +884,27 @@ onUnmounted(() => {
                             :class="timeLeftSeconds < 300 ? 'text-rose-400' : 'text-slate-400'"></i>
                         <span class="text-lg font-black tabular-nums tracking-tighter">{{ formattedTime }}</span>
                     </div>
-                    <div class="flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors">
+                    <div
+                        class="flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors">
                         <button @click="exitExam"
                             class="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-rose-600/80 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-bold border border-slate-600 hover:border-rose-500">
                             <i class="pi pi-sign-out"></i>
                             <span>Exit</span>
                         </button>
                     </div>
-                    
+
                 </div>
             </div>
         </header>
 
-        <!-- TOEFL-Style Sub-header for Level Name -->
+        <!--  Sub-header for Level Name -->
         <div v-if="!isStarting && currentSkill"
             class="bg-white border-b border-slate-200 h-10 px-8 flex justify-end items-center shrink-0 z-20">
             <div class="flex items-center space-x-3 space-x-reverse">
 
                 <div class="px-3 py-1 bg-slate-100 rounded-md border border-slate-200">
                     <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name
-                    }}</span>
+                        }}</span>
                 </div>
             </div>
         </div>
@@ -868,7 +976,7 @@ onUnmounted(() => {
                                     class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
                                     <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{
                                         req.title
-                                    }}</span>
+                                        }}</span>
                                     <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-50 border-slate-200'"
                                         class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
                                         <i v-if="checkedRequirements.includes(req.id)"
@@ -983,7 +1091,7 @@ onUnmounted(() => {
                                         المهمة</span>
                                 </div>
                                 <p class="text-[10px] font-bold text-slate-600 leading-relaxed" dir="auto">
-                                    {{ currentQ.instructions || 'يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً  عليها.'}}
+                                    {{ currentQ.instructions || `يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً عليها.` }}
                                 </p>
                             </div>
 
@@ -1021,7 +1129,7 @@ onUnmounted(() => {
                                         class="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest px-1">
                                         <span>عدد الكلمات: {{ wordCount }}</span>
                                         <span>المطلوب: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞'
-                                        }}</span>
+                                            }}</span>
                                     </div>
                                 </div>
 
@@ -1070,7 +1178,7 @@ onUnmounted(() => {
                                     class="space-y-4">
                                     <div class="bg-white p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1"
                                         dir="auto">
-                                        <button v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx"
+                                        <button v-for="(word, wIdx) in currentWords" :key="wIdx"
                                             @click="toggleWord(word, currentIndex)" :disabled="questionSubmitted"
                                             class="px-1 py-0.5 rounded transition-all font-medium text-lg border-b-2"
                                             :class="answers[currentIndex].selected_words.includes(word) ? 'border-rose-500 text-rose-600 bg-rose-50' : 'border-transparent text-slate-700 hover:bg-slate-50'">
@@ -1099,7 +1207,7 @@ onUnmounted(() => {
                                 <div v-if="currentQ.type === 'matching'" class="space-y-6">
                                     <div class="grid grid-cols-2 gap-6">
                                         <div class="space-y-2">
-                                            <button v-for="opt in getMatchingLeft(currentQ)" :key="opt.id"
+                                            <button v-for="opt in currentMatchingLeft" :key="opt.id"
                                                 @click="toggleMatchSource(opt.id)" :disabled="questionSubmitted"
                                                 class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 flex justify-between items-center"
                                                 :class="selectedMatchSource === opt.id ? 'border-brand-primary bg-indigo-50 shadow-md' : (answers[currentIndex].matching_answers[opt.id] ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white')">
@@ -1107,7 +1215,7 @@ onUnmounted(() => {
                                             </button>
                                         </div>
                                         <div class="space-y-2">
-                                            <button v-for="opt in getMatchingRight(currentQ)" :key="opt.id"
+                                            <button v-for="opt in currentMatchingRight" :key="opt.id"
                                                 @click="completeMatch(opt.id)"
                                                 :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
                                                 class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 text-right"
@@ -1130,8 +1238,8 @@ onUnmounted(() => {
                                     </div>
                                     <div
                                         class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-wrap gap-2 justify-center">
-                                        <button v-for="(word, wIdx) in getAvailableWords(currentQ, currentIndex)"
-                                            :key="wIdx" @click="addToOrdering(word)" :disabled="questionSubmitted"
+                                        <button v-for="(word, wIdx) in currentAvailableWords" :key="wIdx"
+                                            @click="addToOrdering(word)" :disabled="questionSubmitted"
                                             class="px-3 py-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-lg text-sm hover:bg-brand-primary hover:text-white transition-all shadow-sm">
                                             {{ word }}
                                         </button>
@@ -1155,7 +1263,7 @@ onUnmounted(() => {
                                 <div v-if="currentQ.type === 'highlight'" class="space-y-4">
                                     <div class="bg-white p-8 rounded-3xl border border-slate-100 leading-[2.2] text-lg font-medium text-slate-700 shadow-sm rtl-support"
                                         dir="auto">
-                                        <template v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx">
+                                        <template v-for="(word, wIdx) in currentWords" :key="wIdx">
                                             <span @click="toggleHighlight(word, currentIndex)"
                                                 :disabled="questionSubmitted"
                                                 class="px-1 py-0.5 rounded cursor-pointer transition-all border-b border-transparent hover:border-slate-300"
@@ -1219,17 +1327,21 @@ onUnmounted(() => {
             </div>
         </main>
         <!-- Timeout Modal -->
-        <div v-if="showTimeoutModal" 
+        <div v-if="showTimeoutModal"
             class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
-                <div class="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-rose-100/50">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-rose-100/50">
                     <i class="pi pi-clock text-4xl text-rose-500 animate-pulse"></i>
                 </div>
                 <div class="space-y-2">
                     <h2 class="text-3xl font-black text-slate-900 tracking-tight">انتهى الوقت!</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">لقد انتهت الفترة المخصصة لهذا الجزء من التقييم. سيتم حفظ إجاباتك وتوجيهك تلقائياً.</p>
+                    <p class="text-slate-500 font-bold leading-relaxed">لقد انتهت الفترة المخصصة لهذا الجزء من التقييم.
+                        سيتم حفظ
+                        إجاباتك وتوجيهك تلقائياً.</p>
                 </div>
-                <button @click="handleTimeout" 
+                <button @click="handleTimeout"
                     class="w-full py-5 bg-brand-primary text-white rounded-2xl font-black text-lg hover:bg-brand-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-100">
                     متابعة النتائج
                 </button>
@@ -1237,30 +1349,158 @@ onUnmounted(() => {
         </div>
 
         <!-- Exit Confirmation Modal -->
-        <div v-if="showExitModal" 
+        <div v-if="showExitModal"
             class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
-                <div class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-amber-100/50">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-amber-100/50">
                     <i class="pi pi-exclamation-triangle text-4xl text-amber-500"></i>
                 </div>
                 <div class="space-y-2">
                     <h2 class="text-3xl font-black text-slate-900 tracking-tight">هل أنت متأكد؟</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">هل أنت متأكد أنك تريد الخروج؟ سيتم إنهاء الامتحان وحفظ تقدمك الحالي ولن تتمكن من العودة مرة أخرى.</p>
+                    <p class="text-slate-500 font-bold leading-relaxed">هل أنت متأكد أنك تريد الخروج؟ سيتم إنهاء
+                        الامتحان وحفظ
+                        تقدمك الحالي ولن تتمكن من العودة مرة أخرى.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 pt-2">
-                    <button @click="showExitModal = false" 
+                    <button @click="showExitModal = false"
                         class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
                         تراجع
                     </button>
-                    <button @click="confirmExit" 
+                    <button @click="confirmExit"
                         class="py-4 bg-rose-600 text-white rounded-2xl font-black text-sm hover:bg-rose-700 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-100">
                         تأكيد الخروج
                     </button>
                 </div>
             </div>
         </div>
+
+        <!-- showConfirmAnswerModal -->
+        <div v-if="showConfirmAnswerModal"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-amber-100/50">
+                    <i class="pi pi-exclamation-triangle text-4xl text-amber-500"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">يرجى إكمال المهمة قبل المتابعة.</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">يرجى إكمال المهمة قبل المتابعة.</p>
+                </div>
+                <div class="grid grid-cols-1 gap-4 pt-2">
+                    <button @click="showConfirmAnswerModal = false"
+                        class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
+                        حسنا
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Cheat Warning Modal -->
+        <div v-if="showCheatModal"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-rose-100/50">
+                    <i class="pi pi-shield text-4xl text-rose-500"></i>
+                </div>
+                <div class="space-y-2">
+                    <!-- instruction in english lang -->
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Security Alert</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">يرجى عدم مغادرة صفحة الامتحان أو تبديل النوافذ.
+                        سيتم
+                        إنهاء الامتحان تلقائياً عند تكرار المحاولة.</p>
+                    <p class="text-slate-400 text-xs font-medium">Please do not leave the exam page or switch tabs. The
+                        exam
+                        will be automatically terminated if you try again.</p>
+                    <div class="pt-2">
+                        <p class="text-rose-600 font-black text-lg">تحذير {{ cheatWarnings }} من 3</p>
+                        <p class="text-rose-400 text-[10px] font-black uppercase tracking-widest">Warning {{
+                            cheatWarnings }} of
+                            3</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 pt-2">
+                    <button @click="showCheatModal = false"
+                        class="py-4 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-slate-800 transition-all shadow-lg">
+                        فهمت، سألتزم بالتعليمات
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inactivity Modal -->
+        <div v-if="showInactivityModal"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-amber-100/50">
+                    <i class="pi pi-clock text-4xl text-amber-500"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Inactivity Alert</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">لقد كنت غير نشط لفترة طويلة. سيتم إنهاء الجلسة
+                        وتوجيهك
+                        لوحة التحكم خلال ثوانٍ.</p>
+                    <p class="text-slate-400 text-xs font-medium">You have been inactive for too long. Your session will
+                        be
+                        terminated in a few seconds.</p>
+                </div>
+            </div>
+        </div>
+        <!-- Final Cheat Termination Modal -->
+        <div v-if="showFinalCheatModal"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-rose-950/80 backdrop-blur-md animate-in fade-in duration-300">
+            <div
+                class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-rose-100 animate-in zoom-in-95 duration-300">
+                <div
+                    class="w-24 h-24 bg-rose-600 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-rose-400">
+                    <i class="pi pi-lock text-4xl text-white"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-rose-600 tracking-tight uppercase">Exam Terminated</h2>
+                    <p class="text-slate-700 font-bold leading-relaxed">تم اكتشاف محاولة غش متكررة (تبديل النوافذ). سيتم
+                        إنهاء
+                        الامتحان الآن وتوجيهك لوحة التحكم.</p>
+                    <p class="text-slate-500 text-xs font-medium">Repeated cheating attempts detected (tab switching).
+                        The exam
+                        is now terminated.</p>
+                </div>
+                <div class="pt-4">
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div class="bg-rose-600 h-full animate-shrink-width"
+                            style="animation: shrink 5s linear forwards;">
+                        </div>
+                    </div>
+                    <p class="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest">جاري التحويل
+                        تلقائياً...</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </template>
+
+<style>
+@keyframes shrink {
+    from {
+        width: 100%;
+    }
+
+    to {
+        width: 0%;
+    }
+}
+
+.animate-shrink-width {
+    transform-origin: left;
+}
+</style>
 
 <style scoped>
 .animate-in {

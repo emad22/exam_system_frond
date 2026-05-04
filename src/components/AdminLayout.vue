@@ -1,11 +1,14 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import api from '@/services/api'
 import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
+import { useAdminStore } from '@/stores/admin'
 
 const route = useRoute()
 const router = useRouter()
+const adminStore = useAdminStore()
 
 const navigation = [
     { name: 'Dashboard', href: '/admin', icon: 'pi pi-home' },
@@ -23,14 +26,108 @@ const navigation = [
     { name: 'Staff & Roles', href: '/admin/staff', icon: 'pi pi-shield' },
 ]
 
+const currentUser = computed(() => adminStore.user);
+const notifications = computed(() => adminStore.notifications);
+const showNotifications = ref(false);
+const notificationAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+const fetchNotifications = async () => {
+    await adminStore.fetchNotifications();
+};
+
+watch(() => adminStore.notifications.length, (newCount, oldCount) => {
+    if (newCount > oldCount) {
+        notificationAudio.play().catch(e => console.warn('Audio playback was blocked or failed', e));
+    }
+});
+
+const toggleNotifications = () => {
+    showNotifications.value = !showNotifications.value;
+};
+
+const goToReport = (notif) => {
+    const isTeacher = currentUser.value?.role === 'teacher';
+    const routeName = isTeacher ? 'teacher.reports.show' : 'admin.reports.show';
+    
+    router.push({ 
+        name: routeName, 
+        params: { id: notif.data.attempt_id } 
+    });
+    showNotifications.value = false;
+};
+
+const clearNotifications = async () => {
+    try {
+        await api.post('/admin/notifications/mark-as-read');
+        adminStore.clearNotifications();
+        showNotifications.value = false;
+    } catch (err) {
+        console.error('Failed to clear notifications', err);
+    }
+};
+
+let intervalId = null;
+
+onMounted(async () => {
+    try {
+        await adminStore.fetchUser();
+        
+        // Start polling for notifications
+        fetchNotifications();
+        intervalId = setInterval(fetchNotifications, 15000); // Every 15 seconds
+    } catch (err) {
+        console.error('Failed to load user profile', err);
+    }
+});
+
+onUnmounted(() => {
+    if (intervalId) clearInterval(intervalId);
+});
+
+const filteredNavigation = computed(() => {
+    if (!currentUser.value) return [];
+
+    const isTeacher = currentUser.value.role === 'teacher';
+    let baseNav = navigation;
+
+    if (isTeacher) {
+        // Restricted list for Teachers
+        const teacherAllowed = ['Dashboard', 'Questions', 'Reports'];
+        baseNav = navigation.filter(item => teacherAllowed.includes(item.name));
+    }
+
+    // Map hrefs to /teacher if the user is a teacher
+    return baseNav.map(item => ({
+        ...item,
+        href: isTeacher ? item.href.replace('/admin', '/teacher') : item.href
+    }));
+});
+
 const isActive = (path) => {
-    return route.path === path;
+    if (path === '/admin' || path === '/teacher') {
+        return route.path === path;
+    }
+    return route.path.startsWith(path);
 }
 
 const logout = () => {
     localStorage.removeItem('token');
     router.push('/login');
 }
+
+const vClickOutside = {
+    mounted(el, binding) {
+        el.clickOutsideEvent = (event) => {
+            if (!(el === event.target || el.contains(event.target))) {
+                binding.value(event);
+            }
+        };
+        document.addEventListener('click', el.clickOutsideEvent);
+    },
+    unmounted(el) {
+        document.removeEventListener('click', el.clickOutsideEvent);
+    },
+};
 </script>
 
 <template>
@@ -38,16 +135,22 @@ const logout = () => {
         class="flex h-screen bg-slate-50 font-sans text-slate-900 selection:bg-rose-100 selection:text-indigo-900 overflow-hidden">
 
         <!-- Sidebar -->
-        <aside class="w-[280px] bg-white border-r border-slate-200 shadow-xl flex flex-col justify-between hidden lg:flex relative z-20">
-            <div class="flex-1 flex flex-col">
+        <aside
+            class="w-[280px] h-full bg-white border-r border-slate-200 shadow-xl flex flex-col hidden lg:flex relative z-20">
+            
+            <!-- Top Section (Logo + Nav) -->
+            <div class="flex-1 flex flex-col min-h-0">
                 <!-- Logo Section -->
-                <div class="h-28 flex items-center px-8 mb-4 border-b border-slate-100 bg-slate-50/50">
-                    <div class="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white text-lg font-black shadow-md shadow-brand-primary/30 mr-4">
+                <div class="h-24 flex items-center px-8 shrink-0 border-b border-slate-100 bg-slate-50/50">
+                    <div
+                        class="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white text-lg font-black shadow-md shadow-brand-primary/30 mr-4">
                         <i class="pi pi-book"></i>
                     </div>
                     <div>
-                        <h1 class="text-xl font-black text-brand-primary tracking-tight leading-none mb-1">Arab<span class="text-brand-accent">Academy</span></h1>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Management Platform</span>
+                        <h1 class="text-xl font-black text-brand-primary tracking-tight leading-none mb-1">Arab<span
+                                class="text-brand-accent">Academy</span></h1>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Management
+                            Platform</span>
                     </div>
                 </div>
 
@@ -56,33 +159,42 @@ const logout = () => {
                     <div class="px-4 mb-3">
                         <p class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Core Modules</p>
                     </div>
-                    <template v-for="item in navigation" :key="item.name">
+                    <template v-for="item in filteredNavigation" :key="item.name">
                         <router-link :to="item.href" :class="[
                             isActive(item.href) ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-primary',
                             'group flex items-center px-4 py-3.5 text-xs font-bold rounded-xl transition-all duration-300 border border-transparent hover:border-slate-100'
                         ]">
-                            <i :class="[item.icon, isActive(item.href) ? 'text-white' : 'text-slate-400 group-hover:text-brand-secondary']" class="text-lg mr-4 transition-colors"></i>
+                            <i :class="[item.icon, isActive(item.href) ? 'text-white' : 'text-slate-400 group-hover:text-brand-secondary']"
+                                class="text-lg mr-4 transition-colors"></i>
                             {{ item.name }}
-                            <div v-if="isActive(item.href)" class="ml-auto w-1.5 h-1.5 bg-brand-accent rounded-full"></div>
+                            <div v-if="isActive(item.href)" class="ml-auto w-1.5 h-1.5 bg-brand-accent rounded-full">
+                            </div>
                         </router-link>
                     </template>
                 </nav>
             </div>
 
             <!-- User Profile / Bottom Section -->
-            <div class="p-6 border-t border-slate-100 bg-slate-50/50">
-                <div class="bg-white rounded-2xl p-4 mb-4 group cursor-pointer hover:bg-slate-50 transition-colors duration-300 border border-slate-200 shadow-sm">
+            <div class="p-6 shrink-0 border-t border-slate-100 bg-slate-50/50">
+                <div
+                    class="bg-white rounded-2xl p-4 mb-4 group cursor-pointer hover:bg-slate-50 transition-colors duration-300 border border-slate-200 shadow-sm">
                     <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-brand-primary flex items-center justify-center text-white shadow-md">
+                        <div
+                            class="w-9 h-9 rounded-lg bg-brand-primary flex items-center justify-center text-white shadow-md">
                             <i class="pi pi-user text-sm"></i>
                         </div>
-                        <div>
-                            <p class="text-xs font-black text-slate-800">Admin Staff</p>
-                            <p class="text-[10px] font-bold text-slate-400 group-hover:text-brand-primary transition-colors">Management Portal</p>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black text-slate-800 truncate">{{ currentUser?.first_name }} {{
+                                currentUser?.last_name }}
+                            </p>
+                            <p
+                                class="text-[10px] font-bold text-slate-400 group-hover:text-brand-primary transition-colors uppercase tracking-widest">
+                                {{ currentUser?.role }} Portal</p>
                         </div>
                     </div>
                 </div>
-                <button @click="logout" class="w-full flex items-center justify-center space-x-2 px-4 py-3 text-[10px] font-black text-rose-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                <button @click="logout"
+                    class="w-full flex items-center justify-center space-x-2 px-4 py-3 text-[10px] font-black text-rose-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
                     <i class="pi pi-sign-out text-sm"></i>
                     <span>Secure Sign Out</span>
                 </button>
@@ -114,7 +226,47 @@ const logout = () => {
 
                 <div class="flex items-center space-x-6">
                     <div class="hidden md:flex space-x-3">
-                        <Button icon="pi pi-bell" severity="secondary" rounded text aria-label="Notifications" />
+                        <div class="relative">
+                            <Button @click="toggleNotifications" icon="pi pi-bell" :severity="showNotifications ? 'primary' : 'secondary'" rounded text aria-label="Notifications" />
+                            <span v-if="notifications.length > 0" class="absolute top-1 right-1 w-4 h-4 bg-brand-accent text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-bounce">
+                                {{ notifications.length }}
+                            </span>
+
+                            <!-- Notifications Dropdown -->
+                            <div v-if="showNotifications" v-click-outside="() => showNotifications = false" class="absolute right-0 mt-3 w-80 bg-white rounded-[1.5rem] shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in duration-200">
+                                <div class="p-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest">Live Activity</h3>
+                                    <button @click="clearNotifications" v-if="notifications.length > 0" class="text-[10px] font-bold text-brand-primary hover:text-brand-accent transition-colors">Clear All</button>
+                                </div>
+                                <div class="max-h-[350px] overflow-y-auto no-scrollbar">
+                                    <div v-if="notifications.length === 0" class="p-10 text-center">
+                                        <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <i class="pi pi-bell-slash text-slate-300"></i>
+                                        </div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">All caught up!</p>
+                                    </div>
+                                    <div v-else v-for="notif in notifications" :key="notif.id" 
+                                        @click="goToReport(notif)"
+                                        class="p-4 border-b border-slate-50 hover:bg-slate-50/50 transition-colors cursor-pointer group">
+                                        <div class="flex items-start space-x-3">
+                                            <div :class="[
+                                                'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform',
+                                                notif.data.type === 'exam_exited' ? 'bg-amber-50' : 'bg-emerald-50'
+                                            ]">
+                                                <i :class="[
+                                                    'pi text-xs',
+                                                    notif.data.type === 'exam_exited' ? 'pi-sign-out text-amber-500' : 'pi-check-circle text-emerald-500'
+                                                ]"></i>
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-[11px] font-black text-slate-800 leading-snug">{{ notif.data.message }}</p>
+                                                <p class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{{ new Date(notif.created_at).toLocaleTimeString() }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <Button icon="pi pi-cog" severity="secondary" rounded text aria-label="Settings" />
                     </div>
                     <div class="h-8 w-px bg-slate-200 mx-2"></div>
@@ -141,4 +293,3 @@ const logout = () => {
     scrollbar-width: none;
 }
 </style>
-

@@ -3,11 +3,13 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
+import { useAdminStore } from '@/stores/admin';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
+const adminStore = useAdminStore();
 const attempts = ref([]);
 const loading = ref(true);
 const search = ref('');
@@ -25,7 +27,13 @@ const fetchReports = async () => {
 };
 
 const viewDetails = (id) => {
-    router.push(`/admin/reports/${id}/show`);
+    const isTeacher = adminStore.user?.role === 'teacher';
+    const routeName = isTeacher ? 'teacher.reports.show' : 'admin.reports.show';
+    
+    router.push({ 
+        name: routeName, 
+        params: { id: id } 
+    });
 };
 
 const filtered = () => {

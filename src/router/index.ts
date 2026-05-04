@@ -57,35 +57,7 @@ import AdminSystemRequirementsEdit from '@/views/admin/SystemRequirements/edit.v
 import PublicRegisterWizard from '@/views/student/PublicRegisterWizard.vue'
 
 
-const routes = [
-  {
-    path: '/',
-    redirect: '/login' // 👈 ده اللي هيوديه على login
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: LoginView,
-    meta: { title: 'System Authentication' }
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: PublicRegisterWizard,
-    meta: { title: 'Student Registration' }
-  },
-  {
-    path: '/parent',
-    name: 'parent',
-    component: ParentPortal
-  },
-
-  {
-    path: '/dashboard',
-    name: 'dashboard',
-    component: DashboardView,
-    meta: { title: 'Student Dashboard' }
-  },
+const adminRoutes = [
   {
     path: '/admin',
     name: 'admin',
@@ -276,6 +248,53 @@ const routes = [
     props: true
   },
   {
+    path: '/admin/partners/:id/edit',
+    name: 'admin.partners.edit',
+    component: AdminPartnerEdit
+  },
+  {
+    path: '/admin/partners/:id/show',
+    name: 'admin.partners.show',
+    component: AdminPartnerShow
+  },
+];
+
+// Map Admin routes to Teacher routes
+const teacherRoutes = adminRoutes.map(route => ({
+  ...route,
+  path: route.path.replace('/admin', '/teacher'),
+  name: route.name ? (route.name === 'admin' ? 'teacher' : route.name.replace('admin.', 'teacher.')) : undefined
+}));
+
+const routes = [
+  {
+    path: '/',
+    redirect: '/login'
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginView,
+    meta: { title: 'System Authentication' }
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: PublicRegisterWizard,
+    meta: { title: 'Student Registration' }
+  },
+  {
+    path: '/parent',
+    name: 'parent',
+    component: ParentPortal
+  },
+  {
+    path: '/dashboard',
+    name: 'dashboard',
+    component: DashboardView,
+    meta: { title: 'Student Dashboard' }
+  },
+  {
     path: '/exam/:id',
     name: 'exam',
     component: ExamView
@@ -289,16 +308,8 @@ const routes = [
     path: '/students',
     component: Students
   },
-  {
-    path: '/admin/partners/:id/edit',
-    name: 'admin.partners.edit',
-    component: AdminPartnerEdit
-  },
-  {
-    path: '/admin/partners/:id/show',
-    name: 'admin.partners.show',
-    component: AdminPartnerShow
-  },
+  ...adminRoutes,
+  ...teacherRoutes
 ]
 
 const router = createRouter({
@@ -316,7 +327,8 @@ router.beforeEach((to) => {
   }
 
   if (to.path === '/login' && token) {
-    return '/admin';
+    const role = localStorage.getItem('role');
+    return role === 'teacher' ? '/teacher' : '/admin';
   }
   
   return true;

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
+import { useAdminStore } from '@/stores/admin';
 
 import Button from 'primevue/button';
 import Card from 'primevue/card';
@@ -15,6 +16,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import Textarea from 'primevue/textarea';
 
 const questions = ref([]);
+const adminStore = useAdminStore();
 const loading = ref(true);
 const filterSkill = ref(null);
 const filterExam = ref(null);
@@ -165,7 +167,7 @@ onMounted(fetchData);
             </div>
             <div class="flex items-center gap-3">
                 <Button label="Level Guides" icon="pi pi-cog" severity="secondary" outlined @click="openInstructions" class="font-bold text-sm" />
-                <Button label="Add Question" icon="pi pi-plus" @click="$router.push('/admin/questions/create')" class="font-bold text-sm shadow-md" />
+                <Button label="Add Question" icon="pi pi-plus" @click="$router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.questions.create' : 'admin.questions.create' })" class="font-bold text-sm shadow-md" />
             </div>
         </div>
 
@@ -247,7 +249,7 @@ onMounted(fetchData);
             </div>
             <Button v-if="!searchQuery && !filterSkill && !filterType"
                 label="Add First Question" icon="pi pi-plus"
-                @click="$router.push('/admin/questions/create')"
+                @click="$router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.questions.create' : 'admin.questions.create' })"
                 class="font-bold text-sm px-8 shadow-md" />
             <Button v-else label="Clear Filters" icon="pi pi-times" severity="secondary" outlined
                 @click="searchQuery=''; filterSkill=''; filterType=''; filterLevel=''"
@@ -391,13 +393,34 @@ onMounted(fetchData);
                         </template>
                     </Column>
 
+                    <!-- Authorship -->
+                    <Column header="Authorship" style="width: 150px">
+                        <template #body="{ data }">
+                            <div class="flex flex-col gap-1">
+                                <div v-if="data.creator" class="flex items-center gap-1.5">
+                                    <i class="pi pi-user text-[9px] text-slate-400"></i>
+                                    <span class="text-[10px] font-bold text-slate-600 truncate max-w-[120px]" v-tooltip.top="`${data.creator.first_name} ${data.creator.last_name}`">
+                                        {{ data.creator.first_name }} {{ data.creator.last_name }}
+                                    </span>
+                                </div>
+                                <div v-if="data.updater && data.updated_by !== data.created_by" class="flex items-center gap-1.5 opacity-70">
+                                    <i class="pi pi-pencil text-[9px] text-slate-400"></i>
+                                    <span class="text-[10px] font-medium text-slate-500 truncate max-w-[120px]" v-tooltip.top="`Last edited by ${data.updater.first_name}`">
+                                        {{ data.updater.first_name }}
+                                    </span>
+                                </div>
+                                <span v-if="!data.creator" class="text-[9px] font-bold text-slate-300 italic">Pre-existing</span>
+                            </div>
+                        </template>
+                    </Column>
+
                     <!-- Actions -->
                     <Column style="width: 100px" class="text-right">
                         <template #body="{ data }">
                             <div class="flex items-center justify-end gap-1">
                                 <Button icon="pi pi-pencil" text severity="secondary" size="small"
                                     v-tooltip.top="'Edit'"
-                                    @click="$router.push(`/admin/questions/${data.id}/edit`)" />
+                                    @click="$router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.questions.edit' : 'admin.questions.edit', params: { id: data.id } })" />
                                 <Button icon="pi pi-trash" text severity="danger" size="small"
                                     v-tooltip.top="'Delete'"
                                     @click="deleteItem(data.id)" />

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
+import { useAdminStore } from '@/stores/admin';
 import Card from 'primevue/card';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -9,6 +10,7 @@ import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import Button from 'primevue/button';
 
+const adminStore = useAdminStore();
 const stats = ref({
     students_count: 0,
     exams_count: 0,
@@ -62,7 +64,7 @@ const getStatusSeverity = (status) => {
                          <span class="text-xs font-black text-emerald-600 uppercase tracking-tighter">Operational</span>
                      </div>
                  </div>
-                 <Button label="Generate Report" icon="pi pi-file-pdf" outlined severity="secondary" class="text-[10px] font-black uppercase tracking-widest px-8 rounded-2xl" @click="$router.push('/admin/reports')" />
+                 <Button label="Generate Report" icon="pi pi-file-pdf" outlined severity="secondary" class="text-[10px] font-black uppercase tracking-widest px-8 rounded-2xl" @click="$router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.reports' : 'admin.reports' })" />
             </div>
         </div>
 
@@ -150,7 +152,7 @@ const getStatusSeverity = (status) => {
                          <h3 class="text-2xl font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">Recent performance signals</h3>
                          <p class="text-[10px] font-black text-brand-primary uppercase tracking-widest mt-1 opacity-80 italic">Real-time telemetry from active sessions</p>
                     </div>
-                    <Button label="Audit Full Registry" icon="pi pi-arrow-right" iconPos="right" text severity="info" class="text-[10px] font-black uppercase tracking-widest px-8 rounded-2xl hover:bg-slate-50" @click="$router.push('/admin/reports')" />
+                    <Button label="Audit Full Registry" icon="pi pi-arrow-right" iconPos="right" text severity="info" class="text-[10px] font-black uppercase tracking-widest px-8 rounded-2xl hover:bg-slate-50" @click="$router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.reports' : 'admin.reports' })" />
                 </div>
             </template>
             <template #content>
@@ -159,7 +161,7 @@ const getStatusSeverity = (status) => {
                      <Column header="Institutional Entity" style="min-width: 300px">
                         <template #body="{ data }">
                             <div class="flex items-center space-x-4 py-3 group cursor-pointer" 
-                                 @click="data.student_id ? $router.push(`/admin/students/${data.student_id}/show`) : $router.push('/admin/reports')">
+                                 @click="data.student_id ? $router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.students.show' : 'admin.students.show', params: { id: data.student_id } }) : $router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.reports' : 'admin.reports' })">
                                  <div class="w-11 h-11 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 shadow-sm transition-all group-hover:bg-brand-primary group-hover:text-white group-hover:rotate-6">
                                      <i class="pi pi-id-card text-lg"></i>
                                  </div>
