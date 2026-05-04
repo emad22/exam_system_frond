@@ -28,6 +28,7 @@ const startRecording = async () => {
 
         mediaRecorder.value.onstop = () => {
             audioBlob.value = new Blob(audioChunks.value, { type: 'audio/webm' });
+            if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
             audioUrl.value = URL.createObjectURL(audioBlob.value);
             emit('recorded', audioBlob.value);
             
