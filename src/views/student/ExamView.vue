@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/services/api';
 import Button from 'primevue/button';
@@ -16,12 +16,12 @@ const questions = ref([]);
 const currentIndex = ref(0);
 const answers = ref([]);
 const systemRequirements = ref([]);
-const globalOffset = ref(0);       
-const totalSkillQuestions = ref(0); 
+const globalOffset = ref(0);
+const totalSkillQuestions = ref(0);
 const currentLevel = ref(null);
 
 const isLoading = ref(true);
-const isStarting = ref(true); 
+const isStarting = ref(true);
 const isSubmittingBatch = ref(false);
 const questionSubmitted = ref(false);
 const isRetryAttempt = ref(false);
@@ -35,6 +35,10 @@ const hasListened = ref(false);
 const isDemo = ref(false);
 const showLevelTransition = ref(false);
 const nextLevelName = ref('');
+const autoplayFailed = ref(false);
+const lastAudioUrl = ref('');
+const showTimeoutModal = ref(false);
+const showExitModal = ref(false);
 
 // Timer State
 const timeLeftSeconds = ref(0);
@@ -63,13 +67,13 @@ const startTimer = () => {
     const role = (user?.role || '').toLowerCase();
     if (['demo', 'deom', 'staff'].includes(role)) {
         isDemo.value = true;
-        return; 
+        return;
     }
     isDemo.value = false;
     if (!timerConfig.value) return;
-    
+
     const config = timerConfig.value;
-    
+
     // Use ONLY the per-skill duration logic as requested
     const limitMinutes = config.skillDuration;
     let createdStr = config.skillStartedAt;
@@ -78,31 +82,29 @@ const startTimer = () => {
         // If there's no limit for this specific skill, don't show the timer
         return;
     }
-    
+
     // Parse as UTC to avoid timezone issues
     if (!createdStr.endsWith('Z') && !createdStr.match(/[+-]\d{2}:\d{2}$/)) {
         createdStr += 'Z';
     }
-    
+
     const startTime = new Date(createdStr).getTime();
     const limitMs = limitMinutes * 60 * 1000;
-    
+
     const updateTime = () => {
         const now = new Date().getTime();
         const elapsed = now - startTime;
         const remaining = Math.max(0, Math.floor((limitMs - elapsed) / 1000));
-        
+
         timeLeftSeconds.value = remaining;
-        
+
         if (remaining <= 0) {
             clearInterval(timerInterval.value);
-            
-            // --- NEW: Skip auto-submission for Demo users ---
-            alert("Time is up! The assessment has ended.");
-            handleTimeout();
+            showTimeoutModal.value = true;
+            // handleTimeout() will be called when user clicks OK or via auto-redirect in template
         }
     };
-    
+
     updateTime(); // Initial call
     if (timerInterval.value) clearInterval(timerInterval.value);
     timerInterval.value = setInterval(updateTime, 1000);
@@ -138,6 +140,7 @@ const toggleAudioManual = async () => {
     } catch (err) {
         console.error('Audio playback failed:', err);
     }
+    autoplayFailed.value = false;
     syncAudioState();
 };
 
@@ -191,7 +194,7 @@ const fetchData = async () => {
         attempt.value = attRes.data;
         systemRequirements.value = reqRes.data;
         autoVerifyRequirements(reqRes.data);
-        
+
         if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
             router.push('/dashboard');
         }
@@ -206,6 +209,31 @@ const beginExam = async () => {
     isStarting.value = false;
     await fetchNextBatch();
     startTimer();
+};
+
+const confirmExit = async () => {
+    showExitModal.value = false;
+    try {
+        isLoading.value = true;
+        await api.post(`/attempts/${attemptId}/finish`);
+        router.push('/dashboard');
+    } catch (err) {
+        console.error('Error finishing attempt:', err);
+        router.push('/dashboard');
+    }
+};
+
+const exitExam = () => {
+    showExitModal.value = true;
+};
+
+const isNavigatingBack = ref(false);
+
+const prevQuestion = () => {
+    if (currentIndex.value > 0) {
+        isNavigatingBack.value = true;
+        currentIndex.value--;
+    }
 };
 
 const startNextLevel = () => {
@@ -225,7 +253,7 @@ const startNextLevel = () => {
 
 const fetchNextBatch = async () => {
     isLoading.value = true;
-    
+
     // EXPLICITLY stop any playing audio BEFORE fetching new questions
     if (audioRef.value) {
         audioRef.value.pause();
@@ -251,7 +279,7 @@ const fetchNextBatch = async () => {
             currentIndex.value = 0;
             questionSubmitted.value = false;
             hasListened.value = false;
-            
+
             // Populate timer configuration
             timerConfig.value = {
                 type: res.data.timer_type,
@@ -259,7 +287,7 @@ const fetchNextBatch = async () => {
                 skillDuration: res.data.skill_duration,
                 skillStartedAt: res.data.current_skill_started_at
             };
-            
+
             answers.value = questions.value.map(q => {
                 const base = {
                     question_id: q.id,
@@ -276,7 +304,7 @@ const fetchNextBatch = async () => {
                 };
                 return base;
             });
-            
+
             // Populate extra state based on type
             questions.value.forEach((q, idx) => {
                 const content = q.content || '';
@@ -323,53 +351,36 @@ const fetchNextBatch = async () => {
             audioRef.value.pause();
             audioRef.value.currentTime = 0;
         }
-        
+
         window.scrollTo(0, 0);
     }
+};
+
+const VALIDATORS = {
+    mcq: (ans) => !!ans.option_id,
+    true_false: (ans) => !!ans.option_id,
+    speaking: (ans) => !!ans.recorded_file,
+    drag_drop: (ans) => ans.drag_drop_answers.some(a => a !== null && a !== ''),
+    fill_blank: (ans) => ans.fill_blank_answers.every(a => a && a.trim().length > 0),
+    matching: (ans, q) => Object.keys(ans.matching_answers).length === q.options.filter(o => o.is_correct).length,
+    ordering: (ans, q) => ans.ordering_answers.length === q.options.length,
+    highlight: (ans) => ans.highlight_answers.length > 0,
+    short_answer: (ans) => ans.text_answer && ans.text_answer.trim().length > 0,
+    click_word: (ans) => ans.selected_words.length > 0,
+    word_selection: (ans) => ans.selected_words.length > 0,
 };
 
 const submitAnswer = () => {
     const ans = answers.value[currentIndex.value];
     const q = currentQ.value;
-    let isValid = false;
-    
-    if (q.type === 'mcq' || q.type === 'true_false') {
-        isValid = !!ans.option_id;
-    } else if (q.type === 'speaking') {
-        isValid = !!ans.recorded_file;
-    } else if (q.type === 'drag_drop') {
-        isValid = ans.drag_drop_answers.some(a => a !== null && a !== '');
-        if (isValid) {
-            ans.text_answer = JSON.stringify(ans.drag_drop_answers);
-        }
-    } else if (q.type === 'fill_blank') {
-        isValid = ans.fill_blank_answers.every(a => a && a.trim().length > 0);
-        if (isValid) ans.text_answer = JSON.stringify(ans.fill_blank_answers);
-    } else if (q.type === 'matching') {
-        const sourceCount = q.options.filter(o => o.is_correct).length;
-        isValid = Object.keys(ans.matching_answers).length === sourceCount;
-        if (isValid) ans.text_answer = JSON.stringify(ans.matching_answers);
-    } else if (q.type === 'ordering') {
-        // Must use all available words to be valid
-        const requiredCount = q.options.length;
-        isValid = ans.ordering_answers.length === requiredCount;
-        if (isValid) ans.text_answer = JSON.stringify(ans.ordering_answers);
-    } else if (q.type === 'highlight') {
-        isValid = ans.highlight_answers.length > 0;
-        if (isValid) ans.text_answer = JSON.stringify(ans.highlight_answers);
-    } else if (q.type === 'short_answer') {
-        isValid = ans.text_answer && ans.text_answer.trim().length > 0;
-    } else if (q.type === 'click_word' || q.type === 'word_selection') {
-        isValid = ans.selected_words.length > 0;
-        if (isValid) ans.text_answer = JSON.stringify(ans.selected_words);
-    } else {
-        isValid = !!ans.text_answer;
-    }
+
+    const isValid = VALIDATORS[q.type] ? VALIDATORS[q.type](ans, q) : !!ans.text_answer;
 
     if (!isValid) {
-        alert('Please complete the task before proceeding.');
+        alert('يرجى إكمال المهمة قبل المتابعة.');
         return;
     }
+
     questionSubmitted.value = true;
 };
 
@@ -401,13 +412,13 @@ const onDrop = (event, slotIdx, qIdx) => {
     if (questionSubmitted.value) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    
+
     try {
         const data = event.dataTransfer.getData('option');
         if (!data) return;
         const option = JSON.parse(data);
         const ans = answers.value[qIdx];
-        
+
         // Update the specific slot with the dropped word
         ans.drag_drop_answers[slotIdx] = option.option_text;
     } catch (err) {
@@ -485,7 +496,7 @@ const removeFromOrdering = (index) => {
 const getAvailableWords = (q, qIdx) => {
     const allWords = q.options.map(o => o.option_text);
     const selectedWords = answers.value[qIdx].ordering_answers;
-    
+
     // We need to handle duplicate words if they exist in the sentence
     // So we subtract the counts
     let pool = [...allWords];
@@ -525,36 +536,27 @@ const submitCurrentBatch = async () => {
             formData.append(`answers[${index}][question_id]`, ans.question_id);
             if (ans.option_id) formData.append(`answers[${index}][option_id]`, ans.option_id);
             if (ans.text_answer) formData.append(`answers[${index}][text_answer]`, ans.text_answer);
-            if (ans.recorded_file) formData.append(`answers[${index}][audio_file]`, ans.recorded_file, `voice.webm`);
-            
-            // Complex types
-            if (ans.selected_words && ans.selected_words.length > 0) {
-                ans.selected_words.forEach((word, wIdx) => {
-                    formData.append(`answers[${index}][selected_words][${wIdx}]`, word);
-                });
-            }
-            if (ans.drag_drop_answers && ans.drag_drop_answers.length > 0) {
-                ans.drag_drop_answers.forEach((val, vIdx) => {
-                    formData.append(`answers[${index}][drag_drop_answers][${vIdx}]`, val || '');
-                });
-            }
-            if (ans.fill_blank_answers && ans.fill_blank_answers.length > 0) {
-                ans.fill_blank_answers.forEach((val, vIdx) => {
-                    formData.append(`answers[${index}][fill_blank_answers][${vIdx}]`, val || '');
-                });
-            }
+            if (ans.recorded_file) formData.append(`answers[${index}][audio_file]`, ans.recorded_file, 'voice.webm');
+
+            // --- OPTIMIZATION: Use a map for complex array fields ---
+            const arrayFields = {
+                selected_words: ans.selected_words,
+                drag_drop_answers: ans.drag_drop_answers,
+                fill_blank_answers: ans.fill_blank_answers,
+                ordering_answers: ans.ordering_answers,
+                highlight_answers: ans.highlight_answers
+            };
+
+            Object.entries(arrayFields).forEach(([fieldName, value]) => {
+                if (value && Array.isArray(value) && value.length > 0) {
+                    value.forEach((val, vIdx) => {
+                        formData.append(`answers[${index}][${fieldName}][${vIdx}]`, val || '');
+                    });
+                }
+            });
+
             if (ans.matching_answers && Object.keys(ans.matching_answers).length > 0) {
                 formData.append(`answers[${index}][matching_answers]`, JSON.stringify(ans.matching_answers));
-            }
-            if (ans.ordering_answers && ans.ordering_answers.length > 0) {
-                ans.ordering_answers.forEach((val, vIdx) => {
-                    formData.append(`answers[${index}][ordering_answers][${vIdx}]`, val || '');
-                });
-            }
-            if (ans.highlight_answers && ans.highlight_answers.length > 0) {
-                ans.highlight_answers.forEach((val, vIdx) => {
-                    formData.append(`answers[${index}][highlight_answers][${vIdx}]`, val || '');
-                });
             }
         });
 
@@ -574,7 +576,7 @@ const submitCurrentBatch = async () => {
                 showRetryNotification.value = false;
                 globalOffset.value += questions.value.length;
             }
-            
+
             await fetchNextBatch();
         }
     } catch (err) {
@@ -630,6 +632,8 @@ const getSkillIcon = (name) => {
 watch(currentQ, (newQ) => {
     if (!newQ) return;
 
+    autoplayFailed.value = false;
+
     // Reset audio progress when question changes
     audioProgress.value = 0;
     audioCurrentTime.value = '0:00';
@@ -646,21 +650,42 @@ watch(currentQ, (newQ) => {
         if (audioRef.value) {
             audioRef.value.pause();
             audioRef.value.currentTime = 0;
+            lastAudioUrl.value = '';
+        }
+        return;
+    }
+
+    if (isNavigatingBack.value) {
+        isNavigatingBack.value = false;
+        if (audioRef.value) {
+            audioRef.value.pause();
+            audioRef.value.currentTime = 0;
+            lastAudioUrl.value = '';
         }
         return;
     }
 
     const audioUrl = newQ?.passage?.audio_url || newQ?.passage?.audio_path || newQ?.audio_url || newQ?.audio_path;
-    
+
     if (audioUrl) {
+        // --- OPTIMIZATION: Only reload if the source changed ---
+        if (audioUrl === lastAudioUrl.value) {
+            return;
+        }
+        lastAudioUrl.value = audioUrl;
+
         nextTick(() => {
             if (audioRef.value) {
                 audioRef.value.load(); // Force reload for new source
                 audioRef.value.play().catch(err => {
                     console.warn('Autoplay blocked by browser. User interaction required.', err);
+                    autoplayFailed.value = true;
                 });
             }
         });
+    } else {
+        lastAudioUrl.value = '';
+        autoplayFailed.value = false;
     }
 });
 
@@ -668,17 +693,17 @@ const hasStimulusContent = computed(() => {
     if (!currentQ.value) return false;
     const q = currentQ.value;
     const p = q.passage;
-    
+
     // A passage counts as stimulus only if it has text or visual media
     const passageHasContent = p && (
-        (p.content && p.content.trim().length > 0) || 
-        p.image_url || p.image_path || 
+        (p.content && p.content.trim().length > 0) ||
+        p.image_url || p.image_path ||
         (p.media_url && p.media_url.toLowerCase().includes('.mp4')) ||
         (p.media_path && p.media_path.toLowerCase().includes('.mp4'))
     );
 
     // Question counts as stimulus only if it has visual media (Audio stays in response pane)
-    const questionHasMedia = (q.image_url || q.image_path) || 
+    const questionHasMedia = (q.image_url || q.image_path) ||
         (q.media_url && q.media_url.toLowerCase().includes('.mp4')) ||
         (q.media_path && q.media_path.toLowerCase().includes('.mp4'));
 
@@ -690,30 +715,51 @@ onMounted(async () => {
     isDemo.value = user && ['demo', 'deom', 'staff'].includes(user.role?.toLowerCase());
     await fetchData();
 });
+
+onUnmounted(() => {
+    if (timerInterval.value) {
+        clearInterval(timerInterval.value);
+    }
+    if (audioRef.value) {
+        audioRef.value.pause();
+        audioRef.value.src = "";
+        audioRef.value.load();
+    }
+});
 </script>
 
 <template>
     <div class="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
-        
-        
-        <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white shadow-md h-20 px-6 shrink-0" dir="rtl">
+
+
+        <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white shadow-md h-20 px-6 shrink-0"
+            dir="rtl">
             <div class="max-w-[1600px] mx-auto h-full flex justify-between items-center">
-                
-                <!-- Right Side: Skill Info -->
-                <div class="flex flex-col items-end text-right">
-                    <div class="flex items-center space-x-3 space-x-reverse mb-0.5">
-                        <span class="text-xs font-black uppercase tracking-wider text-slate-400">{{ currentSkill?.name }}</span>
+
+                <!-- Right Side: Skill Info & Exit -->
+                <div class="flex items-center space-x-6 space-x-reverse">
+                    
+                    <div class="flex flex-col items-end text-right">
+                        <div class="flex items-center space-x-3 space-x-reverse mb-0.5">
+                            <span class="text-xs font-black uppercase tracking-wider text-slate-400">{{
+                                currentSkill?.name }}</span>
+                        </div>
                     </div>
+                    
                 </div>
 
                 <!-- Left Side: Navigation & Timer -->
                 <div class="flex items-center space-x-3 space-x-reverse">
-                    <button @click="currentIndex > 0 ? currentIndex-- : null" 
+                    <button @click="prevQuestion"
                         :class="currentIndex > 0 ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
-                        class="h-10 px-6 rounded-lg font-bold text-xs transition-all">السابق</button>
-                    <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions }}</span>
-                    <button v-if="!questionSubmitted" @click="submitAnswer" 
-                        class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد الإجابة</button>
+                        class="h-10 px-6 rounded-lg font-bold text-xs transition-all flex items-center gap-2">
+                        <span>السابق</span>
+                    </button>
+                    <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions
+                    }}</span>
+                    <button v-if="!questionSubmitted" @click="submitAnswer"
+                        class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد
+                        الإجابة</button>
                     <button v-else @click="advanceQuestion" :disabled="isSubmittingBatch"
                         class="h-10 px-8 bg-emerald-600 text-white rounded-lg font-black text-xs hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         <span v-if="isSubmittingBatch" class="flex items-center gap-2">
@@ -725,37 +771,52 @@ onMounted(async () => {
                     </button>
 
                     <!-- Timer -->
-                    <div v-if="!isDemo && timerConfig && timerConfig.skillDuration > 0" :class="['flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors', timeLeftSeconds < 300 ? 'bg-rose-900/50 border-rose-500 text-rose-300 animate-pulse' : 'bg-slate-900/50 border-slate-700 text-white']">
-                        <i class="pi pi-clock text-xs" :class="timeLeftSeconds < 300 ? 'text-rose-400' : 'text-slate-400'"></i>
+                    <div v-if="!isDemo && timerConfig && timerConfig.skillDuration > 0"
+                        :class="['flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors', timeLeftSeconds < 300 ? 'bg-rose-900/50 border-rose-500 text-rose-300 animate-pulse' : 'bg-slate-900/50 border-slate-700 text-white']">
+                        <i class="pi pi-clock text-xs"
+                            :class="timeLeftSeconds < 300 ? 'text-rose-400' : 'text-slate-400'"></i>
                         <span class="text-lg font-black tabular-nums tracking-tighter">{{ formattedTime }}</span>
                     </div>
+                    <div class="flex items-center space-x-4 space-x-reverse px-4 py-1.5 rounded-lg border mr-4 transition-colors">
+                        <button @click="exitExam"
+                            class="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-rose-600/80 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-bold border border-slate-600 hover:border-rose-500">
+                            <i class="pi pi-sign-out"></i>
+                            <span>Exit</span>
+                        </button>
+                    </div>
+                    
                 </div>
             </div>
         </header>
-        
+
         <!-- TOEFL-Style Sub-header for Level Name -->
-        <div v-if="!isStarting && currentSkill" class="bg-white border-b border-slate-200 h-10 px-8 flex justify-end items-center shrink-0 z-20">
+        <div v-if="!isStarting && currentSkill"
+            class="bg-white border-b border-slate-200 h-10 px-8 flex justify-end items-center shrink-0 z-20">
             <div class="flex items-center space-x-3 space-x-reverse">
-                
+
                 <div class="px-3 py-1 bg-slate-100 rounded-md border border-slate-200">
-                    <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name }}</span>
+                    <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name
+                    }}</span>
                 </div>
             </div>
         </div>
 
         <main class="flex-grow overflow-hidden relative">
-            
+
             <!-- Retry Notification Overlay -->
-            <div v-if="showRetryNotification" class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6">
-                <div class="bg-white rounded-lg p-10 max-w-xl w-full shadow-2xl border border-slate-200 text-center" dir="rtl">
-                    <div class="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
+            <div v-if="showRetryNotification"
+                class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6">
+                <div class="bg-white rounded-lg p-10 max-w-xl w-full shadow-2xl border border-slate-200 text-center"
+                    dir="rtl">
+                    <div
+                        class="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
                         <i class="pi pi-refresh"></i>
                     </div>
                     <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">إشعار النظام</h3>
                     <p class="text-slate-600 text-base font-medium leading-relaxed mb-8">
                         لم يتم استيفاء الحد الأدنى للدرجة المطلوبة. جاري بدء دورة تقييم ثانية بمحتوى جديد...
                     </p>
-                    <button @click="showRetryNotification = false" 
+                    <button @click="showRetryNotification = false"
                         class="w-full py-4 bg-slate-800 text-white rounded font-bold uppercase text-xs tracking-widest hover:bg-slate-700 transition-all">
                         بدء محاولة جديدة
                     </button>
@@ -763,17 +824,20 @@ onMounted(async () => {
             </div>
 
             <!-- Level Transition Modal -->
-            <div v-if="showLevelTransition" class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-6">
-                <div class="bg-white rounded-3xl p-12 max-w-2xl w-full shadow-2xl border border-slate-200 text-center animate-in zoom-in-95 duration-300">
-                    <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-3xl">
+            <div v-if="showLevelTransition"
+                class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-6">
+                <div
+                    class="bg-white rounded-3xl p-12 max-w-2xl w-full shadow-2xl border border-slate-200 text-center animate-in zoom-in-95 duration-300">
+                    <div
+                        class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-3xl">
                         <i class="pi pi-check-circle"></i>
                     </div>
                     <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-4">أحسنت! لقد أتممت المستوى</h3>
                     <p class="text-slate-600 text-lg font-medium leading-relaxed mb-10">
-                        أنت الآن جاهز للانتقال إلى المستوى التالي: <br/>
+                        أنت الآن جاهز للانتقال إلى المستوى التالي: <br />
                         <span class="text-brand-primary font-black text-2xl mt-2 block">{{ nextLevelName }}</span>
                     </p>
-                    <button @click="startNextLevel" 
+                    <button @click="startNextLevel"
                         class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-brand-primary transition-all shadow-xl shadow-slate-200">
                         بدء المستوى التالي
                     </button>
@@ -789,20 +853,28 @@ onMounted(async () => {
             <!-- Start Screen -->
             <div v-else-if="isStarting" class="max-w-4xl mx-auto py-12" dir="rtl">
                 <div class="bg-white rounded-xl p-16 border border-slate-200 shadow-xl text-center">
-                    <h2 class="text-4xl font-black text-slate-900 tracking-tight mb-4 uppercase">System Readiness Check</h2>
-                    <p class="text-slate-500 text-base font-medium mb-12">The system has verified your system requirements. You are now about to enter a timed testing environment.</p>
-                    
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tight mb-4 uppercase">System Readiness Check
+                    </h2>
+                    <p class="text-slate-500 text-base font-medium mb-12">The system has verified your system
+                        requirements. You
+                        are now about to enter a timed testing environment.</p>
+
                     <div class="grid grid-cols-1 md:grid-cols-1 gap-8 text-right mb-16">
                         <div class="bg-slate-100/100 p-8 rounded-3xl border border-slate-100">
-                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام</h4>
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام
+                            </h4>
                             <div class="space-y-4">
                                 <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req.id)"
                                     class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
-                                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{ req.title }}</span>
-                                    <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-50 border-slate-200'" class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
-                                        <i v-if="checkedRequirements.includes(req.id)" class="pi pi-check text-[8px] text-white"></i>
+                                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{
+                                        req.title
+                                    }}</span>
+                                    <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-50 border-slate-200'"
+                                        class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
+                                        <i v-if="checkedRequirements.includes(req.id)"
+                                            class="pi pi-check text-[8px] text-white"></i>
                                     </div>
-                               </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -816,66 +888,88 @@ onMounted(async () => {
 
             <!-- Error State -->
             <div v-else-if="errorMsg" class="max-w-xl mx-auto py-32 text-center space-y-8" dir="rtl">
-                <div class="w-20 h-20 bg-rose-50 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto text-3xl shadow-lg shadow-rose-100">
+                <div
+                    class="w-20 h-20 bg-rose-50 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto text-3xl shadow-lg shadow-rose-100">
                     <i class="pi pi-exclamation-circle"></i>
                 </div>
                 <div class="space-y-2">
                     <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">تنبيه النظام</h2>
                     <p class="text-slate-500 font-medium leading-relaxed">{{ errorMsg }}</p>
                 </div>
-                <button @click="router.push('/dashboard')" 
+                <button @click="router.push('/dashboard')"
                     class="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-brand-primary transition-all active:scale-95">
                     العودة للوحة التحكم
                 </button>
             </div>
-            
-           
+
+
 
             <!-- Exam Split Screen (Dynamic Layout) -->
-            <div v-else-if="currentQ" class="flex flex-row h-full gap-px bg-slate-300 border-t border-slate-300 animate-in fade-in duration-500 overflow-hidden">
-                
+            <div v-else-if="currentQ"
+                class="flex flex-row h-full gap-px bg-slate-300 border-t border-slate-300 animate-in fade-in duration-500 overflow-hidden">
+
                 <!-- Right Side: Response (Question and Choices) - Now on the Left Side of the viewport -->
-                <div :class="hasStimulusContent ? 'w-2/5 bg-white' : 'w-full bg-slate-50'" class="flex flex-col h-full border-r border-slate-200 shadow-inner animate-in slide-in-from-left-8 duration-700 overflow-hidden">
-                    <div :class="hasStimulusContent ? 'w-full p-4' : 'max-w-5xl mx-auto w-full bg-white my-4 rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col max-h-[calc(100vh-120px)] overflow-hidden'">
-                        <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100" dir="rtl">
+                <div :class="hasStimulusContent ? 'w-2/5 bg-white' : 'w-full bg-slate-50'"
+                    class="flex flex-col h-full border-r border-slate-200 shadow-inner animate-in slide-in-from-left-8 duration-700 overflow-hidden">
+                    <div
+                        :class="hasStimulusContent ? 'w-full p-4' : 'max-w-5xl mx-auto w-full bg-white my-4 rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col max-h-[calc(100vh-120px)] overflow-hidden'">
+                        <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100"
+                            dir="rtl">
                             <i class="pi pi-pencil text-brand-primary"></i>
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المهمة المطلوبة</span>
-                           
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المهمة
+                                المطلوبة</span>
+
                         </div>
 
                         <!-- Audio Player Integrated (One-time playback, no controls) -->
-                        <div v-if="currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path" 
+                        <div v-if="currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path"
                             class="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
                             <div class="flex items-center gap-3 mb-2" dir="rtl">
-                                <div class="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center text-brand-primary text-[10px]">
+                                <div
+                                    class="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center text-brand-primary text-[10px]">
                                     <i class="pi pi-volume-up" :class="isAudioPlaying ? 'animate-pulse' : ''"></i>
                                 </div>
-                                <span class="text-[20px] font-black text-slate-400 uppercase tracking-widest">المقطع الصوتي قيد التشغيل (مرة واحدة فقط)</span>
+                                <span class="text-[20px] font-black text-slate-400 uppercase tracking-widest">المقطع
+                                    الصوتي قيد
+                                    التشغيل (مرة واحدة فقط)</span>
                             </div>
-                            
-                            <audio ref="audioRef" 
-                                :src="resolveUrl(currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path)" 
-                                @play="isAudioPlaying = true" 
-                                @pause="isAudioPlaying = false" 
-                                @ended="hasListened = true"
-                                @timeupdate="updateAudioProgress"
-                                class="hidden"></audio>
-                            
+
+                            <audio ref="audioRef"
+                                :src="resolveUrl(currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path)"
+                                @play="isAudioPlaying = true" @pause="isAudioPlaying = false"
+                                @ended="hasListened = true" @timeupdate="updateAudioProgress" class="hidden"></audio>
+
+                            <!-- Fallback UI for Autoplay Blocked -->
+                            <div v-if="autoplayFailed && !isAudioPlaying && !hasListened"
+                                class="mt-2 flex items-center justify-between p-2 bg-rose-50 border border-rose-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
+                                <div class="flex items-center gap-2">
+                                    <i class="pi pi-exclamation-triangle text-rose-500 text-xs"></i>
+                                    <span class="text-[10px] font-bold text-rose-700">اضغط للبدء في الاستماع</span>
+                                </div>
+                                <button @click="toggleAudioManual"
+                                    class="px-4 py-1.5 bg-rose-600 text-white rounded-md text-[10px] font-black hover:bg-rose-700 transition-all shadow-sm">
+                                    تشغيل المقطع
+                                </button>
+                            </div>
+
                             <!-- Custom Progress Bar (Non-interactive) -->
                             <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mt-1">
-                                <div class="bg-brand-primary h-full transition-all duration-150 ease-linear" :style="{ width: audioProgress + '%' }"></div>
+                                <div class="bg-brand-primary h-full transition-all duration-150 ease-linear"
+                                    :style="{ width: audioProgress + '%' }"></div>
                             </div>
                             <div class="flex justify-between mt-1.5 text-[8px] font-bold text-slate-400 font-mono">
                                 <span class="text-brand-primary">{{ audioCurrentTime }}</span>
                                 <span>{{ audioDuration }}</span>
                             </div>
 
-                            <p v-if="hasListened" class="text-[9px] text-emerald-600 font-bold mt-2 text-center" dir="rtl">✓ تم الاستماع للمقطع بالكامل</p>
+                            <p v-if="hasListened" class="text-[9px] text-emerald-600 font-bold mt-2 text-center"
+                                dir="rtl">✓ تم
+                                الاستماع للمقطع بالكامل</p>
                         </div>
 
                         <div class="flex-grow flex flex-col space-y-4 overflow-hidden">
-                            <div v-if="currentQ.content && !['fill_blank', 'drag_drop', 'word_selection', 'click_word', 'highlight', 'matching', 'ordering'].includes(currentQ.type)" 
-                                class="text-lg font-black text-slate-900 leading-snug interactive-content-area rtl-support" 
+                            <div v-if="currentQ.content && !['fill_blank', 'drag_drop', 'word_selection', 'click_word', 'highlight', 'matching', 'ordering'].includes(currentQ.type)"
+                                class="text-lg font-black text-slate-900 leading-snug interactive-content-area rtl-support"
                                 v-html="cleanHtml(currentQ.content)" dir="auto">
                             </div>
                             <h3 v-else class="text-base font-bold text-slate-800 leading-tight" dir="rtl">
@@ -885,31 +979,36 @@ onMounted(async () => {
                             <div class="bg-slate-50 border border-slate-100 p-3 rounded-lg" dir="rtl">
                                 <div class="flex items-center gap-2 mb-1">
                                     <i class="pi pi-question-circle text-brand-primary text-[9px]"></i>
-                                    <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">تعليمات المهمة</span>
+                                    <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">تعليمات
+                                        المهمة</span>
                                 </div>
                                 <p class="text-[10px] font-bold text-slate-600 leading-relaxed" dir="auto">
-                                    {{ currentQ.instructions || 'يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً عليها.' }}
+                                    {{ currentQ.instructions || 'يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً  عليها.'}}
                                 </p>
                             </div>
 
                             <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pt-2 space-y-2">
                                 <!-- MCQ -->
-                                <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'" class="space-y-1.5">
+                                <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'"
+                                    class="space-y-1.5">
                                     <button v-for="(opt, oIdx) in currentQ.options" :key="opt.id"
-                                        @click="answers[currentIndex].option_id = opt.id"
-                                        :disabled="questionSubmitted"
+                                        @click="answers[currentIndex].option_id = opt.id" :disabled="questionSubmitted"
                                         class="w-full p-3.5 rounded-xl border-2 transition-all flex flex-row-reverse items-center gap-4 group"
-                                        :class="answers[currentIndex].option_id === opt.id 
-                                            ? 'border-brand-primary bg-indigo-50/30 ring-2 ring-indigo-500/5' 
+                                        :class="answers[currentIndex].option_id === opt.id
+                                            ? 'border-brand-primary bg-indigo-50/30 ring-2 ring-indigo-500/5'
                                             : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 bg-white shadow-sm'">
                                         <div class="w-8 h-8 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all shadow-sm"
-                                            :class="answers[currentIndex].option_id === opt.id 
-                                                ? 'bg-brand-primary border-brand-primary scale-105 shadow-md shadow-indigo-200' 
+                                            :class="answers[currentIndex].option_id === opt.id
+                                                ? 'bg-brand-primary border-brand-primary scale-105 shadow-md shadow-indigo-200'
                                                 : 'bg-slate-50 border-slate-100 group-hover:border-slate-200'">
-                                            <span v-if="answers[currentIndex].option_id !== opt.id" class="text-[9px] font-black text-slate-300">{{ String.fromCharCode(65 + oIdx) }}</span>
+                                            <span v-if="answers[currentIndex].option_id !== opt.id"
+                                                class="text-[9px] font-black text-slate-300">{{ String.fromCharCode(65 +
+                                                    oIdx)
+                                                }}</span>
                                             <i v-else class="pi pi-check text-[10px] text-white"></i>
                                         </div>
-                                        <span class="font-black text-slate-700 leading-snug text-base grow text-right" dir="auto">{{ opt.option_text }}</span>
+                                        <span class="font-black text-slate-700 leading-snug text-base grow text-right"
+                                            dir="auto">{{ opt.option_text }}</span>
                                     </button>
                                 </div>
 
@@ -918,12 +1017,14 @@ onMounted(async () => {
                                     <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
                                         class="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm font-medium focus:border-brand-primary transition-all min-h-[180px] outline-none"
                                         placeholder="اكتب إجابتك هنا..."></textarea>
-                                    <div class="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                                    <div
+                                        class="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest px-1">
                                         <span>عدد الكلمات: {{ wordCount }}</span>
-                                        <span>المطلوب: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞' }}</span>
+                                        <span>المطلوب: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞'
+                                        }}</span>
                                     </div>
                                 </div>
-                                
+
                                 <!-- Speaking -->
                                 <div v-if="currentQ.type === 'speaking'" class="space-y-4">
                                     <AudioRecorder @recorded="(blob) => answers[currentIndex].recorded_file = blob"
@@ -932,25 +1033,32 @@ onMounted(async () => {
 
                                 <!-- Drag & Drop -->
                                 <div v-if="currentQ.type === 'drag_drop'" class="space-y-6">
-                                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 leading-[2.4] text-base font-medium text-slate-700 interactive-content-area rtl-support" dir="auto">
-                                        <template v-for="(part, pIdx) in parsedDragDropContent(currentQ.content)" :key="pIdx">
+                                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 leading-[2.4] text-base font-medium text-slate-700 interactive-content-area rtl-support"
+                                        dir="auto">
+                                        <template v-for="(part, pIdx) in parsedDragDropContent(currentQ.content)"
+                                            :key="pIdx">
                                             <span v-html="part"></span>
                                             <span v-if="pIdx < parsedDragDropContent(currentQ.content).length - 1"
-                                                @dragover.prevent @dragenter.prevent @drop="onDrop($event, pIdx, currentIndex)"
+                                                @dragover.prevent @dragenter.prevent
+                                                @drop="onDrop($event, pIdx, currentIndex)"
                                                 class="inline-flex items-center justify-center min-w-[120px] h-9 mx-1 px-4 rounded-lg border-2 border-dashed transition-all relative top-1.5"
-                                                :class="answers[currentIndex].drag_drop_answers[pIdx] 
-                                                    ? 'bg-indigo-50 border-brand-primary border-solid text-brand-primary font-black text-sm shadow-sm' 
+                                                :class="answers[currentIndex].drag_drop_answers[pIdx]
+                                                    ? 'bg-indigo-50 border-brand-primary border-solid text-brand-primary font-black text-sm shadow-sm'
                                                     : 'bg-white border-slate-300 shadow-inner text-xl font-black text-slate-400 hover:border-brand-primary hover:bg-slate-50'">
                                                 {{ answers[currentIndex].drag_drop_answers[pIdx] || '..........' }}
-                                                <button v-if="answers[currentIndex].drag_drop_answers[pIdx] && !questionSubmitted" @click="clearSlot(pIdx, currentIndex)"
+                                                <button
+                                                    v-if="answers[currentIndex].drag_drop_answers[pIdx] && !questionSubmitted"
+                                                    @click="clearSlot(pIdx, currentIndex)"
                                                     class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[7px] shadow-sm">
                                                     <i class="pi pi-times"></i>
                                                 </button>
                                             </span>
                                         </template>
                                     </div>
-                                    <div class="flex flex-wrap gap-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                                        <div v-for="opt in currentQ.options" :key="opt.id" draggable="true" @dragstart="onDragStart($event, opt)"
+                                    <div
+                                        class="flex flex-wrap gap-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                        <div v-for="opt in currentQ.options" :key="opt.id" draggable="true"
+                                            @dragstart="onDragStart($event, opt)"
                                             class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 cursor-grab hover:bg-brand-primary hover:text-white transition-all shadow-sm">
                                             {{ opt.option_text }}
                                         </div>
@@ -958,9 +1066,12 @@ onMounted(async () => {
                                 </div>
 
                                 <!-- Word Selection -->
-                                <div v-if="currentQ.type === 'word_selection' || currentQ.type === 'click_word'" class="space-y-4">
-                                    <div class="bg-white p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1" dir="auto">
-                                        <button v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx" @click="toggleWord(word, currentIndex)" :disabled="questionSubmitted"
+                                <div v-if="currentQ.type === 'word_selection' || currentQ.type === 'click_word'"
+                                    class="space-y-4">
+                                    <div class="bg-white p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1"
+                                        dir="auto">
+                                        <button v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx"
+                                            @click="toggleWord(word, currentIndex)" :disabled="questionSubmitted"
                                             class="px-1 py-0.5 rounded transition-all font-medium text-lg border-b-2"
                                             :class="answers[currentIndex].selected_words.includes(word) ? 'border-rose-500 text-rose-600 bg-rose-50' : 'border-transparent text-slate-700 hover:bg-slate-50'">
                                             {{ word }}
@@ -970,11 +1081,16 @@ onMounted(async () => {
 
                                 <!-- Fill in the Blank -->
                                 <div v-if="currentQ.type === 'fill_blank'" class="space-y-4">
-                                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-200 leading-[2.6] text-lg font-medium text-slate-800 shadow-inner interactive-content-area rtl-support" dir="auto">
-                                        <template v-for="(part, pIdx) in parsedFillBlankContent(currentQ.content)" :key="pIdx">
+                                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-200 leading-[2.6] text-lg font-medium text-slate-800 shadow-inner interactive-content-area rtl-support"
+                                        dir="auto">
+                                        <template v-for="(part, pIdx) in parsedFillBlankContent(currentQ.content)"
+                                            :key="pIdx">
                                             <span v-html="part"></span>
-                                            <input v-if="pIdx < parsedFillBlankContent(currentQ.content).length - 1" v-model="answers[currentIndex].fill_blank_answers[pIdx]" :disabled="questionSubmitted" type="text"
-                                                class="inline-block w-28 h-8 mx-1 px-2 rounded border-2 border-slate-200 bg-white focus:border-brand-primary outline-none transition-all text-brand-primary font-black text-center text-base relative top-0.5" placeholder="..." />
+                                            <input v-if="pIdx < parsedFillBlankContent(currentQ.content).length - 1"
+                                                v-model="answers[currentIndex].fill_blank_answers[pIdx]"
+                                                :disabled="questionSubmitted" type="text"
+                                                class="inline-block w-28 h-8 mx-1 px-2 rounded border-2 border-slate-200 bg-white focus:border-brand-primary outline-none transition-all text-brand-primary font-black text-center text-base relative top-0.5"
+                                                placeholder="..." />
                                         </template>
                                     </div>
                                 </div>
@@ -983,14 +1099,17 @@ onMounted(async () => {
                                 <div v-if="currentQ.type === 'matching'" class="space-y-6">
                                     <div class="grid grid-cols-2 gap-6">
                                         <div class="space-y-2">
-                                            <button v-for="opt in getMatchingLeft(currentQ)" :key="opt.id" @click="toggleMatchSource(opt.id)" :disabled="questionSubmitted"
+                                            <button v-for="opt in getMatchingLeft(currentQ)" :key="opt.id"
+                                                @click="toggleMatchSource(opt.id)" :disabled="questionSubmitted"
                                                 class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 flex justify-between items-center"
                                                 :class="selectedMatchSource === opt.id ? 'border-brand-primary bg-indigo-50 shadow-md' : (answers[currentIndex].matching_answers[opt.id] ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white')">
                                                 <span class="text-right w-full" dir="auto">{{ opt.option_text }}</span>
                                             </button>
                                         </div>
                                         <div class="space-y-2">
-                                            <button v-for="opt in getMatchingRight(currentQ)" :key="opt.id" @click="completeMatch(opt.id)" :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
+                                            <button v-for="opt in getMatchingRight(currentQ)" :key="opt.id"
+                                                @click="completeMatch(opt.id)"
+                                                :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
                                                 class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 text-right"
                                                 :class="isAlreadyMatched(opt.id) ? 'bg-slate-50 opacity-40' : (selectedMatchSource ? 'border-brand-primary/30 bg-white hover:bg-brand-primary hover:text-white' : 'border-slate-100 bg-white')">
                                                 <span dir="auto">{{ opt.option_text }}</span>
@@ -1001,14 +1120,18 @@ onMounted(async () => {
 
                                 <!-- Ordering -->
                                 <div v-if="currentQ.type === 'ordering'" class="space-y-6">
-                                    <div class="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 items-center justify-center">
-                                        <button v-for="(word, oIdx) in answers[currentIndex].ordering_answers" :key="oIdx" @click="removeFromOrdering(oIdx)" :disabled="questionSubmitted"
+                                    <div
+                                        class="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 items-center justify-center">
+                                        <button v-for="(word, oIdx) in answers[currentIndex].ordering_answers"
+                                            :key="oIdx" @click="removeFromOrdering(oIdx)" :disabled="questionSubmitted"
                                             class="px-3 py-2 bg-white border-2 border-brand-primary text-brand-primary font-black rounded-lg text-sm shadow-sm animate-in zoom-in-75">
                                             {{ word }}
                                         </button>
                                     </div>
-                                    <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-wrap gap-2 justify-center">
-                                        <button v-for="(word, wIdx) in getAvailableWords(currentQ, currentIndex)" :key="wIdx" @click="addToOrdering(word)" :disabled="questionSubmitted"
+                                    <div
+                                        class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-wrap gap-2 justify-center">
+                                        <button v-for="(word, wIdx) in getAvailableWords(currentQ, currentIndex)"
+                                            :key="wIdx" @click="addToOrdering(word)" :disabled="questionSubmitted"
                                             class="px-3 py-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-lg text-sm hover:bg-brand-primary hover:text-white transition-all shadow-sm">
                                             {{ word }}
                                         </button>
@@ -1017,9 +1140,11 @@ onMounted(async () => {
 
                                 <!-- Short Answer -->
                                 <div v-if="currentQ.type === 'short_answer'" class="space-y-4">
-                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg flex flex-col items-center gap-6">
+                                    <div
+                                        class="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg flex flex-col items-center gap-6">
                                         <div class="w-full max-w-sm">
-                                            <input v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted" type="text"
+                                            <input v-model="answers[currentIndex].text_answer"
+                                                :disabled="questionSubmitted" type="text"
                                                 class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-lg font-black text-slate-800 text-center focus:border-brand-primary outline-none transition-all"
                                                 placeholder="اكتب إجابتك هنا..." dir="auto" />
                                         </div>
@@ -1028,9 +1153,11 @@ onMounted(async () => {
 
                                 <!-- Highlight -->
                                 <div v-if="currentQ.type === 'highlight'" class="space-y-4">
-                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 leading-[2.2] text-lg font-medium text-slate-700 shadow-sm rtl-support" dir="auto">
+                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 leading-[2.2] text-lg font-medium text-slate-700 shadow-sm rtl-support"
+                                        dir="auto">
                                         <template v-for="(word, wIdx) in getWords(currentQ.content)" :key="wIdx">
-                                            <span @click="toggleHighlight(word, currentIndex)" :disabled="questionSubmitted"
+                                            <span @click="toggleHighlight(word, currentIndex)"
+                                                :disabled="questionSubmitted"
                                                 class="px-1 py-0.5 rounded cursor-pointer transition-all border-b border-transparent hover:border-slate-300"
                                                 :class="answers[currentIndex].highlight_answers.includes(word) ? 'bg-yellow-200 text-slate-900 border-yellow-400 font-bold shadow-md' : ''">
                                                 {{ word }}
@@ -1043,52 +1170,129 @@ onMounted(async () => {
                         </div>
 
                         <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                            <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Institutional Assessment Protocol 2024</span>
+                            <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Institutional
+                                Assessment
+                                Protocol 2024</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Left Side: Stimulus Pane (Material) - Only show if content exists -->
-                <div v-if="hasStimulusContent" class="w-3/5 bg-white p-4 overflow-y-auto custom-scrollbar flex flex-col h-full transition-all duration-700">
-                    <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100" dir="rtl">
+                <div v-if="hasStimulusContent"
+                    class="w-3/5 bg-white p-4 overflow-y-auto custom-scrollbar flex flex-col h-full transition-all duration-700">
+                    <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100"
+                        dir="rtl">
                         <i class="pi pi-file-edit text-slate-400"></i>
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المادة العلمية</span>
                     </div>
 
                     <div class="flex-grow prose prose-slate max-w-none">
                         <!-- 1. Passage Content -->
-                        <div v-if="currentQ.passage" class="space-y-4 mb-6 pb-6 border-b border-slate-100 border-dashed">
-                            <h3 v-if="currentQ.passage.title" class="text-xl font-black text-slate-900 tracking-tight leading-tight" dir="auto">{{ currentQ.passage.title }}</h3>
+                        <div v-if="currentQ.passage"
+                            class="space-y-4 mb-6 pb-6 border-b border-slate-100 border-dashed">
+                            <h3 v-if="currentQ.passage.title"
+                                class="text-xl font-black text-slate-900 tracking-tight leading-tight" dir="auto">{{
+                                    currentQ.passage.title }}</h3>
                             <div v-if="currentQ.passage.image_url || currentQ.passage.image_path" class="w-full mb-4">
-                                <img :src="resolveUrl(currentQ.passage.image_url || currentQ.passage.image_path)" class="w-full h-auto rounded-xl shadow-md border border-slate-100" />
+                                <img :src="resolveUrl(currentQ.passage.image_url || currentQ.passage.image_path)"
+                                    class="w-full h-auto rounded-xl shadow-md border border-slate-100" />
                             </div>
-                            <div v-if="currentQ.passage.content" class="text-lg text-slate-700 leading-relaxed font-serif text-justify ql-content rtl-support" v-html="cleanHtml(currentQ.passage.content)" dir="auto"></div>
+                            <div v-if="currentQ.passage.content"
+                                class="text-lg text-slate-700 leading-relaxed font-serif text-justify ql-content rtl-support"
+                                v-html="cleanHtml(currentQ.passage.content)" dir="auto"></div>
                         </div>
 
                         <!-- 2. Videos -->
-                        <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4')" class="flex flex-col items-center justify-center py-4">
-                            <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls autoplay @ended="hasListened = true" class="w-full rounded-xl shadow-lg"></video>
+                        <div v-if="(currentQ.media_url || currentQ.media_path) && (currentQ.media_url || currentQ.media_path).includes('.mp4')"
+                            class="flex flex-col items-center justify-center py-4">
+                            <video :src="resolveUrl(currentQ.media_url || currentQ.media_path)" controls autoplay
+                                @ended="hasListened = true" class="w-full rounded-xl shadow-lg"></video>
                         </div>
 
                         <!-- 3. Question Image -->
                         <div v-if="currentQ.image_url || currentQ.image_path" class="w-full flex justify-center py-4">
-                            <img :src="resolveUrl(currentQ.image_url || currentQ.image_path)" class="max-w-full h-auto rounded-xl shadow-lg border border-white" />
+                            <img :src="resolveUrl(currentQ.image_url || currentQ.image_path)"
+                                class="max-w-full h-auto rounded-xl shadow-lg border border-white" />
                         </div>
                     </div>
                 </div>
             </div>
         </main>
+        <!-- Timeout Modal -->
+        <div v-if="showTimeoutModal" 
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div class="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-rose-100/50">
+                    <i class="pi pi-clock text-4xl text-rose-500 animate-pulse"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">انتهى الوقت!</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">لقد انتهت الفترة المخصصة لهذا الجزء من التقييم. سيتم حفظ إجاباتك وتوجيهك تلقائياً.</p>
+                </div>
+                <button @click="handleTimeout" 
+                    class="w-full py-5 bg-brand-primary text-white rounded-2xl font-black text-lg hover:bg-brand-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-100">
+                    متابعة النتائج
+                </button>
+            </div>
+        </div>
+
+        <!-- Exit Confirmation Modal -->
+        <div v-if="showExitModal" 
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center space-y-6 border border-slate-100 animate-in zoom-in-95 duration-300">
+                <div class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2 border-4 border-amber-100/50">
+                    <i class="pi pi-exclamation-triangle text-4xl text-amber-500"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">هل أنت متأكد؟</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">هل أنت متأكد أنك تريد الخروج؟ سيتم إنهاء الامتحان وحفظ تقدمك الحالي ولن تتمكن من العودة مرة أخرى.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                    <button @click="showExitModal = false" 
+                        class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
+                        تراجع
+                    </button>
+                    <button @click="confirmExit" 
+                        class="py-4 bg-rose-600 text-white rounded-2xl font-black text-sm hover:bg-rose-700 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-100">
+                        تأكيد الخروج
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <style scoped>
-.animate-in { animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-.custom-scrollbar-dark::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar-dark::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
-.custom-scrollbar-dark::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #E2E8F0;
+    border-radius: 10px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
 
 /* Academic Paragraph Styling - Scope ONLY to stimulus pane */
 .w-3\/5 .ql-content :deep(p) {
@@ -1098,8 +1302,8 @@ onMounted(async () => {
 }
 
 /* Ensure images and other elements don't get indented */
-.w-3\/5 .ql-content :deep(img), 
-.w-3\/5 .ql-content :deep(ul), 
+.w-3\/5 .ql-content :deep(img),
+.w-3\/5 .ql-content :deep(ul),
 .w-3\/5 .ql-content :deep(ol) {
     text-indent: 0;
 }
@@ -1115,7 +1319,8 @@ onMounted(async () => {
 
 .interactive-content-area :deep(*) {
     text-indent: 0 !important;
-    display: inline; /* Keep words inline for selection types */
+    display: inline;
+    /* Keep words inline for selection types */
 }
 
 /* Specific fix for p tags inside interactive area */
