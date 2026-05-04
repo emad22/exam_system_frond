@@ -55,6 +55,24 @@ const resetSkill = async (skillId, skillName) => {
     }
 };
 
+const formatTime = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
+
+const formatFullDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleString();
+};
+
+const calculateDuration = (start, end) => {
+    if (!start || !end) return 'N/A';
+    const diff = new Date(end) - new Date(start);
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${mins}m ${secs}s`;
+};
+
 onMounted(fetchDetails);
 </script>
 
@@ -148,8 +166,30 @@ onMounted(fetchDetails);
                                         </div>
                                     </div>
                                     <div class="flex items-center space-x-6">
+                                        <div class="flex items-center gap-8 mr-6 border-r border-slate-100 pr-8 py-2">
+                                            <div class="text-right">
+                                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Started At</p>
+                                                <p class="text-[11px] font-black text-slate-700">{{ formatTime(skillResult.started_at) }}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Finished At</p>
+                                                <p class="text-[11px] font-black text-slate-700">{{ formatTime(skillResult.finished_at) }}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Duration</p>
+                                                <p class="text-[11px] font-black text-indigo-600">{{ calculateDuration(skillResult.started_at, skillResult.finished_at) }}</p>
+                                            </div>
+                                        </div>
                                         <Button label="Reset Skill" icon="pi pi-refresh" severity="danger" outlined size="small" class="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl" @click="resetSkill(skillResult.skill_id, skillResult.skill?.name)" />
-                                        <div class="text-right">
+                                        
+                                        <div class="text-right border-l border-slate-100 pl-6 ml-2">
+                                            <div class="text-3xl font-black text-emerald-600 italic">
+                                                {{ skillResult.score !== null && skillResult.score !== undefined ? Math.round(Number(skillResult.score)) : 0 }}<span class="text-lg text-emerald-400">%</span>
+                                            </div>
+                                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Skill Score</p>
+                                        </div>
+
+                                        <div class="text-right border-l border-slate-100 pl-6 ml-2">
                                             <div class="text-3xl font-black text-slate-800 italic">{{ skillResult.max_level_reached }}</div>
                                             <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peak Tier Reached</p>
                                         </div>

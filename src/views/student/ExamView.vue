@@ -213,8 +213,8 @@ const startNextLevel = () => {
     // Trigger audio playback now that the student is ready
     nextTick(() => {
         if (audioRef.value) {
-            const mediaUrl = currentQ.value?.passage?.media_url || currentQ.value?.audio_url || currentQ.value?.media_url;
-            if (mediaUrl) {
+            const audioUrl = currentQ.value?.passage?.audio_url || currentQ.value?.passage?.audio_path || currentQ.value?.audio_url || currentQ.value?.audio_path;
+            if (audioUrl) {
                 audioRef.value.play().catch(err => {
                     console.warn('Manual play failed after transition:', err);
                 });
@@ -338,9 +338,8 @@ const submitAnswer = () => {
     } else if (q.type === 'speaking') {
         isValid = !!ans.recorded_file;
     } else if (q.type === 'drag_drop') {
-        isValid = ans.drag_drop_answers.every(a => a !== null);
+        isValid = ans.drag_drop_answers.some(a => a !== null && a !== '');
         if (isValid) {
-            // Serialize to text_answer for backend
             ans.text_answer = JSON.stringify(ans.drag_drop_answers);
         }
     } else if (q.type === 'fill_blank') {
@@ -651,9 +650,9 @@ watch(currentQ, (newQ) => {
         return;
     }
 
-    const mediaUrl = newQ?.passage?.media_url || newQ?.audio_url || newQ?.media_url;
+    const audioUrl = newQ?.passage?.audio_url || newQ?.passage?.audio_path || newQ?.audio_url || newQ?.audio_path;
     
-    if (mediaUrl) {
+    if (audioUrl) {
         nextTick(() => {
             if (audioRef.value) {
                 audioRef.value.load(); // Force reload for new source
@@ -856,7 +855,6 @@ onMounted(async () => {
                             
                             <audio ref="audioRef" 
                                 :src="resolveUrl(currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path)" 
-                                autoplay 
                                 @play="isAudioPlaying = true" 
                                 @pause="isAudioPlaying = false" 
                                 @ended="hasListened = true"
