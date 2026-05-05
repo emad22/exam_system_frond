@@ -44,7 +44,8 @@ const isSkillCompleted = (exam, skillId) => {
 const startSkill = async (skillId) => {
     if (!exams.value[0]) return;
     // Remove the blocking check for demo users
-    if (!isDemo.value && isSkillCompleted(skillId)) return;
+    // Fix: pass exams.value[0] as the first argument
+    if (!isDemo.value && isSkillCompleted(exams.value[0], skillId)) return;
     
     startingSkillId.value = skillId;
     try {
