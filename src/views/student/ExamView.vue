@@ -221,7 +221,7 @@ const confirmExit = async () => {
     showExitModal.value = false;
     try {
         isLoading.value = true;
-        await api.post(`/attempts/${attemptId}/finish`);
+        await api.post(`/attempts/${attemptId}/completion`);
         router.push('/dashboard');
     } catch (err) {
         console.error('Error finishing attempt:', err);
@@ -645,8 +645,8 @@ const resolveUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
     // Fallback: Use the base URL from the API service if the path is relative
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-    const storageBase = baseUrl.replace('/api', '/storage');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const storageBase = baseUrl.replace('/api/v1', '/storage').replace('/api', '/storage');
     return `${storageBase}/${path.replace('storage/', '')}`;
 };
 
@@ -672,7 +672,7 @@ watch(currentQ, (newQ) => {
 
     if (newQ && newQ.id) {
         // Update last_seen_question_id in background
-        api.post(`/attempts/${attemptId}/update-progress`, { question_id: newQ.id })
+        api.patch(`/attempts/${attemptId}/progress`, { question_id: newQ.id })
             .catch(err => console.warn('Progress update failed', err));
     }
 
@@ -748,7 +748,7 @@ const handleVisibilityChange = async () => {
 
         // Log to database
         try {
-            const res = await api.post(`/attempts/${attemptId}/log-warning`);
+            const res = await api.post(`/attempts/${attemptId}/warnings`);
 
             // If backend says we reached 3 warnings for this skill
             if (res.data.should_terminate_skill) {

@@ -30,6 +30,7 @@ const navigation = [
 const currentUser = computed(() => adminStore.user);
 const notifications = computed(() => adminStore.notifications);
 const showNotifications = ref(false);
+const showUserMenu = ref(false);
 const notificationAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
 const fetchNotifications = async () => {
@@ -46,7 +47,14 @@ const toggleNotifications = () => {
     showNotifications.value = !showNotifications.value;
 };
 
-const goToReport = (notif) => {
+const goToReport = async (notif) => {
+    try {
+        await api.post('/admin/notifications/mark-as-read', { id: notif.id });
+        adminStore.markAsRead(notif.id);
+    } catch (err) {
+        console.error('Failed to mark notification as read', err);
+    }
+
     const isTeacher = currentUser.value?.role === 'teacher';
     const routeName = isTeacher ? 'teacher.reports.show' : 'admin.reports.show';
     
@@ -73,11 +81,14 @@ onMounted(async () => {
     try {
         await adminStore.fetchUser();
         
-        // Start polling for notifications
+        // Start polling for notifications only if user is authenticated
         fetchNotifications();
         intervalId = setInterval(fetchNotifications, 15000); // Every 15 seconds
     } catch (err) {
         console.error('Failed to load user profile', err);
+        if (err.response?.status === 401) {
+            router.push('/login');
+        }
     }
 });
 
@@ -132,6 +143,14 @@ const vClickOutside = {
         document.removeEventListener('click', el.clickOutsideEvent);
     },
 };
+
+const resolveUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const storageBase = baseUrl.replace('/api/v1', '/storage').replace('/api', '/storage');
+    return `${storageBase}/${path.replace('storage/', '')}`;
+};
 </script>
 
 <template>
@@ -181,6 +200,7 @@ const vClickOutside = {
             <!-- User Profile / Bottom Section -->
             <div class="p-6 shrink-0 border-t border-slate-100 bg-slate-50/50">
                 <div
+                    @click="router.push('/profile')"
                     class="bg-white rounded-2xl p-4 mb-4 group cursor-pointer hover:bg-slate-50 transition-colors duration-300 border border-slate-200 shadow-sm">
                     <div class="flex items-center space-x-3">
                         <div
@@ -271,10 +291,40 @@ const vClickOutside = {
                                 </div>
                             </div>
                         </div>
-                        <Button icon="pi pi-cog" severity="secondary" rounded text aria-label="Settings" />
+                        <!-- User Profile Dropdown -->
+                        <div class="relative">
+                            <div @click.stop="showUserMenu = !showUserMenu" class="flex items-center gap-2 bg-white/50 hover:bg-white p-1.5 pr-3 rounded-2xl border border-slate-100 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md group">
+                                <div class="w-9 h-9 rounded-xl bg-brand-primary/10 flex items-center justify-center overflow-hidden border border-brand-primary/20">
+                                    <img v-if="currentUser?.avatar" :src="resolveUrl(currentUser.avatar)" class="w-full h-full object-cover" />
+                                    <i v-else class="pi pi-user text-brand-primary"></i>
+                                </div>
+                                <i class="pi pi-chevron-down text-[10px] text-slate-400 group-hover:text-brand-primary transition-transform duration-300" :class="{'rotate-180': showUserMenu}"></i>
+                            </div>
+
+                            <!-- Dropdown Menu -->
+                            <div v-if="showUserMenu" v-click-outside="() => showUserMenu = false" class="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in duration-200">
+                                <div class="p-4 border-b border-slate-50 bg-slate-50/50">
+                                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Signed in as</p>
+                                    <p class="text-xs font-black text-slate-800 truncate">{{ currentUser?.name || currentUser?.username }}</p>
+                                </div>
+                                <div class="p-2">
+                                    <button @click="router.push('/profile'); showUserMenu = false" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-brand-primary/5 hover:text-brand-primary rounded-xl transition-all group">
+                                        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-brand-primary/10">
+                                            <i class="pi pi-user-edit text-xs"></i>
+                                        </div>
+                                        Edit Profile
+                                    </button>
+                                    <div class="h-px bg-slate-50 my-1"></div>
+                                    <button @click="logout" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-xl transition-all group">
+                                        <div class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center group-hover:bg-rose-100">
+                                            <i class="pi pi-sign-out text-xs"></i>
+                                        </div>
+                                        Sign Out
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="h-8 w-px bg-slate-200 mx-2"></div>
-                    <Button label="New Action" icon="pi pi-plus" size="small" class="font-bold tracking-wide" />
                 </div>
             </header>
 

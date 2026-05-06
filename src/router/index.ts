@@ -55,6 +55,7 @@ import AdminSystemRequirements from '@/views/admin/SystemRequirements/index.vue'
 import AdminSystemRequirementsCreate from '@/views/admin/SystemRequirements/create.vue'
 import AdminSystemRequirementsEdit from '@/views/admin/SystemRequirements/edit.vue'
 import PublicRegisterWizard from '@/views/student/PublicRegisterWizard.vue'
+import ProfileView from '@/views/ProfileView.vue'
 
 
 const adminRoutes = [
@@ -269,6 +270,12 @@ const adminRoutes = [
     component: () => import('@/views/admin/Certificates/Templates.vue'),
     meta: { title: 'Certificate Templates' }
   },
+  {
+    path: '/admin/profile',
+    name: 'admin.profile',
+    component: ProfileView,
+    meta: { title: 'Security & Identity' }
+  },
 ];
 
 // Map Admin routes to Teacher routes
@@ -325,6 +332,12 @@ const routes = [
   {
     path: '/students',
     component: Students
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: ProfileView,
+    meta: { title: 'My Profile' }
   },
   ...adminRoutes,
   ...teacherRoutes

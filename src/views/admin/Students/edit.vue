@@ -7,6 +7,7 @@ import api from '@/services/api';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import Checkbox from 'primevue/checkbox';
+import Password from 'primevue/password';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import DatePicker from 'primevue/datepicker';
@@ -369,8 +370,13 @@ onMounted(() => {
                                         <h3 class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Credential Override</h3>
                                         <Button icon="pi pi-refresh" text rounded severity="secondary" size="small" @click="editForm.password = generatePassword()" />
                                      </div>
-                                     <div class="flex flex-col space-y-2">
-                                         <InputText v-model="editForm.password" class="w-full bg-transparent border-slate-700 text-white text-xl font-black tracking-[0.2em] font-mono text-center focus:border-brand-primary transition-all py-4" placeholder="••••••" />
+                                     <div class="flex flex-col space-y-2 relative">
+                                         <Password v-model="editForm.password" 
+                                            toggleMask 
+                                            :feedback="false"
+                                            class="w-full" 
+                                            inputClass="w-full bg-transparent border-slate-700 text-white text-xl font-black tracking-[0.2em] font-mono text-center focus:border-brand-primary transition-all py-4" 
+                                            placeholder="••••••" />
                                          <div class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center">Leave blank to retain current key</div>
                                      </div>
                                 </div>

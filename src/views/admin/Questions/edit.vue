@@ -294,6 +294,24 @@ const setCorrect = (qIdx, optIdx) => {
     }
 };
 
+const moveOptionUp = (qIdx, optIdx) => {
+    if (optIdx > 0) {
+        const options = form.value.questions[qIdx].options;
+        const temp = options[optIdx];
+        options[optIdx] = options[optIdx - 1];
+        options[optIdx - 1] = temp;
+    }
+};
+
+const moveOptionDown = (qIdx, optIdx) => {
+    const options = form.value.questions[qIdx].options;
+    if (optIdx < options.length - 1) {
+        const temp = options[optIdx];
+        options[optIdx] = options[optIdx + 1];
+        options[optIdx + 1] = temp;
+    }
+};
+
 const handleTypeChange = (qIdx) => {
     const q = form.value.questions[qIdx];
     if (q.type === 'true_false') {
@@ -508,50 +526,55 @@ onMounted(() => {
                 </template>
             </Card>
 
-            <!-- 2. Passage Context -->
+            <!-- 2. Reading Material / Shared Context -->
             <Card class="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-slate-50/50">
                 <template #title>
                     <div class="flex items-center px-4 py-2 gap-4">
                         <div class="w-10 h-10 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
                             <i class="pi pi-book text-xl"></i>
                         </div>
-                        <span class="text-lg font-black text-slate-800">Passage Integration</span>
+                        <span class="text-lg font-black text-slate-800">Reading Material / Shared Context</span>
                     </div>
                 </template>
                 <template #content>
                     <div class="px-4 space-y-6">
-                        <!-- Mode Selector: Display Only (Cannot change mode in edit) -->
-                        <div class="flex items-center gap-4 bg-slate-100/50 p-4 rounded-2xl">
-                            <i :class="[form.passage_mode === 'none' ? 'pi pi-ban' : 'pi pi-book', 'text-xl text-slate-400']"></i>
-                            <div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Passage Mode</span>
-                                <span class="text-sm font-black text-slate-700 uppercase tracking-wider">{{ form.passage_mode === 'none' ? 'No Passage Linked' : 'Integrated Context' }}</span>
-                            </div>
+                        <!-- Mode Selector: Simplified -->
+                        <div class="flex bg-slate-100/50 p-1.5 rounded-3xl gap-1">
+                            <button
+                                v-for="mode in [{ id: 'none', label: 'Single Question', icon: 'pi-ban' }, { id: 'existing', label: 'Existing Material', icon: 'pi-search' }, { id: 'new', label: 'New Material', icon: 'pi-plus-circle' }]"
+                                :key="mode.id" type="button" @click="form.passage_mode = mode.id"
+                                :class="form.passage_mode === mode.id ? 'bg-white shadow-sm text-slate-800 border-slate-200' : 'text-slate-500 hover:text-slate-700'"
+                                class="flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all duration-300 font-black text-xs uppercase tracking-wider">
+                                <i
+                                    :class="[mode.icon, form.passage_mode === mode.id ? 'text-indigo-500' : 'text-slate-300']"></i>
+                                {{ mode.label }}
+                            </button>
                         </div>
 
-                        <!-- Integrated Passage Editor -->
+                        <!-- Integrated Material Editor -->
                         <div v-if="form.passage_mode !== 'none'" class="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-sm border border-slate-50 space-y-8 animate-in zoom-in-95 duration-400">
                             
                             <!-- Header Info -->
                             <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                                 <div class="md:col-span-8 flex flex-col">
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Passage Title</label>
-                                    <InputText v-model="form.passage_title" placeholder="Descriptive title..." class="w-full rounded-2xl h-14 bg-slate-50/50 border-none px-6 font-bold text-slate-800" />
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Title of the Material / Text</label>
+                                    <InputText v-model="form.passage_title" placeholder="e.g. Reading Comprehension: The Solar System..." class="w-full rounded-2xl h-14 bg-slate-50/50 border-none px-6 font-bold text-slate-800" />
                                 </div>
                                 <div class="md:col-span-4 flex flex-col">
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Primary Type</label>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Material Type</label>
                                     <Select v-model="form.passage_type"
-                                        :options="[{ label: 'Text', value: 'text' }, { label: 'Image', value: 'image' }, { label: 'Audio', value: 'audio' }, { label: 'Video', value: 'video' }]"
+                                        :options="[{ label: 'Reading Text', value: 'text' }, { label: 'Image-based', value: 'image' }, { label: 'Audio-based', value: 'audio' }, { label: 'Video-based', value: 'video' }]"
                                         optionLabel="label" optionValue="value" class="w-full rounded-2xl h-14 bg-slate-50/50 border-none px-4" />
                                 </div>
                             </div>
 
                             <!-- Text Content: Rich Editor -->
                             <div class="flex flex-col">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Textual Content (Optional)</label>
-                                <Editor v-model="form.passage_content" editorStyle="height: 300px" 
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Main Content / Passage Text</label>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Type the reading text that questions will be based on</p>
+                                <Editor v-model="form.passage_content" editorStyle="height: 200px" 
                                     class="rounded-3xl overflow-hidden border border-slate-100 bg-slate-50/50"
-                                    placeholder="Update formatted text content here..." />
+                                    placeholder="Enter formatted reading text here..." />
                             </div>
 
                             <!-- Media Attachments -->
@@ -817,15 +840,28 @@ onMounted(() => {
                                     <div v-for="(opt, oIdx) in q.options" :key="oIdx" 
                                         class="flex items-center gap-6 p-5 rounded-[2rem] border-2 transition-all bg-white"
                                         :class="opt.is_correct ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-50 shadow-sm'">
-                                        <button v-if="q.type !== 'short_answer'" type="button" @click="setCorrect(qIdx, oIdx)" 
-                                            class="w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all shrink-0"
-                                            :class="opt.is_correct ? 'bg-emerald-500 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-200 text-transparent'">
-                                            <i class="pi pi-check text-sm font-black"></i>
-                                        </button>
+                                        <div class="flex flex-col items-center gap-1 shrink-0">
+                                            <span class="text-[9px] font-black text-slate-400 uppercase">#{{ oIdx + 1 }}</span>
+                                            <button v-if="q.type !== 'short_answer'" type="button" @click="setCorrect(qIdx, oIdx)" 
+                                                class="w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all"
+                                                :class="opt.is_correct ? 'bg-emerald-500 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-200 text-transparent'">
+                                                <i class="pi pi-check text-sm font-black"></i>
+                                            </button>
+                                        </div>
                                         <InputText v-model="opt.option_text" :disabled="q.type === 'true_false'" class="w-full border-none bg-transparent font-black text-slate-800 text-lg py-2 focus:ring-0" />
-                                        <button v-if="['mcq', 'short_answer', 'drag_drop', 'word_selection', 'click_word', 'fill_blank', 'matching', 'ordering', 'highlight', 'listening'].includes(q.type) && q.options.length > 1" @click="removeOption(qIdx, oIdx)" class="w-10 h-10 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all flex items-center justify-center shrink-0">
-                                            <i class="pi pi-trash"></i>
-                                        </button>
+                                        <div class="flex items-center gap-1 shrink-0">
+                                            <button v-if="oIdx > 0" type="button" @click="moveOptionUp(qIdx, oIdx)"
+                                                class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-brand-primary transition-all flex items-center justify-center">
+                                                <i class="pi pi-chevron-up text-[10px]"></i>
+                                            </button>
+                                            <button v-if="oIdx < q.options.length - 1" type="button" @click="moveOptionDown(qIdx, oIdx)"
+                                                class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-brand-primary transition-all flex items-center justify-center">
+                                                <i class="pi pi-chevron-down text-[10px]"></i>
+                                            </button>
+                                            <button v-if="['mcq', 'short_answer', 'drag_drop', 'word_selection', 'click_word', 'fill_blank', 'matching', 'ordering', 'highlight', 'listening'].includes(q.type) && q.options.length > 1" @click="removeOption(qIdx, oIdx)" class="w-8 h-8 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all flex items-center justify-center">
+                                                <i class="pi pi-trash text-[10px]"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

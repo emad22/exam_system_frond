@@ -29,6 +29,9 @@ export const useAdminStore = defineStore('admin', {
     },
     clearNotifications() {
       this.notifications = [];
+    },
+    markAsRead(id) {
+      this.notifications = this.notifications.filter(n => n.id !== id);
     }
   }
 });
