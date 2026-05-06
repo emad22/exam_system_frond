@@ -7,8 +7,6 @@ import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
-import RequirementTester from '@/components/RequirementTester.vue';
-
 
 const router = useRouter();
 const exams = ref([]);
@@ -18,13 +16,6 @@ const startingSkillId = ref(null);
 const selectedLevel = ref(1);
 const isDemo = ref(false);
 const certificates = ref([]);
-const systemRequirements = ref([]);
-const checkedRequirements = ref([]);
-const autoVerifiedIds = ref([]);
-const activeTesterReq = ref(null);
-const showRequirementsModal = ref(false);
-const pendingSkillId = ref(null);
-
 
 const fetchDashboard = async () => {
     isLoading.value = true;
@@ -47,65 +38,11 @@ const fetchDashboard = async () => {
         // Check role case-insensitively and include typos
         const userRole = (student.value?.role || '').toLowerCase();
         isDemo.value = ['demo', 'deom', 'staff'].includes(userRole);
-
-        // Fetch system requirements
-        const reqRes = await api.get('/public/system-requirements');
-        systemRequirements.value = reqRes.data;
-        autoVerifyRequirements(reqRes.data);
     } catch (err) {
         console.error('Failed to load dashboard', err);
     } finally {
         isLoading.value = false;
     }
-};
-
-const autoVerifyRequirements = (requirements) => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isOnline = navigator.onLine;
-    const isChrome = ua.includes('chrome') && !ua.includes('edg');
-    const isEdge = ua.includes('edg');
-    const isDesktop = !/android|iphone|ipad|mobile/.test(ua);
-    const hasMediaDevices = !!(navigator.mediaDevices);
-
-    requirements.forEach(req => {
-        if (req.test_type && req.test_type !== 'none') return;
-
-        const cat = req.category?.toLowerCase();
-        const title = req.title?.toLowerCase();
-        let verified = false;
-        
-        if (cat === 'internet' || title.includes('internet')) verified = isOnline;
-        else if (cat === 'browser' || title.includes('chrome')) verified = (isChrome || isEdge) && isDesktop;
-        else if (cat === 'hardware' || title.includes('audio')) verified = hasMediaDevices;
-
-        if (verified) {
-            autoVerifiedIds.value.push(req.id);
-            if (!checkedRequirements.value.includes(req.id)) checkedRequirements.value.push(req.id);
-        }
-    });
-};
-
-const canStart = computed(() => {
-    const mandatoryIds = systemRequirements.value.filter(r => r.is_mandatory).map(r => r.id);
-    return mandatoryIds.every(id => checkedRequirements.value.includes(id));
-});
-
-const toggleRequirement = (req) => {
-    if (autoVerifiedIds.value.includes(req.id)) return;
-    if (req.test_type && req.test_type !== 'none' && !checkedRequirements.value.includes(req.id)) {
-        activeTesterReq.value = req;
-        return;
-    }
-    const index = checkedRequirements.value.indexOf(req.id);
-    if (index === -1) checkedRequirements.value.push(req.id);
-    else checkedRequirements.value.splice(index, 1);
-};
-
-const handleTestPassed = (req) => {
-    if (!checkedRequirements.value.includes(req.id)) {
-        checkedRequirements.value.push(req.id);
-    }
-    activeTesterReq.value = null;
 };
 
 
@@ -137,36 +74,18 @@ const isSkillCompleted = (exam, skillId) => {
     return exam.completed_skill_ids.some(id => String(id) === String(skillId));
 };
 
-const startSkill = async (skillId) => {
+const startSkill = (skillId) => {
     if (!exams.value[0]) return;
     if (!isDemo.value && isSkillCompleted(exams.value[0], skillId)) return;
 
-    // Check if requirements are satisfied first
-    if (!canStart.value) {
-        pendingSkillId.value = skillId;
-        showRequirementsModal.value = true;
-        return;
-    }
-
-    startingSkillId.value = skillId;
-    try {
-        const payload = { skill_id: skillId };
-        if (isDemo.value) payload.level_id = selectedLevel.value;
-
-        const res = await api.post(`/exams/${exams.value[0].id}/start`, payload);
-        router.push(`/exam/${res.data.attempt.id}`);
-    } catch (err) {
-        alert(err.response?.data?.error || 'Failed to start session');
-    } finally {
-        startingSkillId.value = null;
-    }
-};
-
-const confirmStartAfterRequirements = () => {
-    showRequirementsModal.value = false;
-    if (pendingSkillId.value) {
-        startSkill(pendingSkillId.value);
-    }
+    router.push({
+        name: 'exam.setup',
+        params: {
+            examId: exams.value[0].id,
+            skillId: skillId,
+            levelId: isDemo.value ? selectedLevel.value : undefined
+        }
+    });
 };
 
 const resetDemoProgress = async () => {
@@ -582,40 +501,6 @@ const vClickOutside = {
             </div>
         </main>
 
-        <!-- Requirements Verification Modal -->
-        <Dialog v-model:visible="showRequirementsModal" modal header="System Readiness Check" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
-            <div class="p-4 text-center" dir="rtl">
-                <h3 class="text-xl font-black text-slate-900 mb-2">فحص جاهزية النظام</h3>
-                <p class="text-sm text-slate-500 mb-8">يرجى التأكد من استيفاء جميع المتطلبات التالية لضمان تجربة اختبار سلسة.</p>
-
-                <div class="grid grid-cols-1 gap-4 text-right mb-8">
-                    <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req)"
-                        class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:shadow-md">
-                        <div class="flex flex-col">
-                            <span class="text-sm font-black text-slate-700 uppercase tracking-tight">{{ req.title }}</span>
-                            <span class="text-[10px] text-slate-400">{{ req.description }}</span>
-                        </div>
-                        <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-200'"
-                            class="w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all shadow-sm">
-                            <i v-if="checkedRequirements.includes(req.id)" class="pi pi-check text-xs text-white"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-3">
-                    <button @click="confirmStartAfterRequirements" :disabled="!canStart"
-                        class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm tracking-widest shadow-xl hover:bg-brand-primary disabled:opacity-30 transition-all">
-                        بدء الاختبار الآن
-                    </button>
-                    <button @click="showRequirementsModal = false" class="text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:text-slate-600 transition-colors">
-                        إلغاء
-                    </button>
-                </div>
-            </div>
-        </Dialog>
-
-        <!-- Interactive Tester Component -->
-        <RequirementTester v-if="activeTesterReq" :requirement="activeTesterReq" @close="activeTesterReq = null" @passed="handleTestPassed" />
 
     </div>
 </template>

@@ -332,6 +332,11 @@ const routes = [
     component: ExamView
   },
   {
+    path: '/exam/setup/:examId/:skillId/:levelId?',
+    name: 'exam.setup',
+    component: ExamView
+  },
+  {
     path: '/exam/:id/result',
     name: 'result',
     component: ResultView

@@ -9,7 +9,10 @@ import RequirementTester from '@/components/RequirementTester.vue';
 
 const route = useRoute();
 const router = useRouter();
-const attemptId = route.params.id;
+const attemptId = ref(route.params.id);
+const examId = route.params.examId;
+const skillId = route.params.skillId;
+const levelId = route.params.levelId;
 
 const attempt = ref(null);
 const currentSkill = ref(null);
@@ -206,7 +209,7 @@ const autoVerifyRequirements = (requirements) => {
         else if (cat === 'hardware' || title.includes('audio')) verified = hasMediaDevices;
 
         if (verified) {
-            // No need to track in autoVerifiedIds as we don't show the check here anymore
+            autoVerifiedIds.value.push(req.id);
             if (!checkedRequirements.value.includes(req.id)) checkedRequirements.value.push(req.id);
         }
     });
@@ -215,16 +218,18 @@ const autoVerifyRequirements = (requirements) => {
 const fetchData = async () => {
     isLoading.value = true;
     try {
-        const [attRes, reqRes] = await Promise.all([
-            api.get(`/attempts/${attemptId}`),
+        const [reqRes] = await Promise.all([
             api.get('/public/system-requirements')
         ]);
-        attempt.value = attRes.data;
         systemRequirements.value = reqRes.data;
         autoVerifyRequirements(reqRes.data);
 
-        if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
-            router.push('/dashboard');
+        if (attemptId.value && attemptId.value !== 'start') {
+            const attRes = await api.get(`/attempts/${attemptId.value}`);
+            attempt.value = attRes.data;
+            if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
+                router.push('/dashboard');
+            }
         }
     } catch (err) {
         errorMsg.value = "Session initialization failed.";
@@ -234,6 +239,26 @@ const fetchData = async () => {
 };
 
 const beginExam = async () => {
+    if (!attemptId.value || attemptId.value === 'start') {
+        try {
+            isLoading.value = true;
+            const payload = { 
+                skill_id: skillId,
+                level_id: levelId
+            };
+            const res = await api.post(`/exams/${examId}/start`, payload);
+            attemptId.value = res.data.attempt.id;
+            attempt.value = res.data.attempt;
+            
+            // Update URL silently so refresh works
+            router.replace(`/exam/${attemptId.value}`);
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to start session');
+            isLoading.value = false;
+            return;
+        }
+    }
+    
     isStarting.value = false;
     await fetchNextBatch();
     startTimer();
@@ -243,7 +268,7 @@ const confirmExit = async () => {
     showExitModal.value = false;
     try {
         isLoading.value = true;
-        await api.post(`/attempts/${attemptId}/completion`);
+        await api.post(`/attempts/${attemptId.value}/completion`);
         router.push('/dashboard');
     } catch (err) {
         console.error('Error finishing attempt:', err);
@@ -291,7 +316,7 @@ const fetchNextBatch = async () => {
 
     questions.value = []; // Safety clear
     try {
-        const res = await api.get(`/attempts/${attemptId}/next-batch`);
+        const res = await api.get(`/attempts/${attemptId.value}/next-batch`);
         if (res.data.questions?.length > 0) {
             currentSkill.value = res.data.skill;
             // Show level transition if level changed
@@ -593,10 +618,10 @@ const submitCurrentBatch = async () => {
             }
         });
 
-        const res = await api.post(`/attempts/${attemptId}/submit-batch`, formData, {
+        const res = await api.post(`/attempts/${attemptId.value}/submit-batch`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
-        if (res.data.finished_exam) router.push(`/exam/${attemptId}/result`);
+        if (res.data.finished_exam) router.push(`/exam/${attemptId.value}/result`);
         else if (res.data.next_step === 'dashboard') router.push('/dashboard');
         else {
             // Handle retry notification logic
@@ -621,7 +646,7 @@ const submitCurrentBatch = async () => {
 
 const handleTimeout = async () => {
     try {
-        await api.post(`/attempts/${attemptId}/timeout`);
+        await api.post(`/attempts/${attemptId.value}/timeout`);
         router.push('/dashboard');
     } catch (err) {
         console.error('Timeout finalization failed', err);
@@ -694,7 +719,7 @@ watch(currentQ, (newQ) => {
 
     if (newQ && newQ.id) {
         // Update last_seen_question_id in background
-        api.patch(`/attempts/${attemptId}/progress`, { question_id: newQ.id })
+        api.patch(`/attempts/${attemptId.value}/progress`, { question_id: newQ.id })
             .catch(err => console.warn('Progress update failed', err));
     }
 
@@ -770,7 +795,7 @@ const handleVisibilityChange = async () => {
 
         // Log to database
         try {
-            const res = await api.post(`/attempts/${attemptId}/warnings`);
+            const res = await api.post(`/attempts/${attemptId.value}/warnings`);
 
             // If backend says we reached 3 warnings for this skill
             if (res.data.should_terminate_skill) {
@@ -990,22 +1015,22 @@ onUnmounted(() => {
                         are now about to enter a timed testing environment.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-1 gap-8 text-right mb-16">
-                        <div class="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-4">تعليمات الاختبار</h4>
-                            <ul class="text-right space-y-3 text-sm text-slate-600 font-medium">
-                                <li class="flex items-start gap-3">
-                                    <i class="pi pi-info-circle text-brand-primary mt-1"></i>
-                                    <span>بمجرد البدء، سيبدأ المؤقت الخاص بهذا الجزء من الاختبار.</span>
-                                </li>
-                                <li class="flex items-start gap-3">
-                                    <i class="pi pi-info-circle text-brand-primary mt-1"></i>
-                                    <span>يرجى التأكد من تواجدك في بيئة هادئة وتركيز كامل.</span>
-                                </li>
-                                <li class="flex items-start gap-3">
-                                    <i class="pi pi-info-circle text-brand-primary mt-1"></i>
-                                    <span>لا تغادر صفحة الاختبار حتى تنتهي من جميع الأسئلة.</span>
-                                </li>
-                            </ul>
+                        <div class="bg-slate-100/100 p-8 rounded-3xl border border-slate-100">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام
+                            </h4>
+                            <div class="space-y-4">
+                                <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req)"
+                                    class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
+                                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{
+                                        req.title
+                                        }}</span>
+                                    <div :class="checkedRequirements.includes(req.id) ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-50 border-slate-200'"
+                                        class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all">
+                                        <i v-if="checkedRequirements.includes(req.id)"
+                                            class="pi pi-check text-[8px] text-white"></i>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
