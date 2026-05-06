@@ -358,9 +358,7 @@ onMounted(() => {
                                 placeholder="E.G. JOHN@DOMAIN.COM OR USERNAME123..."></textarea>
                         </div>
                         <div class="space-y-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mapping
-                                Short
-                                Codes</label>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mapping Short Codes</label>
                             <input v-model="bulkSkills" type="text"
                                 class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-black uppercase text-brand-primary focus:bg-white focus:border-brand-primary/20 focus:ring-4 focus:ring-rose-50/50 transition-all outline-none shadow-sm"
                                 placeholder="E.G. R, W, G">

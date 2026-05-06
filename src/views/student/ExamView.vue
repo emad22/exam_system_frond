@@ -5,6 +5,7 @@ import api from '@/services/api';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import AudioRecorder from '@/components/AudioRecorder.vue';
+import RequirementTester from '@/components/RequirementTester.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -45,6 +46,7 @@ const showFinalCheatModal = ref(false);
 const showInactivityModal = ref(false);
 const cheatWarnings = ref(0);
 const lastActivityAt = ref(Date.now());
+const activeTesterReq = ref(null);
 
 // Timer State
 const timeLeftSeconds = ref(0);
@@ -160,11 +162,25 @@ const canStart = computed(() => {
     return mandatoryIds.every(id => checkedRequirements.value.includes(id));
 });
 
-const toggleRequirement = (id) => {
-    if (autoVerifiedIds.value.includes(id)) return;
-    const index = checkedRequirements.value.indexOf(id);
-    if (index === -1) checkedRequirements.value.push(id);
+const toggleRequirement = (req) => {
+    if (autoVerifiedIds.value.includes(req.id)) return;
+    
+    // If it has an interactive test, open the tester instead of just checking it
+    if (req.test_type && req.test_type !== 'none' && !checkedRequirements.value.includes(req.id)) {
+        activeTesterReq.value = req;
+        return;
+    }
+
+    const index = checkedRequirements.value.indexOf(req.id);
+    if (index === -1) checkedRequirements.value.push(req.id);
     else checkedRequirements.value.splice(index, 1);
+};
+
+const handleTestPassed = (req) => {
+    if (!checkedRequirements.value.includes(req.id)) {
+        checkedRequirements.value.push(req.id);
+    }
+    activeTesterReq.value = null;
 };
 
 const autoVerifyRequirements = (requirements) => {
@@ -176,9 +192,15 @@ const autoVerifyRequirements = (requirements) => {
     const hasMediaDevices = !!(navigator.mediaDevices);
 
     requirements.forEach(req => {
+        // Do not auto-verify if it requires an interactive test
+        if (req.test_type && req.test_type !== 'none') {
+            return;
+        }
+
         const cat = req.category?.toLowerCase();
         const title = req.title?.toLowerCase();
         let verified = false;
+        
         if (cat === 'internet' || title.includes('internet')) verified = isOnline;
         else if (cat === 'browser' || title.includes('chrome')) verified = (isChrome || isEdge) && isDesktop;
         else if (cat === 'hardware' || title.includes('audio')) verified = hasMediaDevices;
@@ -972,7 +994,7 @@ onUnmounted(() => {
                             <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام
                             </h4>
                             <div class="space-y-4">
-                                <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req.id)"
+                                <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req)"
                                     class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
                                     <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{
                                         req.title
@@ -1375,6 +1397,9 @@ onUnmounted(() => {
                 </div>
             </div>
         </div>
+
+        <!-- System Requirement Tester Modal -->
+        <RequirementTester v-if="activeTesterReq" :requirement="activeTesterReq" @close="activeTesterReq = null" @passed="handleTestPassed" />
 
         <!-- showConfirmAnswerModal -->
         <div v-if="showConfirmAnswerModal"

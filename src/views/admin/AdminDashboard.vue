@@ -11,19 +11,13 @@ import ProgressSpinner from 'primevue/progressspinner';
 import Button from 'primevue/button';
 
 const adminStore = useAdminStore();
-const stats = ref({
-    students_count: 0,
-    exams_count: 0,
-    attempts_count: 0,
-    live_students_count: 0,
-    recent_attempts: []
-});
+const stats = ref(null);
 const loading = ref(true);
 
 onMounted(async () => {
     try {
         const res = await api.get('/admin/stats');
-        stats.value = res.data;
+        stats.value = res.data.data;
     } catch (err) {
         console.error("Error loading stats", err);
     } finally {
@@ -69,8 +63,8 @@ const getStatusSeverity = (status) => {
         </div>
 
         <!-- Metric Hub Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Stat Card 1 -->
+        <div v-if="stats" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Stat Card 1: Students -->
             <div class="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm group hover:shadow-xl transition-all duration-500 relative overflow-hidden">
                 <div class="absolute -right-4 -top-4 w-32 h-32 bg-slate-50 rounded-full group-hover:scale-150 transition-all duration-700 opacity-50"></div>
                 <div class="relative z-10">
@@ -78,17 +72,20 @@ const getStatusSeverity = (status) => {
                           <div class="w-14 h-14 bg-brand-primary rounded-[1.5rem] flex items-center justify-center text-white shadow-lg shadow-rose-200 group-hover:rotate-12 transition-all">
                                <i class="pi pi-users text-2xl"></i>
                           </div>
-                          <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Candidate Matrix</span>
+                          <span v-if="stats.stats.students.today > 0" class="bg-emerald-50 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest border border-emerald-100">
+                              +{{ stats.stats.students.today }} Today
+                          </span>
+                          <span v-else class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Candidate Matrix</span>
                      </div>
                      <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Institutional Reach</h3>
-                     <div class="text-6xl font-black text-slate-800 tracking-tighter">{{ stats.students_count }}</div>
+                     <div class="text-6xl font-black text-slate-800 tracking-tighter">{{ stats.stats.students.total }}</div>
                      <p class="mt-8 text-[10px] font-black text-brand-primary uppercase tracking-widest border-t border-slate-50 pt-6 flex items-center">
                          <i class="pi pi-check-circle mr-2"></i> Verified Student Registrations
                      </p>
                 </div>
             </div>
 
-            <!-- Stat Card 2 -->
+            <!-- Stat Card 2: Exams -->
             <div class="bg-rose-50/50 p-10 rounded-[2.5rem] border border-brand-primary/10 group hover:shadow-xl transition-all duration-500 relative overflow-hidden">
                 <div class="absolute -right-4 -top-4 w-32 h-32 bg-brand-primary/5 rounded-full group-hover:scale-150 transition-all duration-700 opacity-50"></div>
                 <div class="relative z-10">
@@ -96,17 +93,20 @@ const getStatusSeverity = (status) => {
                           <div class="w-14 h-14 bg-brand-accent rounded-[1.5rem] flex items-center justify-center text-white shadow-lg shadow-rose-100 group-hover:rotate-12 transition-all">
                                <i class="pi pi-file-edit text-2xl"></i>
                           </div>
-                          <span class="text-[8px] font-black text-brand-primary/30 uppercase tracking-widest">Assessment Matrix</span>
+                          <span v-if="stats.stats.exams.today > 0" class="bg-brand-primary/10 text-brand-primary text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                              +{{ stats.stats.exams.today }} New
+                          </span>
+                          <span v-else class="text-[8px] font-black text-brand-primary/30 uppercase tracking-widest">Assessment Matrix</span>
                      </div>
                      <h3 class="text-[10px] font-black text-brand-primary/40 uppercase tracking-widest mb-2 italic">Evaluative Depth</h3>
-                     <div class="text-6xl font-black text-brand-primary tracking-tighter">{{ stats.exams_count }}</div>
+                     <div class="text-6xl font-black text-brand-primary tracking-tighter">{{ stats.stats.exams.total }}</div>
                      <p class="mt-8 text-[10px] font-black text-brand-primary uppercase tracking-widest border-t border-brand-primary/10 pt-6 flex items-center">
                          <i class="pi pi-cloud mr-2 text-brand-accent"></i> Deployed Assessment Units
                      </p>
                 </div>
             </div>
 
-            <!-- Stat Card 3 -->
+            <!-- Stat Card 3: Attempts -->
             <div class="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm group hover:shadow-xl transition-all duration-500 relative overflow-hidden">
                 <div class="absolute -right-4 -top-4 w-32 h-32 bg-slate-50 rounded-full group-hover:scale-150 transition-all duration-700 opacity-50"></div>
                 <div class="relative z-10">
@@ -114,10 +114,12 @@ const getStatusSeverity = (status) => {
                           <div class="w-14 h-14 bg-slate-800 rounded-[1.5rem] flex items-center justify-center text-white shadow-lg shadow-slate-200 group-hover:rotate-12 transition-all">
                                <i class="pi pi-chart-line text-2xl"></i>
                           </div>
-                          <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Protocol Sync</span>
+                          <span class="text-[8px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-full uppercase tracking-widest">
+                              {{ stats.stats.attempts.last_7_days }} Wkly
+                          </span>
                      </div>
                      <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Performance Volume</h3>
-                     <div class="text-6xl font-black text-slate-800 tracking-tighter">{{ stats.attempts_count }}</div>
+                     <div class="text-6xl font-black text-slate-800 tracking-tighter">{{ stats.stats.attempts.total }}</div>
                      <p class="mt-8 text-[10px] font-black text-slate-500 uppercase tracking-widest border-t border-slate-50 pt-6 flex items-center">
                          <i class="pi pi-spin pi-spinner mr-2 opacity-50"></i> Total Evaluated Sessions
                      </p>
@@ -129,23 +131,23 @@ const getStatusSeverity = (status) => {
                 <div class="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500/5 rounded-full group-hover:scale-150 transition-all duration-700 opacity-50"></div>
                 <div class="relative z-10 flex items-center justify-between">
                      <div>
-                         <div class="flex items-center gap-3 mb-4">
-                             <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
-                             <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Live telemetry active</span>
-                         </div>
-                         <h3 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-1 italic">Real-time engagement</h3>
-                         <div class="text-7xl font-black text-emerald-600 tracking-tighter">{{ stats.live_students_count }}</div>
-                         <p class="mt-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Students currently performing assessments</p>
+                          <div class="flex items-center gap-3 mb-4">
+                              <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
+                              <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Live telemetry active</span>
+                          </div>
+                          <h3 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-1 italic">Real-time engagement</h3>
+                          <div class="text-7xl font-black text-emerald-600 tracking-tighter">{{ stats.stats.live }}</div>
+                          <p class="mt-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Students currently performing assessments</p>
                      </div>
                      <div class="hidden md:block">
-                         <i class="pi pi-bolt text-7xl text-emerald-100 group-hover:text-emerald-200 transition-colors"></i>
+                          <i class="pi pi-bolt text-7xl text-emerald-100 group-hover:text-emerald-200 transition-colors"></i>
                      </div>
                 </div>
             </div>
         </div>
 
         <!-- Recent Intelligence Timeline -->
-        <Card class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
+        <Card v-if="stats" class="border border-slate-100 shadow-sm rounded-[2.5rem] overflow-hidden mt-6">
             <template #header>
                 <div class="px-10 py-10 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center space-y-6 md:space-y-0">
                     <div>
@@ -160,18 +162,16 @@ const getStatusSeverity = (status) => {
                      
                      <Column header="Institutional Entity" style="min-width: 300px">
                         <template #body="{ data }">
-                            <div class="flex items-center space-x-4 py-3 group cursor-pointer" 
-                                 @click="data.student_id ? $router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.students.show' : 'admin.students.show', params: { id: data.student_id } }) : $router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.reports' : 'admin.reports' })">
+                            <div class="flex items-center space-x-4 py-3 group cursor-pointer">
                                  <div class="w-11 h-11 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 shadow-sm transition-all group-hover:bg-brand-primary group-hover:text-white group-hover:rotate-6">
                                      <i class="pi pi-id-card text-lg"></i>
                                  </div>
                                  <div class="space-y-1">
                                       <div class="font-black text-slate-800 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">
-                                          {{ data.student?.user?.first_name || data.user?.first_name || 'DEMO' }} 
-                                          {{ data.student?.user?.last_name || data.user?.last_name || 'USER' }}
+                                          {{ data.student_name }}
                                       </div>
                                       <div class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
-                                          {{ data.student_id ? 'Identity #' + data.student_id : 'STAFF/DEMO ACCOUNT' }}
+                                          Identity Record
                                       </div>
                                  </div>
                             </div>
@@ -181,7 +181,7 @@ const getStatusSeverity = (status) => {
                      <Column header="Logic Domain" style="min-width: 250px">
                         <template #body="{ data }">
                             <div class="flex flex-col space-y-1">
-                                <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight leading-none">{{ data.exam?.title }}</span>
+                                <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight leading-none">{{ data.exam_title }}</span>
                                 <div class="flex items-center space-x-2">
                                      <div class="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse"></div>
                                      <span class="text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em]">Active Matrix Deployment</span>
@@ -200,9 +200,9 @@ const getStatusSeverity = (status) => {
                         <template #body="{ data }">
                              <div class="flex flex-col items-end">
                                  <div class="text-2xl font-black text-slate-800 tracking-tighter leading-none">
-                                    {{ data.total_score || 0 }}
+                                    {{ data.total_score }}
                                  </div>
-                                 <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">Points Acquired</div>
+                                 <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">{{ data.avg_score }}% Accuracy</div>
                              </div>
                         </template>
                      </Column>
@@ -210,15 +210,14 @@ const getStatusSeverity = (status) => {
                      <Column header="Chronology" style="width: 150px" class="text-right">
                         <template #body="{ data }">
                              <div class="flex flex-col items-end px-2">
-                                 <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">{{ new Date(data.created_at).toLocaleDateString() }}</span>
-                                 <span class="text-[8px] font-bold text-slate-300 uppercase italic">{{ new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</span>
+                                 <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">{{ data.created_at }}</span>
                              </div>
                         </template>
                      </Column>
 
                      <template #empty>
                         <div class="p-20 text-center">
-                             <div class="text-4xl mb-6 opacity-10 italic">ðŸ“¡</div>
+                             <div class="text-4xl mb-6 opacity-10 italic">📡</div>
                              <p class="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em]">Institutional telemetry matrix empty...</p>
                         </div>
                      </template>

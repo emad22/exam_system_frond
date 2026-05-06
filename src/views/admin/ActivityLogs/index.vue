@@ -7,8 +7,8 @@ import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
-import Calendar from 'primevue/calendar';
+import Select from 'primevue/select';
+import DatePicker from 'primevue/datepicker';
 import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
 import { useConfirm } from "primevue/useconfirm";
@@ -155,7 +155,7 @@ const bulkDelete = () => {
             <div class="bg-white/60 backdrop-blur-md p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-wrap gap-6 items-end">
                 <div class="flex flex-col space-y-2">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Action Type</label>
-                    <Dropdown v-model="filters.action" :options="actionOptions" optionLabel="label" optionValue="value" class="w-48 rounded-xl border-slate-100" />
+                    <Select v-model="filters.action" :options="actionOptions" optionLabel="label" optionValue="value" class="w-48 rounded-xl border-slate-100" />
                 </div>
                 
                 <div class="flex flex-col space-y-2">
@@ -165,12 +165,12 @@ const bulkDelete = () => {
 
                 <div class="flex flex-col space-y-2">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">From Date</label>
-                    <Calendar v-model="filters.date_from" dateFormat="yy-mm-dd" class="w-48 rounded-xl" :showIcon="true" />
+                    <DatePicker v-model="filters.date_from" dateFormat="yy-mm-dd" class="w-48 rounded-xl" :showIcon="true" />
                 </div>
 
                 <div class="flex flex-col space-y-2">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">To Date</label>
-                    <Calendar v-model="filters.date_to" dateFormat="yy-mm-dd" class="w-48 rounded-xl" :showIcon="true" />
+                    <DatePicker v-model="filters.date_to" dateFormat="yy-mm-dd" class="w-48 rounded-xl" :showIcon="true" />
                 </div>
             </div>
 

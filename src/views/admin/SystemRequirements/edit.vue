@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
@@ -28,9 +28,19 @@ const categories = [
     { label: 'Hardware', value: 'Hardware' }
 ];
 
+const testTypes = [
+    { label: 'None (Manual Check)', value: 'none' },
+    { label: 'Audio Output (Speakers)', value: 'audio_output' },
+    { label: 'Audio Input (Microphone)', value: 'audio_input' },
+    { label: 'Video Input (Camera)', value: 'video_input' },
+    { label: 'Network Speed Test', value: 'network_speed' },
+    { label: 'Browser Compatibility', value: 'browser_compatibility' }
+];
+
 const form = ref({
     title: '',
     description: '',
+    test_type: 'none',
     category: 'General',
     is_active: true,
     is_mandatory: true,
@@ -134,6 +144,11 @@ const updateRequirement = async () => {
                                                 <i class="pi pi-cog text-xs"></i>
                                             </div>
                                             <h3 class="text-sm font-black text-slate-800 uppercase tracking-wider">Classification</h3>
+                                        </div>
+
+                                        <div class="flex flex-col space-y-2">
+                                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">Interactive Test Type</label>
+                                            <Select v-model="form.test_type" :options="testTypes" optionLabel="label" optionValue="value" class="w-full rounded-xl bg-slate-50 border-slate-100" />
                                         </div>
 
                                         <div class="flex flex-col space-y-2">
