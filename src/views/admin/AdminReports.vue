@@ -7,22 +7,71 @@ import { useAdminStore } from '@/stores/admin';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
+import Select from 'primevue/select';
 
 const router = useRouter();
 const adminStore = useAdminStore();
 const attempts = ref([]);
+const partners = ref([]);
+const selectedPartner = ref(null);
 const loading = ref(true);
 const search = ref('');
 
+const skillMap = {
+    'listening': 'Listening',
+    'reading': 'Reading',
+    'grammar': 'Grammar',
+    'writing': 'Writing',
+    'writting': 'Writing',
+    'speaking': 'Speaking'
+};
+
+const getSkillDisplayName = (name) => {
+    alert(name);
+    if (!name) return 'Unknown Skill';
+    const lowerName = name.toLowerCase();
+    const matchedKey = Object.keys(skillMap).find(key => lowerName.includes(key));
+    return matchedKey ? skillMap[matchedKey] : name;
+};
+
+const getSortedSkills = (skills) => {
+    if (!skills) return [];
+    const orderMap = {
+        'Listening': 1,
+        'Reading': 2,
+        'Grammar': 3,
+        'Writing': 4,
+        'Speaking': 5
+    };
+
+    return [...skills].sort((a, b) => {
+        const nameA = getSkillDisplayName(a.skill?.name);
+        const nameB = getSkillDisplayName(b.skill?.name);
+        return (orderMap[nameA] || 99) - (orderMap[nameB] || 99);
+    });
+};
+
 const fetchReports = async () => {
     loading.value = true;
+   
     try {
         const res = await api.get('/admin/reports');
+        // api.get('/admin/partners/active');
         attempts.value = res.data.data || res.data;
+      //   console.log("****************************"+JSON.stringify(attempts.value));
     } catch (err) {
         console.error('Failed to load reports', err);
     } finally {
         loading.value = false;
+    }
+};
+
+const fetchPartners = async () => {
+    try {
+        const res = await api.get('/admin/partners/active');
+        partners.value = res.data;
+    } catch (err) {
+        console.error('Failed to load partners', err);
     }
 };
 
@@ -37,12 +86,21 @@ const viewDetails = (id) => {
 };
 
 const filtered = () => {
-    if (!search.value) return attempts.value;
-    const q = search.value.toLowerCase();
-    return attempts.value.filter(a =>
-        `${a.student?.user?.first_name} ${a.student?.user?.last_name}`.toLowerCase().includes(q) ||
-        a.exam?.title?.toLowerCase().includes(q)
-    );
+    let result = attempts.value;
+
+    if (selectedPartner.value) {
+        result = result.filter(a => a.student?.partner_id === selectedPartner.value);
+    }
+
+    if (search.value) {
+        const q = search.value.toLowerCase();
+        result = result.filter(a =>
+            `${a.student?.user?.first_name} ${a.student?.user?.last_name}`.toLowerCase().includes(q) ||
+            a.exam?.title?.toLowerCase().includes(q)
+        );
+    }
+    
+    return result;
 };
 
 const scoreColor = (score) => {
@@ -52,7 +110,10 @@ const scoreColor = (score) => {
     return 'text-rose-600';
 };
 
-onMounted(fetchReports);
+onMounted(() => {
+    fetchReports();
+    fetchPartners();
+});
 </script>
 
 <template>
@@ -66,6 +127,7 @@ onMounted(fetchReports);
                 <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-1">Movement reports for completed evaluations</p>
             </div>
             <div class="flex items-center space-x-3">
+                <Select v-model="selectedPartner" :options="partners" optionLabel="partner_name" optionValue="id" placeholder="Filter by Partner" showClear class="w-48 bg-slate-50 border-slate-100 rounded-xl text-xs font-bold" />
                 <span class="relative">
                     <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 text-xs" />
                     <input v-model="search" type="text" placeholder="Filter identities..."
@@ -129,6 +191,33 @@ onMounted(fetchReports);
                                     {{ attempt.finished_at ? new Date(attempt.finished_at).toLocaleDateString('en-GB') : 'PENDING' }}
                                 </div>
                                 <div class="text-[8px] font-bold text-emerald-500 uppercase tracking-tight" v-if="attempt.status === 'completed'">Validated Outcome</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" class="bg-slate-50 px-10 pb-6">
+                                <div class="flex flex-wrap gap-3 mt-2">
+                                    <div 
+                                        v-for="skillResult in sortedAttemptSkills" :key="skillResult.id"
+                                        :value="skillResult.skill_id.toString()" class="mr-4 group shrink-0">
+
+                                        <div class="flex items-center space-x-3 px-6 py-3 rounded-2xl transition-all group-aria-selected:bg-brand-primary group-aria-selected:text-white group-aria-selected:shadow-lg group-aria-selected:shadow-indigo-200/50 bg-white border border-slate-100 hover:border-slate-200">
+                                        <span class="w-6 h-6 rounded-lg bg-indigo-50/50 text-indigo-500 group-aria-selected:bg-white/20 group-aria-selected:text-white flex items-center justify-center font-black text-[10px]">{{
+                                            skillResult.skill?.short_code || 'S' }}</span>
+                                        <span class="text-[11px] font-black uppercase tracking-widest">{{
+                                            getSkillDisplayName(skillResult.skill?.name) }}</span>
+                                        </div>
+
+                                        <span class="font-bold text-slate-500 text-xs uppercase">
+                                            {{ getSkillDisplayName(skillResult.skill?.name) }}
+                                        </span>
+
+                                        <span class="font-black text-sm" :class="scoreColor(skillResult.score)">
+                                            {{ sk.score !== null ? Math.round(sk.score) + '%' : '—' }}
+                                        </span>
+                                    </div>
+
+                                </div>
+
                             </td>
                         </tr>
                     </tbody>
