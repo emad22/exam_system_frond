@@ -103,21 +103,13 @@ const resetDemoProgress = async () => {
 
 const getSkillIcon = (name) => {
     name = name.toLowerCase();
-<<<<<<< HEAD
     if (name.includes('listening')) return '/Listening02.png';
     if (name.includes('reading')) return '/Reading-1.png';
     if (name.includes('writing')) return '/Writing-01.png';
     if (name.includes('speaking')) return '/Speaking-02.png';
     if (name.includes('grammar') || name.includes('structure')) return '/Strac-01.png';
     return '/logo.png';
-=======
-    if (name.includes('listening')) return '🎧';
-    if (name.includes('reading')) return '📖';
-    if (name.includes('writing')) return '✍️';
-    if (name.includes('speaking')) return '🗣️';
-    if (name.includes('structure') || name.includes('structure')) return '📋';
-    return '🎯';
->>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
+
 };
 
 const logout = () => {
@@ -249,16 +241,8 @@ const vClickOutside = {
                         <div v-if="showUserMenu" v-click-outside="() => showUserMenu = false"
                             class="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in duration-200">
                             <div class="p-4 border-b border-slate-50 bg-slate-50/50">
-<<<<<<< HEAD
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-left">Candidate</p>
                                 <p class="text-xs font-black text-slate-800 truncate text-left">{{ fullStudentName }}</p>
-=======
-                                <p
-                                    class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-left">
-                                    Candidate</p>
-                                <p class="text-xs font-black text-slate-800 truncate text-left">{{ student?.name ||
-                                    student?.first_name }}</p>
->>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
                             </div>
                             <div class="p-2">
                                 <button @click="router.push('/profile'); showUserMenu = false"
@@ -458,7 +442,6 @@ const vClickOutside = {
                         :class="isSkillCompleted(exams[0], skill.id) ? 'opacity-50 grayscale pointer-events-none' : 'hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 hover:border-brand-primary/20'">
 
                         <!-- Icon -->
-<<<<<<< HEAD
                         <div :class="[
                             isSkillCompleted(exams[0], skill.id) ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-600 group-hover:bg-brand-primary group-hover:text-white',
                             'w-12 h-12 rounded-xl flex items-center justify-center text-lg transition-all duration-500 shadow-sm border border-slate-100 shrink-0'
@@ -470,15 +453,6 @@ const vClickOutside = {
                                 :alt="skill.name"
                                 class="h-9 w-9 object-contain group-hover:scale-110 transition-transform"
                             />
-=======
-                        <div
-                            :class="[
-                                isSkillCompleted(exams[0], skill.id) ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-600 group-hover:bg-brand-primary group-hover:text-white',
-                                'w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all duration-500 shadow-sm border border-slate-100 shrink-0']">
-                            <i v-if="isSkillCompleted(exams[0], skill.id)" class="pi pi-check text-sm"></i>
-                            <span v-else class="group-hover:scale-110 transition-transform">{{ getSkillIcon(skill.name)
-                            }}</span>
->>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
                         </div>
 
                         <!-- Details -->
