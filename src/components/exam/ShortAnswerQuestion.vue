@@ -1,0 +1,57 @@
+<script setup>
+import { computed } from 'vue';
+import VirtualKeyboard from '@/components/VirtualKeyboard.vue';
+import { useVirtualKeyboard } from '@/composables/useVirtualKeyboard';
+
+const props = defineProps({
+    question: {
+        type: Object,
+        required: true
+    },
+    answer: {
+        type: Object,
+        required: true
+    },
+    disabled: {
+        type: Boolean,
+        default: false
+    }
+});
+
+const emit = defineEmits(['update:answer']);
+
+const textAnswer = computed({
+    get: () => props.answer.text_answer || '',
+    set: (val) => emit('update:answer', { ...props.answer, text_answer: val })
+});
+
+const { keyboardLayout, showVirtualKeyboard, toggleKeyboardLayout } = useVirtualKeyboard();
+</script>
+
+<template>
+    <div class="space-y-4">
+        <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg flex flex-col items-center gap-6">
+            <div class="w-full max-w-sm">
+                <input v-model="textAnswer" :disabled="disabled" type="text"
+                    class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-lg font-black text-slate-800 text-center focus:border-brand-primary outline-none transition-all"
+                    placeholder="اكتب إجابتك هنا..." dir="auto" />
+            </div>
+            
+            <div class="flex items-center gap-4 w-full justify-center">
+                <button @click="toggleKeyboardLayout" class="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-500 transition-all">
+                    {{ keyboardLayout === 'arabic' ? 'English Keyboard' : 'Arabic Keyboard' }}
+                </button>
+                <button @click="showVirtualKeyboard = !showVirtualKeyboard" class="w-10 h-8 flex items-center justify-center bg-slate-100 rounded-lg hover:bg-slate-200 transition-all" :title="showVirtualKeyboard ? 'Hide Keyboard' : 'Show Keyboard'">
+                    <svg viewBox="0 0 24 24" class="w-5 h-5 transition-colors" :class="showVirtualKeyboard ? 'text-brand-primary' : 'text-slate-400'" fill="currentColor">
+                        <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <VirtualKeyboard v-if="showVirtualKeyboard && !disabled" 
+                v-model="textAnswer" 
+                :layout="keyboardLayout" 
+                class="w-full" />
+        </div>
+    </div>
+</template>

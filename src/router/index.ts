@@ -383,14 +383,36 @@ router.beforeEach((to) => {
   const isPublicVerification = to.path.startsWith('/verify-certificate/');
   const authRequired = !publicPages.includes(to.path) && !isPublicVerification;
   const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
 
   if (authRequired && !token) {
     return '/login';
   }
 
+  // Redirect authenticated users away from public pages
   if (to.path === '/login' && token) {
-    const role = localStorage.getItem('role');
-    return role === 'teacher' ? '/teacher' : '/admin';
+    if (role === 'teacher') return '/teacher';
+    if (role === 'student') return '/dashboard';
+    return '/admin';
+  }
+
+  // Administrative path protection
+  if (to.path.startsWith('/admin')) {
+    if (role !== 'admin' && role !== 'demo') {
+      return role === 'teacher' ? '/teacher' : '/dashboard';
+    }
+  }
+
+  // Teacher path protection
+  if (to.path.startsWith('/teacher')) {
+    if (role !== 'teacher' && role !== 'admin' && role !== 'demo') {
+      return '/dashboard';
+    }
+  }
+
+  // Student path protection (optional, but good for consistency)
+  if (to.path === '/dashboard' && (role === 'admin' || role === 'teacher')) {
+    return role === 'admin' ? '/admin' : '/teacher';
   }
   
   return true;

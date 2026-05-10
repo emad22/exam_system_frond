@@ -7,6 +7,13 @@ import InputText from 'primevue/inputtext';
 import AudioRecorder from '@/components/AudioRecorder.vue';
 import RequirementTester from '@/components/RequirementTester.vue';
 import StudentHeader from '@/components/StudentHeader.vue';
+import VirtualKeyboard from '@/components/VirtualKeyboard.vue';
+import QuestionDispatcher from '@/components/exam/QuestionDispatcher.vue';
+
+// Composables
+import { useExamTimer } from '@/composables/useExamTimer';
+import { useAntiCheat } from '@/composables/useAntiCheat';
+import { useAudioEngine } from '@/composables/useAudioEngine';
 
 const route = useRoute();
 const router = useRouter();
@@ -34,131 +41,51 @@ const showRetryNotification = ref(false);
 const errorMsg = ref('');
 const checkedRequirements = ref([]);
 const autoVerifiedIds = ref([]);
-const audioRef = ref(null);
-const isAudioPlaying = ref(false);
 const hasListened = ref(false);
 const isDemo = ref(false);
 const showLevelTransition = ref(false);
 const nextLevelName = ref('');
-const autoplayFailed = ref(false);
-const lastAudioUrl = ref('');
 const showTimeoutModal = ref(false);
+const lastAudioUrl = ref('');
+// Modals managed locally or by composables
 const showExitModal = ref(false);
 const showConfirmAnswerModal = ref(false);
-const showCheatModal = ref(false);
-const showFinalCheatModal = ref(false);
 const showInactivityModal = ref(false);
-const cheatWarnings = ref(0);
-const lastActivityAt = ref(Date.now());
 const activeTesterReq = ref(null);
-
-// Timer State
-const timeLeftSeconds = ref(0);
-const timerInterval = ref(null);
+const keyboardLayout = ref('arabic');
+const showVirtualKeyboard = ref(true);
 const timerConfig = ref(null);
+const lastActivityAt = ref(Date.now());
 
-// Audio Tracking State
-const audioProgress = ref(0);
-const audioCurrentTime = ref('0:00');
-const audioDuration = ref('0:00');
+const toggleKeyboardLayout = () => {
+    keyboardLayout.value = keyboardLayout.value === 'arabic' ? 'english' : 'arabic';
+};
 
-const formattedTime = computed(() => {
-    if (timeLeftSeconds.value <= 0) return "00:00:00";
-    const h = Math.floor(timeLeftSeconds.value / 3600);
-    const m = Math.floor((timeLeftSeconds.value % 3600) / 60);
-    const s = timeLeftSeconds.value % 60;
-    if (h > 0) {
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-});
+const focusedInputIndex = ref(0);
+
+// Use Composables
+const { timeLeftSeconds, formattedTime, isTimeLow, startTimer: initTimer, stopTimer } = useExamTimer();
+const {
+    cheatWarnings, showCheatModal, showFinalCheatModal, isIntentionallyLeaving,
+    handleVisibilityChange: logCheatWarning, setupAntiCheat, destroyAntiCheat
+} = useAntiCheat(attemptId, { onFinalWarning: () => handleTimeout() });
+
+const {
+    audioRef, isAudioPlaying, audioProgress, audioCurrentTime, audioDuration, autoplayFailed,
+    syncAudioState, updateAudioProgress, toggleAudioManual, onAudioError, playStimulusAudio
+} = useAudioEngine();
+
+const handleVisibilityChange = () => logCheatWarning(isStarting.value, showTimeoutModal.value);
 
 const startTimer = () => {
-    // --- FIX: Direct check from localStorage to prevent race conditions ---
     const user = JSON.parse(localStorage.getItem('user'));
     const role = (user?.role || '').toLowerCase();
-    if (['demo', 'staff'].includes(role)) {
-        isDemo.value = true;
-        return;
-    }
-    isDemo.value = false;
-    if (!timerConfig.value) return;
+    isDemo.value = ['demo', 'staff'].includes(role);
+    if (isDemo.value) return;
 
-    const config = timerConfig.value;
-
-    // Use ONLY the per-skill duration logic as requested
-    const limitMinutes = config.skillDuration;
-    let createdStr = config.skillStartedAt;
-
-    if (!createdStr || !limitMinutes) {
-        // If there's no limit for this specific skill, don't show the timer
-        return;
-    }
-
-    // Parse as UTC to avoid timezone issues
-    if (!createdStr.endsWith('Z') && !createdStr.match(/[+-]\d{2}:\d{2}$/)) {
-        createdStr += 'Z';
-    }
-
-    const startTime = new Date(createdStr).getTime();
-    const limitMs = limitMinutes * 60 * 1000;
-
-    const updateTime = () => {
-        const now = new Date().getTime();
-        const elapsed = now - startTime;
-        const remaining = Math.max(0, Math.floor((limitMs - elapsed) / 1000));
-
-        timeLeftSeconds.value = remaining;
-
-        if (remaining <= 0) {
-            clearInterval(timerInterval.value);
-            showTimeoutModal.value = true;
-            // handleTimeout() will be called when user clicks OK or via auto-redirect in template
-        }
-    };
-
-    updateTime(); // Initial call
-    if (timerInterval.value) clearInterval(timerInterval.value);
-    timerInterval.value = setInterval(updateTime, 1000);
-};
-
-const syncAudioState = () => {
-    if (audioRef.value) isAudioPlaying.value = !audioRef.value.paused;
-};
-
-const formatAudioTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-};
-
-const updateAudioProgress = () => {
-    if (!audioRef.value) return;
-    const current = audioRef.value.currentTime;
-    const total = audioRef.value.duration;
-    if (total) {
-        audioProgress.value = (current / total) * 100;
-        audioCurrentTime.value = formatAudioTime(current);
-        audioDuration.value = formatAudioTime(total);
-    }
-};
-
-const toggleAudioManual = async () => {
-    if (!audioRef.value) return;
-    try {
-        if (audioRef.value.paused) await audioRef.value.play();
-        else audioRef.value.pause();
-    } catch (err) {
-        console.error('Audio playback failed:', err);
-    }
-    autoplayFailed.value = false;
-    syncAudioState();
-};
-
-const onAudioError = (e) => {
-    console.error('Audio element error:', e);
-    isAudioPlaying.value = false;
+    initTimer(timerConfig.value, () => {
+        showTimeoutModal.value = true;
+    });
 };
 
 const canStart = computed(() => {
@@ -168,7 +95,7 @@ const canStart = computed(() => {
 
 const toggleRequirement = (req) => {
     if (autoVerifiedIds.value.includes(req.id)) return;
-    
+
     // If it has an interactive test, open the tester instead of just checking it
     if (req.test_type && req.test_type !== 'none' && !checkedRequirements.value.includes(req.id)) {
         activeTesterReq.value = req;
@@ -217,14 +144,14 @@ const beginExam = async () => {
     if (!attemptId.value || attemptId.value === 'start') {
         try {
             isLoading.value = true;
-            const payload = { 
+            const payload = {
                 skill_id: skillId,
                 level_id: levelId
             };
             const res = await api.post(`/exams/${examId}/start`, payload);
             attemptId.value = res.data.attempt.id;
             attempt.value = res.data.attempt;
-            
+
             // Update URL silently so refresh works
             router.replace(`/exam/${attemptId.value}`);
         } catch (err) {
@@ -233,7 +160,7 @@ const beginExam = async () => {
             return;
         }
     }
-    
+
     isStarting.value = false;
     await fetchNextBatch();
     startTimer();
@@ -256,7 +183,6 @@ const exitExam = () => {
 };
 
 const isNavigatingBack = ref(false);
-const isIntentionallyLeaving = ref(false);
 
 onBeforeRouteLeave((to, from) => {
     isIntentionallyLeaving.value = true;
@@ -420,141 +346,10 @@ const submitAnswer = () => {
     questionSubmitted.value = true;
 };
 
-// Word Selection Helpers
-const getWords = (content) => {
-    const tmp = document.createElement("DIV");
-    tmp.innerHTML = content;
-    const text = tmp.textContent || tmp.innerText || "";
-    // Regex that separates words from punctuation marks while ignoring whitespace
-    return text.match(/[\w'-]+|[^\w\s]/g) || [];
-};
-
-const toggleWord = (word, qIdx) => {
-    if (questionSubmitted.value) return;
-    const ans = answers.value[qIdx];
-    const index = ans.selected_words.indexOf(word);
-    if (index === -1) ans.selected_words.push(word);
-    else ans.selected_words.splice(index, 1);
-};
-
-// Drag & Drop Helpers
-const onDragStart = (event, option) => {
-    if (questionSubmitted.value) return;
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('option', JSON.stringify(option));
-};
-
-const onDrop = (event, slotIdx, qIdx) => {
-    if (questionSubmitted.value) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-
-    try {
-        const data = event.dataTransfer.getData('option');
-        if (!data) return;
-        const option = JSON.parse(data);
-        const ans = answers.value[qIdx];
-
-        // Update the specific slot with the dropped word
-        ans.drag_drop_answers[slotIdx] = option.option_text;
-    } catch (err) {
-        console.error('Drop processing failed:', err);
-    }
-};
-
-const clearSlot = (slotIdx, qIdx) => {
-    if (questionSubmitted.value) return;
-    answers.value[qIdx].drag_drop_answers[slotIdx] = null;
-};
-
-const parsedDragDropContent = (content) => {
-    if (!content) return [];
-    // Split by ............... or [target] or []
-    return content.split(/\.{10,}|\[\s*target\s*\]|\[\s*\]/gi);
-};
-
-const parsedFillBlankContent = (content) => {
-    if (!content) return [];
-    // Split by [input] or []
-    return content.split(/\[\s*input\s*\]|\[\s*\]/gi);
-};
-
-// Matching Helpers
-const selectedMatchSource = ref(null);
-const toggleMatchSource = (sourceId) => {
-    if (selectedMatchSource.value === sourceId) selectedMatchSource.value = null;
-    else selectedMatchSource.value = sourceId;
-};
-const completeMatch = (targetText) => {
-    if (!selectedMatchSource.value || isAlreadyMatched(targetText)) return;
-    answers.value[currentIndex.value].matching_answers[selectedMatchSource.value] = targetText;
-    selectedMatchSource.value = null;
-};
-const removeMatch = (sourceId) => {
-    const ans = answers.value[currentIndex.value];
-    const { [sourceId]: removed, ...rest } = ans.matching_answers;
-    ans.matching_answers = rest;
-};
-const isAlreadyMatched = (targetText) => {
-    return Object.values(answers.value[currentIndex.value].matching_answers).includes(targetText);
-};
-const getMatchingLeft = (q) => {
-    return q.options.filter(o => o.option_text.includes('|')).map(o => ({
-        id: o.id,
-        option_text: o.option_text.split('|')[0].trim()
-    }));
-};
-const getMatchingRight = (q) => {
-    const targets = [];
-    q.options.forEach(o => {
-        if (o.option_text.includes('|')) {
-            targets.push(o.option_text.split('|')[1].trim());
-        } else {
-            targets.push(o.option_text.trim());
-        }
-    });
-    // Use the text as the ID for the targets list
-    return [...new Set(targets)].map(t => ({ id: t, option_text: t }));
-};
-const getOptionText = (idOrText) => {
-    const opt = questions.value[currentIndex.value].options.find(o => o.id == idOrText);
-    if (opt && opt.option_text.includes('|')) return opt.option_text.split('|')[0].trim();
-    return idOrText; // It's likely the target text already
-};
-
-// Ordering Helpers
-const addToOrdering = (word) => {
-    if (questionSubmitted.value) return;
-    answers.value[currentIndex.value].ordering_answers.push(word);
-};
-const removeFromOrdering = (index) => {
-    if (questionSubmitted.value) return;
-    answers.value[currentIndex.value].ordering_answers.splice(index, 1);
-};
-const getAvailableWords = (q, qIdx) => {
-    const allWords = q.options.map(o => o.option_text);
-    const selectedWords = answers.value[qIdx].ordering_answers;
-
-    // We need to handle duplicate words if they exist in the sentence
-    // So we subtract the counts
-    let pool = [...allWords];
-    selectedWords.forEach(w => {
-        const index = pool.indexOf(w);
-        if (index > -1) pool.splice(index, 1);
-    });
-    return pool;
-};
-
-// Highlight Helpers
-const toggleHighlight = (word, qIdx) => {
-    if (questionSubmitted.value) return;
-    const ans = answers.value[qIdx];
-    const index = ans.highlight_answers.indexOf(word);
-    if (index === -1) ans.highlight_answers.push(word);
-    else ans.highlight_answers.splice(index, 1);
-};
-
 const advanceQuestion = async () => {
+    // Save current answer as a draft before moving
+    await saveCurrentAnswerDraft();
+
     if (currentIndex.value < questions.value.length - 1) {
         currentIndex.value++;
         questionSubmitted.value = false;
@@ -565,7 +360,34 @@ const advanceQuestion = async () => {
     }
 };
 
-const submitCurrentBatch = async () => {
+const saveCurrentAnswerDraft = async () => {
+    if (isStarting.value || !currentQ.value) return;
+
+    const ans = answers.value[currentIndex.value];
+    if (!ans) return;
+
+    try {
+        const payload = {
+            question_id: ans.question_id,
+            option_id: ans.option_id,
+            text_answer: ans.text_answer,
+            selected_words: ans.selected_words,
+            drag_drop_answers: ans.drag_drop_answers,
+            fill_blank_answers: ans.fill_blank_answers,
+            ordering_answers: ans.ordering_answers,
+            highlight_answers: ans.highlight_answers,
+            matching_answers: ans.matching_answers
+        };
+
+        // Note: We don't send files (audio) here to keep it lightweight. 
+        // Audio is still sent via the final submitBatch.
+        await api.post(`/attempts/${attemptId.value}/save-answer`, payload);
+    } catch (err) {
+        console.warn('Failed to save answer draft', err);
+    }
+};
+
+const submitCurrentBatch = async (isTimeout = false) => {
     if (isSubmittingBatch.value) return;
     isSubmittingBatch.value = true;
     try {
@@ -601,6 +423,15 @@ const submitCurrentBatch = async () => {
         const res = await api.post(`/attempts/${attemptId.value}/submit-batch`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
+
+        if (isTimeout) {
+            await api.post(`/attempts/${attemptId.value}/timeout`, {
+                skill_id: currentSkill.value?.id
+            });
+            router.push('/skill-selection');
+            return;
+        }
+
         if (res.data.finished_exam) router.push(`/exam/${attemptId.value}/result`);
         else if (res.data.next_step === 'dashboard') router.push('/skill-selection');
         else {
@@ -618,45 +449,24 @@ const submitCurrentBatch = async () => {
             await fetchNextBatch();
         }
     } catch (err) {
-        alert('Data transmission error. Try again.');
+        console.error('Submission failed', err);
+        if (isTimeout) {
+            router.push('/skill-selection');
+        } else {
+            alert('Data transmission error. Try again.');
+        }
     } finally {
         isSubmittingBatch.value = false;
     }
 };
 
 const handleTimeout = async () => {
-    try {
-        await api.post(`/attempts/${attemptId.value}/timeout`);
-        router.push('/skill-selection');
-    } catch (err) {
-        console.error('Timeout finalization failed', err);
-        router.push('/skill-selection');
-    }
+    await submitCurrentBatch(true);
 };
 
 const currentQ = computed(() => questions.value[currentIndex.value] || null);
 const displayNumber = computed(() => globalOffset.value + currentIndex.value + 1);
 const wordCount = computed(() => (answers.value[currentIndex.value]?.text_answer || '').trim().split(/\s+/).filter(w => w).length);
-
-const currentWords = computed(() => {
-    if (!currentQ.value?.content) return [];
-    return getWords(currentQ.value.content);
-});
-
-const currentMatchingLeft = computed(() => {
-    if (!currentQ.value || currentQ.value.type !== 'matching') return [];
-    return getMatchingLeft(currentQ.value);
-});
-
-const currentMatchingRight = computed(() => {
-    if (!currentQ.value || currentQ.value.type !== 'matching') return [];
-    return getMatchingRight(currentQ.value);
-});
-
-const currentAvailableWords = computed(() => {
-    if (!currentQ.value || currentQ.value.type !== 'ordering') return [];
-    return getAvailableWords(currentQ.value, currentIndex.value);
-});
 
 const shouldShowQuestion = computed(() => {
     return !!currentQ.value; // Show immediately if a question exists
@@ -768,45 +578,7 @@ const hasStimulusContent = computed(() => {
     return !!(passageHasContent || questionHasMedia);
 });
 
-// --- ANTI-CHEAT LOGIC ---
-const handleVisibilityChange = async () => {
-    if (document.visibilityState === 'hidden' && !isStarting.value && !showTimeoutModal.value && !isIntentionallyLeaving.value) {
-        cheatWarnings.value++;
-
-        // Log to database
-        try {
-            const res = await api.post(`/attempts/${attemptId.value}/warnings`);
-
-            // If backend says we reached 3 warnings for this skill
-            if (res.data.should_terminate_skill) {
-                showFinalCheatModal.value = true;
-                setTimeout(() => {
-                    // Redirect to dashboard as requested
-                    router.push('/skill-selection');
-                }, 5000);
-                return;
-            }
-        } catch (err) {
-            console.error('Failed to log cheat warning', err);
-        }
-
-        console.warn(`Cheating attempt detected: Tab switch. Warning count: ${cheatWarnings.value}`);
-        if (cheatWarnings.value >= 3) {
-            showFinalCheatModal.value = true;
-            setTimeout(() => {
-                handleTimeout();
-            }, 5000);
-        } else {
-            showCheatModal.value = true;
-        }
-    }
-};
-
-const preventCopyPaste = (e) => {
-    e.preventDefault();
-    return false;
-};
-
+// --- INACTIVITY LOGIC ---
 const updateActivity = () => {
     lastActivityAt.value = Date.now();
 };
@@ -831,36 +603,31 @@ onMounted(async () => {
     isDemo.value = user && ['demo', 'deom', 'staff'].includes(user.role?.toLowerCase());
     await fetchData();
 
-    // Prevent Cheating
+    // Initialize Anti-Cheat
+    setupAntiCheat();
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    document.addEventListener('copy', preventCopyPaste);
-    document.addEventListener('paste', preventCopyPaste);
-    document.addEventListener('contextmenu', preventCopyPaste);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Inactivity tracking
     document.addEventListener('mousemove', updateActivity);
     document.addEventListener('keydown', updateActivity);
     document.addEventListener('click', updateActivity);
-    inactivityInterval = setInterval(checkInactivity, 30000); // Check every 30s
+    inactivityInterval = setInterval(checkInactivity, 30000);
 });
 
 onUnmounted(() => {
-    if (timerInterval.value) {
-        clearInterval(timerInterval.value);
-    }
+    stopTimer();
     if (inactivityInterval) clearInterval(inactivityInterval);
+
+    // Cleanup Audio
     if (audioRef.value) {
         audioRef.value.pause();
         audioRef.value.src = "";
-        audioRef.value.load();
     }
 
-    // Remove Anti-Cheat listeners
+    // Remove Anti-Cheat
+    destroyAntiCheat();
     document.removeEventListener('visibilitychange', handleVisibilityChange);
-    document.removeEventListener('copy', preventCopyPaste);
-    document.removeEventListener('paste', preventCopyPaste);
-    document.removeEventListener('contextmenu', preventCopyPaste);
     window.removeEventListener('beforeunload', handleBeforeUnload);
     document.removeEventListener('mousemove', updateActivity);
     document.removeEventListener('keydown', updateActivity);
@@ -897,7 +664,7 @@ onUnmounted(() => {
                         <span>السابق</span>
                     </button>
                     <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions
-                        }}</span>
+                    }}</span>
                     <button v-if="!questionSubmitted" @click="submitAnswer"
                         class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد
                         الإجابة</button>
@@ -938,7 +705,7 @@ onUnmounted(() => {
 
                 <div class="px-3 py-1 bg-slate-100 rounded-md border border-slate-200">
                     <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name
-                        }}</span>
+                    }}</span>
                 </div>
             </div>
         </div>
@@ -1091,190 +858,14 @@ onUnmounted(() => {
                                         المهمة</span>
                                 </div>
                                 <p class="text-[10px] font-bold text-slate-600 leading-relaxed" dir="auto">
-                                    {{ currentQ.instructions || `يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً عليها.` }}
+                                    {{ currentQ.instructions || `يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً
+                                    عليها.`
+                                    }}
                                 </p>
                             </div>
 
-                            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pt-2 space-y-2">
-                                <!-- MCQ -->
-                                <div v-if="currentQ.type === 'mcq' || currentQ.type === 'true_false'"
-                                    class="space-y-1.5">
-                                    <button v-for="(opt, oIdx) in currentQ.options" :key="opt.id"
-                                        @click="answers[currentIndex].option_id = opt.id" :disabled="questionSubmitted"
-                                        class="w-full p-3.5 rounded-xl border-2 transition-all flex flex-row-reverse items-center gap-4 group"
-                                        :class="answers[currentIndex].option_id === opt.id
-                                            ? 'border-brand-primary bg-indigo-50/30 ring-2 ring-indigo-500/5'
-                                            : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 bg-white shadow-sm'">
-                                        <div class="w-8 h-8 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all shadow-sm"
-                                            :class="answers[currentIndex].option_id === opt.id
-                                                ? 'bg-brand-primary border-brand-primary scale-105 shadow-md shadow-indigo-200'
-                                                : 'bg-slate-50 border-slate-100 group-hover:border-slate-200'">
-                                            <span v-if="answers[currentIndex].option_id !== opt.id"
-                                                class="text-[9px] font-black text-slate-300">{{ String.fromCharCode(65 +
-                                                    oIdx)
-                                                }}</span>
-                                            <i v-else class="pi pi-check text-[10px] text-white"></i>
-                                        </div>
-                                        <span class="font-black text-slate-700 leading-snug text-base grow text-right"
-                                            dir="auto">{{ opt.option_text }}</span>
-                                    </button>
-                                </div>
-
-                                <!-- Writing -->
-                                <div v-if="currentQ.type === 'writing'" class="space-y-3" dir="rtl">
-                                    <textarea v-model="answers[currentIndex].text_answer" :disabled="questionSubmitted"
-                                        class="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm font-medium focus:border-brand-primary transition-all min-h-[180px] outline-none"
-                                        placeholder="اكتب إجابتك هنا..."></textarea>
-                                    <div
-                                        class="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest px-1">
-                                        <span>عدد الكلمات: {{ wordCount }}</span>
-                                        <span>المطلوب: {{ currentQ.min_words || 0 }} - {{ currentQ.max_words || '∞'
-                                            }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Speaking -->
-                                <div v-if="currentQ.type === 'speaking'" class="space-y-4">
-                                    <AudioRecorder @recorded="(blob) => answers[currentIndex].recorded_file = blob"
-                                        class="!bg-slate-50 !border-slate-200" :disabled="questionSubmitted" />
-                                </div>
-
-                                <!-- Drag & Drop -->
-                                <div v-if="currentQ.type === 'drag_drop'" class="space-y-6">
-                                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 leading-[2.4] text-base font-medium text-slate-700 interactive-content-area rtl-support"
-                                        dir="auto">
-                                        <template v-for="(part, pIdx) in parsedDragDropContent(currentQ.content)"
-                                            :key="pIdx">
-                                            <span v-html="part"></span>
-                                            <span v-if="pIdx < parsedDragDropContent(currentQ.content).length - 1"
-                                                @dragover.prevent @dragenter.prevent
-                                                @drop="onDrop($event, pIdx, currentIndex)"
-                                                class="inline-flex items-center justify-center min-w-[120px] h-9 mx-1 px-4 rounded-lg border-2 border-dashed transition-all relative top-1.5"
-                                                :class="answers[currentIndex].drag_drop_answers[pIdx]
-                                                    ? 'bg-indigo-50 border-brand-primary border-solid text-brand-primary font-black text-sm shadow-sm'
-                                                    : 'bg-white border-slate-300 shadow-inner text-xl font-black text-slate-400 hover:border-brand-primary hover:bg-slate-50'">
-                                                {{ answers[currentIndex].drag_drop_answers[pIdx] || '..........' }}
-                                                <button
-                                                    v-if="answers[currentIndex].drag_drop_answers[pIdx] && !questionSubmitted"
-                                                    @click="clearSlot(pIdx, currentIndex)"
-                                                    class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[7px] shadow-sm">
-                                                    <i class="pi pi-times"></i>
-                                                </button>
-                                            </span>
-                                        </template>
-                                    </div>
-                                    <div
-                                        class="flex flex-wrap gap-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                                        <div v-for="opt in currentQ.options" :key="opt.id" draggable="true"
-                                            @dragstart="onDragStart($event, opt)"
-                                            class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 cursor-grab hover:bg-brand-primary hover:text-white transition-all shadow-sm">
-                                            {{ opt.option_text }}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Word Selection -->
-                                <div v-if="currentQ.type === 'word_selection' || currentQ.type === 'click_word'"
-                                    class="space-y-4">
-                                    <div class="bg-white p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-2 gap-y-1"
-                                        dir="auto">
-                                        <button v-for="(word, wIdx) in currentWords" :key="wIdx"
-                                            @click="toggleWord(word, currentIndex)" :disabled="questionSubmitted"
-                                            class="px-1 py-0.5 rounded transition-all font-medium text-lg border-b-2"
-                                            :class="answers[currentIndex].selected_words.includes(word) ? 'border-rose-500 text-rose-600 bg-rose-50' : 'border-transparent text-slate-700 hover:bg-slate-50'">
-                                            {{ word }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Fill in the Blank -->
-                                <div v-if="currentQ.type === 'fill_blank'" class="space-y-4">
-                                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-200 leading-[2.6] text-lg font-medium text-slate-800 shadow-inner interactive-content-area rtl-support"
-                                        dir="auto">
-                                        <template v-for="(part, pIdx) in parsedFillBlankContent(currentQ.content)"
-                                            :key="pIdx">
-                                            <span v-html="part"></span>
-                                            <input v-if="pIdx < parsedFillBlankContent(currentQ.content).length - 1"
-                                                v-model="answers[currentIndex].fill_blank_answers[pIdx]"
-                                                :disabled="questionSubmitted" type="text"
-                                                class="inline-block w-28 h-8 mx-1 px-2 rounded border-2 border-slate-200 bg-white focus:border-brand-primary outline-none transition-all text-brand-primary font-black text-center text-base relative top-0.5"
-                                                placeholder="..." />
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <!-- Matching -->
-                                <div v-if="currentQ.type === 'matching'" class="space-y-6">
-                                    <div class="grid grid-cols-2 gap-6">
-                                        <div class="space-y-2">
-                                            <button v-for="opt in currentMatchingLeft" :key="opt.id"
-                                                @click="toggleMatchSource(opt.id)" :disabled="questionSubmitted"
-                                                class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 flex justify-between items-center"
-                                                :class="selectedMatchSource === opt.id ? 'border-brand-primary bg-indigo-50 shadow-md' : (answers[currentIndex].matching_answers[opt.id] ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white')">
-                                                <span class="text-right w-full" dir="auto">{{ opt.option_text }}</span>
-                                            </button>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <button v-for="opt in currentMatchingRight" :key="opt.id"
-                                                @click="completeMatch(opt.id)"
-                                                :disabled="questionSubmitted || !selectedMatchSource || isAlreadyMatched(opt.id)"
-                                                class="w-full p-3 rounded-xl border-2 transition-all text-sm font-black text-slate-700 text-right"
-                                                :class="isAlreadyMatched(opt.id) ? 'bg-slate-50 opacity-40' : (selectedMatchSource ? 'border-brand-primary/30 bg-white hover:bg-brand-primary hover:text-white' : 'border-slate-100 bg-white')">
-                                                <span dir="auto">{{ opt.option_text }}</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Ordering -->
-                                <div v-if="currentQ.type === 'ordering'" class="space-y-6">
-                                    <div
-                                        class="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 items-center justify-center">
-                                        <button v-for="(word, oIdx) in answers[currentIndex].ordering_answers"
-                                            :key="oIdx" @click="removeFromOrdering(oIdx)" :disabled="questionSubmitted"
-                                            class="px-3 py-2 bg-white border-2 border-brand-primary text-brand-primary font-black rounded-lg text-sm shadow-sm animate-in zoom-in-75">
-                                            {{ word }}
-                                        </button>
-                                    </div>
-                                    <div
-                                        class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-wrap gap-2 justify-center">
-                                        <button v-for="(word, wIdx) in currentAvailableWords" :key="wIdx"
-                                            @click="addToOrdering(word)" :disabled="questionSubmitted"
-                                            class="px-3 py-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-lg text-sm hover:bg-brand-primary hover:text-white transition-all shadow-sm">
-                                            {{ word }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Short Answer -->
-                                <div v-if="currentQ.type === 'short_answer'" class="space-y-4">
-                                    <div
-                                        class="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg flex flex-col items-center gap-6">
-                                        <div class="w-full max-w-sm">
-                                            <input v-model="answers[currentIndex].text_answer"
-                                                :disabled="questionSubmitted" type="text"
-                                                class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-lg font-black text-slate-800 text-center focus:border-brand-primary outline-none transition-all"
-                                                placeholder="اكتب إجابتك هنا..." dir="auto" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Highlight -->
-                                <div v-if="currentQ.type === 'highlight'" class="space-y-4">
-                                    <div class="bg-white p-8 rounded-3xl border border-slate-100 leading-[2.2] text-lg font-medium text-slate-700 shadow-sm rtl-support"
-                                        dir="auto">
-                                        <template v-for="(word, wIdx) in currentWords" :key="wIdx">
-                                            <span @click="toggleHighlight(word, currentIndex)"
-                                                :disabled="questionSubmitted"
-                                                class="px-1 py-0.5 rounded cursor-pointer transition-all border-b border-transparent hover:border-slate-300"
-                                                :class="answers[currentIndex].highlight_answers.includes(word) ? 'bg-yellow-200 text-slate-900 border-yellow-400 font-bold shadow-md' : ''">
-                                                {{ word }}
-                                            </span>
-                                            {{ ' ' }}
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
+                            <QuestionDispatcher v-if="currentQ && answers[currentIndex]" :question="currentQ"
+                                v-model:answer="answers[currentIndex]" :disabled="questionSubmitted" />
                         </div>
 
                         <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
@@ -1377,7 +968,8 @@ onUnmounted(() => {
         </div>
 
         <!-- System Requirement Tester Modal -->
-        <RequirementTester v-if="activeTesterReq" :requirement="activeTesterReq" @close="activeTesterReq = null" @passed="handleTestPassed" />
+        <RequirementTester v-if="activeTesterReq" :requirement="activeTesterReq" @close="activeTesterReq = null"
+            @passed="handleTestPassed" />
 
         <!-- showConfirmAnswerModal -->
         <div v-if="showConfirmAnswerModal"
