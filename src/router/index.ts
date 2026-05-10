@@ -56,6 +56,7 @@ import AdminSystemRequirementsCreate from '@/views/admin/SystemRequirements/crea
 import AdminSystemRequirementsEdit from '@/views/admin/SystemRequirements/edit.vue'
 import PublicRegisterWizard from '@/views/student/PublicRegisterWizard.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import AdminActivityLogs from '@/views/admin/ActivityLogs/index.vue'
 
 
 const adminRoutes = [
@@ -276,6 +277,12 @@ const adminRoutes = [
     component: ProfileView,
     meta: { title: 'Security & Identity' }
   },
+  {
+    path: '/admin/activity-logs',
+    name: 'admin.logs',
+    component: AdminActivityLogs,
+    meta: { title: 'System Activity Logs' }
+  },
 ];
 
 // Map Admin routes to Teacher routes
@@ -322,6 +329,11 @@ const routes = [
   {
     path: '/exam/:id',
     name: 'exam',
+    component: ExamView
+  },
+  {
+    path: '/exam/setup/:examId/:skillId/:levelId?',
+    name: 'exam.setup',
     component: ExamView
   },
   {

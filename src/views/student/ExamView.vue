@@ -5,10 +5,14 @@ import api from '@/services/api';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import AudioRecorder from '@/components/AudioRecorder.vue';
+import RequirementTester from '@/components/RequirementTester.vue';
 
 const route = useRoute();
 const router = useRouter();
-const attemptId = route.params.id;
+const attemptId = ref(route.params.id);
+const examId = route.params.examId;
+const skillId = route.params.skillId;
+const levelId = route.params.levelId;
 
 const attempt = ref(null);
 const currentSkill = ref(null);
@@ -45,6 +49,7 @@ const showFinalCheatModal = ref(false);
 const showInactivityModal = ref(false);
 const cheatWarnings = ref(0);
 const lastActivityAt = ref(Date.now());
+const activeTesterReq = ref(null);
 
 // Timer State
 const timeLeftSeconds = ref(0);
@@ -160,11 +165,25 @@ const canStart = computed(() => {
     return mandatoryIds.every(id => checkedRequirements.value.includes(id));
 });
 
-const toggleRequirement = (id) => {
-    if (autoVerifiedIds.value.includes(id)) return;
-    const index = checkedRequirements.value.indexOf(id);
-    if (index === -1) checkedRequirements.value.push(id);
+const toggleRequirement = (req) => {
+    if (autoVerifiedIds.value.includes(req.id)) return;
+    
+    // If it has an interactive test, open the tester instead of just checking it
+    if (req.test_type && req.test_type !== 'none' && !checkedRequirements.value.includes(req.id)) {
+        activeTesterReq.value = req;
+        return;
+    }
+
+    const index = checkedRequirements.value.indexOf(req.id);
+    if (index === -1) checkedRequirements.value.push(req.id);
     else checkedRequirements.value.splice(index, 1);
+};
+
+const handleTestPassed = (req) => {
+    if (!checkedRequirements.value.includes(req.id)) {
+        checkedRequirements.value.push(req.id);
+    }
+    activeTesterReq.value = null;
 };
 
 const autoVerifyRequirements = (requirements) => {
@@ -176,9 +195,15 @@ const autoVerifyRequirements = (requirements) => {
     const hasMediaDevices = !!(navigator.mediaDevices);
 
     requirements.forEach(req => {
+        // Do not auto-verify if it requires an interactive test
+        if (req.test_type && req.test_type !== 'none') {
+            return;
+        }
+
         const cat = req.category?.toLowerCase();
         const title = req.title?.toLowerCase();
         let verified = false;
+        
         if (cat === 'internet' || title.includes('internet')) verified = isOnline;
         else if (cat === 'browser' || title.includes('chrome')) verified = (isChrome || isEdge) && isDesktop;
         else if (cat === 'hardware' || title.includes('audio')) verified = hasMediaDevices;
@@ -193,16 +218,18 @@ const autoVerifyRequirements = (requirements) => {
 const fetchData = async () => {
     isLoading.value = true;
     try {
-        const [attRes, reqRes] = await Promise.all([
-            api.get(`/attempts/${attemptId}`),
+        const [reqRes] = await Promise.all([
             api.get('/public/system-requirements')
         ]);
-        attempt.value = attRes.data;
         systemRequirements.value = reqRes.data;
         autoVerifyRequirements(reqRes.data);
 
-        if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
-            router.push('/dashboard');
+        if (attemptId.value && attemptId.value !== 'start') {
+            const attRes = await api.get(`/attempts/${attemptId.value}`);
+            attempt.value = attRes.data;
+            if (attempt.value.status === 'completed' || attempt.value.status === 'voided') {
+                router.push('/dashboard');
+            }
         }
     } catch (err) {
         errorMsg.value = "Session initialization failed.";
@@ -212,6 +239,26 @@ const fetchData = async () => {
 };
 
 const beginExam = async () => {
+    if (!attemptId.value || attemptId.value === 'start') {
+        try {
+            isLoading.value = true;
+            const payload = { 
+                skill_id: skillId,
+                level_id: levelId
+            };
+            const res = await api.post(`/exams/${examId}/start`, payload);
+            attemptId.value = res.data.attempt.id;
+            attempt.value = res.data.attempt;
+            
+            // Update URL silently so refresh works
+            router.replace(`/exam/${attemptId.value}`);
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to start session');
+            isLoading.value = false;
+            return;
+        }
+    }
+    
     isStarting.value = false;
     await fetchNextBatch();
     startTimer();
@@ -221,7 +268,7 @@ const confirmExit = async () => {
     showExitModal.value = false;
     try {
         isLoading.value = true;
-        await api.post(`/attempts/${attemptId}/completion`);
+        await api.post(`/attempts/${attemptId.value}/completion`);
         router.push('/dashboard');
     } catch (err) {
         console.error('Error finishing attempt:', err);
@@ -269,7 +316,7 @@ const fetchNextBatch = async () => {
 
     questions.value = []; // Safety clear
     try {
-        const res = await api.get(`/attempts/${attemptId}/next-batch`);
+        const res = await api.get(`/attempts/${attemptId.value}/next-batch`);
         if (res.data.questions?.length > 0) {
             currentSkill.value = res.data.skill;
             // Show level transition if level changed
@@ -571,10 +618,10 @@ const submitCurrentBatch = async () => {
             }
         });
 
-        const res = await api.post(`/attempts/${attemptId}/submit-batch`, formData, {
+        const res = await api.post(`/attempts/${attemptId.value}/submit-batch`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
-        if (res.data.finished_exam) router.push(`/exam/${attemptId}/result`);
+        if (res.data.finished_exam) router.push(`/exam/${attemptId.value}/result`);
         else if (res.data.next_step === 'dashboard') router.push('/dashboard');
         else {
             // Handle retry notification logic
@@ -599,7 +646,7 @@ const submitCurrentBatch = async () => {
 
 const handleTimeout = async () => {
     try {
-        await api.post(`/attempts/${attemptId}/timeout`);
+        await api.post(`/attempts/${attemptId.value}/timeout`);
         router.push('/dashboard');
     } catch (err) {
         console.error('Timeout finalization failed', err);
@@ -672,7 +719,7 @@ watch(currentQ, (newQ) => {
 
     if (newQ && newQ.id) {
         // Update last_seen_question_id in background
-        api.patch(`/attempts/${attemptId}/progress`, { question_id: newQ.id })
+        api.patch(`/attempts/${attemptId.value}/progress`, { question_id: newQ.id })
             .catch(err => console.warn('Progress update failed', err));
     }
 
@@ -748,7 +795,7 @@ const handleVisibilityChange = async () => {
 
         // Log to database
         try {
-            const res = await api.post(`/attempts/${attemptId}/warnings`);
+            const res = await api.post(`/attempts/${attemptId.value}/warnings`);
 
             // If backend says we reached 3 warnings for this skill
             if (res.data.should_terminate_skill) {
@@ -972,7 +1019,7 @@ onUnmounted(() => {
                             <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">متطلبات النظام
                             </h4>
                             <div class="space-y-4">
-                                <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req.id)"
+                                <div v-for="req in systemRequirements" :key="req.id" @click="toggleRequirement(req)"
                                     class="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer group">
                                     <span class="text-[10px] font-black text-slate-600 uppercase tracking-tight">{{
                                         req.title
@@ -1375,6 +1422,9 @@ onUnmounted(() => {
                 </div>
             </div>
         </div>
+
+        <!-- System Requirement Tester Modal -->
+        <RequirementTester v-if="activeTesterReq" :requirement="activeTesterReq" @close="activeTesterReq = null" @passed="handleTestPassed" />
 
         <!-- showConfirmAnswerModal -->
         <div v-if="showConfirmAnswerModal"

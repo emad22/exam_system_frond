@@ -29,7 +29,7 @@ const fetchDashboard = async () => {
 
         // Fetch certificates if student is from arabacademy
         const partnerName = (student.value?.student?.partner?.partner_name || '').toLowerCase();
-        console.log('partnerName', partnerName);
+
         if (partnerName.includes('arabacademy')) {
             const certRes = await api.get('/certificates');
             certificates.value = certRes.data;
@@ -45,6 +45,25 @@ const fetchDashboard = async () => {
     }
 };
 
+
+const skillMap = {
+    'listening': 'Listening',
+    'reading': 'Reading',
+    'grammar': 'Structure',
+    'gramar': 'Structure',
+    'structure': 'Structure',
+    'writing': 'Writing',
+    'writting': 'Writing',
+    'speaking': 'Speaking'
+};
+
+const getSkillDisplayName = (name) => {
+    if (!name) return 'Unknown Skill';
+    const lowerName = name.toLowerCase();
+    const matchedKey = Object.keys(skillMap).find(key => lowerName.includes(key));
+    return matchedKey ? skillMap[matchedKey] : name;
+};
+
 onMounted(fetchDashboard);
 
 const skills = () => exams.value?.[0]?.skills || [];
@@ -55,24 +74,18 @@ const isSkillCompleted = (exam, skillId) => {
     return exam.completed_skill_ids.some(id => String(id) === String(skillId));
 };
 
-const startSkill = async (skillId) => {
+const startSkill = (skillId) => {
     if (!exams.value[0]) return;
-    // Remove the blocking check for demo users
-    // Fix: pass exams.value[0] as the first argument
     if (!isDemo.value && isSkillCompleted(exams.value[0], skillId)) return;
 
-    startingSkillId.value = skillId;
-    try {
-        const payload = { skill_id: skillId };
-        if (isDemo.value) payload.level_id = selectedLevel.value;
-
-        const res = await api.post(`/exams/${exams.value[0].id}/start`, payload);
-        router.push(`/exam/${res.data.attempt.id}`);
-    } catch (err) {
-        alert(err.response?.data?.error || 'Failed to start session');
-    } finally {
-        startingSkillId.value = null;
-    }
+    router.push({
+        name: 'exam.setup',
+        params: {
+            examId: exams.value[0].id,
+            skillId: skillId,
+            levelId: isDemo.value ? selectedLevel.value : undefined
+        }
+    });
 };
 
 const resetDemoProgress = async () => {
@@ -90,12 +103,21 @@ const resetDemoProgress = async () => {
 
 const getSkillIcon = (name) => {
     name = name.toLowerCase();
+<<<<<<< HEAD
     if (name.includes('listening')) return '/Listening02.png';
     if (name.includes('reading')) return '/Reading-1.png';
     if (name.includes('writing')) return '/Writing-01.png';
     if (name.includes('speaking')) return '/Speaking-02.png';
     if (name.includes('grammar') || name.includes('structure')) return '/Strac-01.png';
     return '/logo.png';
+=======
+    if (name.includes('listening')) return '🎧';
+    if (name.includes('reading')) return '📖';
+    if (name.includes('writing')) return '✍️';
+    if (name.includes('speaking')) return '🗣️';
+    if (name.includes('structure') || name.includes('structure')) return '📋';
+    return '🎯';
+>>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
 };
 
 const logout = () => {
@@ -211,30 +233,47 @@ const vClickOutside = {
                 <div class="flex items-center space-x-4">
                     <!-- User Profile Dropdown -->
                     <div class="relative">
-                        <div @click.stop="showUserMenu = !showUserMenu" class="flex items-center gap-2 bg-slate-50 hover:bg-white p-1.5 pr-3 rounded-2xl border border-slate-100 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md group">
-                            <div class="w-9 h-9 rounded-xl bg-brand-primary/10 flex items-center justify-center overflow-hidden border border-brand-primary/20">
-                                <img v-if="student?.avatar" :src="resolveUrl(student.avatar)" class="w-full h-full object-cover" />
+                        <div @click.stop="showUserMenu = !showUserMenu"
+                            class="flex items-center gap-2 bg-slate-50 hover:bg-white p-1.5 pr-3 rounded-2xl border border-slate-100 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md group">
+                            <div
+                                class="w-9 h-9 rounded-xl bg-brand-primary/10 flex items-center justify-center overflow-hidden border border-brand-primary/20">
+                                <img v-if="student?.avatar" :src="resolveUrl(student.avatar)"
+                                    class="w-full h-full object-cover" />
                                 <i v-else class="pi pi-user text-brand-primary"></i>
                             </div>
-                            <i class="pi pi-chevron-down text-[10px] text-slate-400 group-hover:text-brand-primary transition-transform duration-300" :class="{'rotate-180': showUserMenu}"></i>
+                            <i class="pi pi-chevron-down text-[10px] text-slate-400 group-hover:text-brand-primary transition-transform duration-300"
+                                :class="{ 'rotate-180': showUserMenu }"></i>
                         </div>
 
                         <!-- Dropdown Menu -->
-                        <div v-if="showUserMenu" v-click-outside="() => showUserMenu = false" class="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in duration-200">
+                        <div v-if="showUserMenu" v-click-outside="() => showUserMenu = false"
+                            class="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in duration-200">
                             <div class="p-4 border-b border-slate-50 bg-slate-50/50">
+<<<<<<< HEAD
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-left">Candidate</p>
                                 <p class="text-xs font-black text-slate-800 truncate text-left">{{ fullStudentName }}</p>
+=======
+                                <p
+                                    class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-left">
+                                    Candidate</p>
+                                <p class="text-xs font-black text-slate-800 truncate text-left">{{ student?.name ||
+                                    student?.first_name }}</p>
+>>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
                             </div>
                             <div class="p-2">
-                                <button @click="router.push('/profile'); showUserMenu = false" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-brand-primary/5 hover:text-brand-primary rounded-xl transition-all group">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-brand-primary/10">
+                                <button @click="router.push('/profile'); showUserMenu = false"
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-brand-primary/5 hover:text-brand-primary rounded-xl transition-all group">
+                                    <div
+                                        class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-brand-primary/10">
                                         <i class="pi pi-user-edit text-xs"></i>
                                     </div>
                                     Edit Profile
                                 </button>
                                 <div class="h-px bg-slate-50 my-1"></div>
-                                <button @click="logout" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-xl transition-all group">
-                                    <div class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center group-hover:bg-rose-100">
+                                <button @click="logout"
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-xl transition-all group">
+                                    <div
+                                        class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center group-hover:bg-rose-100">
                                         <i class="pi pi-sign-out text-xs"></i>
                                     </div>
                                     Sign Out
@@ -354,10 +393,8 @@ const vClickOutside = {
                     class="bg-white rounded-[0.5rem] p-6 border-2 border-indigo-50 shadow-xl shadow-indigo-100/20 space-y-4 animate-in fade-in zoom-in duration-1000">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-1">Official
-                                Credentials</p>
-                            <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Academic Certificate
-                            </h3>
+                            <p class="text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-1">Official Credentials</p>
+                            <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Academic Certificate </h3>
                         </div>
                         <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
                             <i class="pi pi-award"></i>
@@ -402,7 +439,7 @@ const vClickOutside = {
                     <div class="flex items-center space-x-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
                         <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                         <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest">{{ skills().length
-                            }} Active Domains</span>
+                        }} Active Skills</span>
                     </div>
                 </div>
 
@@ -410,8 +447,7 @@ const vClickOutside = {
                 <div class="flex-grow overflow-hidden p-4 space-y-2">
                     <div v-if="!exams.length" class="h-full flex flex-col items-center justify-center text-center p-12">
                         <span class="text-5xl mb-4 grayscale opacity-20">🎯</span>
-                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-tight">No Active Evaluations
-                        </h3>
+                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-tight">No Active Skills</h3>
                         <p class="text-slate-400 font-bold mt-2 text-[10px] uppercase tracking-widest max-w-xs">
                             Account pending institutional approval. Contact administration.
                         </p>
@@ -422,6 +458,7 @@ const vClickOutside = {
                         :class="isSkillCompleted(exams[0], skill.id) ? 'opacity-50 grayscale pointer-events-none' : 'hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 hover:border-brand-primary/20'">
 
                         <!-- Icon -->
+<<<<<<< HEAD
                         <div :class="[
                             isSkillCompleted(exams[0], skill.id) ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-600 group-hover:bg-brand-primary group-hover:text-white',
                             'w-12 h-12 rounded-xl flex items-center justify-center text-lg transition-all duration-500 shadow-sm border border-slate-100 shrink-0'
@@ -433,13 +470,22 @@ const vClickOutside = {
                                 :alt="skill.name"
                                 class="h-9 w-9 object-contain group-hover:scale-110 transition-transform"
                             />
+=======
+                        <div
+                            :class="[
+                                isSkillCompleted(exams[0], skill.id) ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-600 group-hover:bg-brand-primary group-hover:text-white',
+                                'w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all duration-500 shadow-sm border border-slate-100 shrink-0']">
+                            <i v-if="isSkillCompleted(exams[0], skill.id)" class="pi pi-check text-sm"></i>
+                            <span v-else class="group-hover:scale-110 transition-transform">{{ getSkillIcon(skill.name)
+                            }}</span>
+>>>>>>> 635374f8bc60023affb345e4d45d5bb5669bc37e
                         </div>
 
                         <!-- Details -->
                         <div class="flex-grow min-w-0">
                             <h4
                                 class="text-sm font-black text-slate-800 tracking-tight group-hover:text-brand-primary transition-colors uppercase leading-none mb-1.5 truncate">
-                                {{ skill.name }}</h4>
+                                {{ getSkillDisplayName(skill.name) }}</h4>
                             <div class="flex items-center gap-2">
                                 <span
                                     class="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">Standard
@@ -479,51 +525,7 @@ const vClickOutside = {
             </div>
         </main>
 
-        <!-- Profile Settings Modal -->
-        <Dialog v-model:visible="showProfileModal" header="Profile Settings" modal class="w-full max-w-md">
-            <div class="space-y-6 p-1">
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Profile
-                        Picture</label>
-                    <div class="flex items-center gap-4">
-                        <div
-                            class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-200">
-                            <img v-if="student?.avatar" :src="resolveUrl(student.avatar)"
-                                class="w-full h-full object-cover" />
-                            <i v-else class="pi pi-user text-slate-300 text-xl"></i>
-                        </div>
-                        <input type="file" @change="onFileSelect" accept="image/*"
-                            class="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-brand-primary/10 file:text-brand-primary hover:file:bg-brand-primary/20 cursor-pointer" />
-                    </div>
-                </div>
 
-                <div class="space-y-4 pt-4 border-t border-slate-100">
-                    <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">New
-                            Password</label>
-                        <Password v-model="profileForm.password" toggleMask class="w-full"
-                            inputClass="w-full p-inputtext-sm" />
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm
-                            Password</label>
-                        <Password v-model="profileForm.password_confirmation" toggleMask :feedback="false"
-                            class="w-full" inputClass="w-full p-inputtext-sm" />
-                    </div>
-                </div>
-            </div>
-
-            <template #footer>
-                <div class="flex justify-end gap-2 pt-4">
-                    <Button label="Cancel"
-                        class="p-button-text p-button-sm font-black uppercase tracking-widest text-slate-400"
-                        @click="showProfileModal = false" />
-                    <Button label="Save Changes" :loading="isUpdating"
-                        class="p-button-raised p-button-sm font-black uppercase tracking-widest"
-                        @click="updateProfile" />
-                </div>
-            </template>
-        </Dialog>
     </div>
 </template>
 

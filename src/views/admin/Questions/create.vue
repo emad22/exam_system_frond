@@ -9,7 +9,6 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
-import Textarea from 'primevue/textarea';
 import Message from 'primevue/message';
 import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
@@ -33,7 +32,6 @@ const questionTypes = [
     { label: 'Click Word', value: 'click_word', icon: 'pi-cursor-click' },
     { label: 'Matching', value: 'matching', icon: 'pi-link' },
     { label: 'Ordering', value: 'ordering', icon: 'pi-list' },
-    { label: 'Highlight', value: 'highlight', icon: 'pi-eye' },
     { label: 'Listening Task', value: 'listening', icon: 'pi-headphones' },
     { label: 'Short Answer', value: 'short_answer', icon: 'pi-pencil' },
     { label: 'Writing Task', value: 'writing', icon: 'pi-file-edit' },

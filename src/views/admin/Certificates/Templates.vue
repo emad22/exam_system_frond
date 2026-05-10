@@ -24,7 +24,7 @@ const fetchTemplates = async () => {
     isLoading.value = true;
     try {
         const res = await api.get('/admin/certificate-templates');
-        templates.value = res.data;
+        templates.value = res.data.data || res.data;
     } catch (err) {
         console.error('Failed to fetch templates', err);
     } finally {
