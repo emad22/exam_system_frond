@@ -20,6 +20,12 @@ const selectedAttempt = ref(null);
 const loading = ref(true);
 const currentUser = ref(null);
 
+const totalScore = computed(() => {
+    if (!selectedAttempt.value || !selectedAttempt.value.attempt_skills) return 0;
+    return selectedAttempt.value.attempt_skills.reduce((sum, skillResult) => {
+        return sum + (getCalculatedSkillScore(skillResult) || 0);
+    }, 0);
+});
 const fetchDetails = async () => {
     loading.value = true;
     try {
@@ -80,10 +86,16 @@ const calculateDuration = (start, end) => {
     return `${mins}m ${secs}s`;
 };
 
+const getCalculatedSkillScore = (skillResult) => {
+    if (!skillResult || skillResult.score === null || skillResult.score === undefined) return null;
+    const levelsCount = skillResult.skill?.levels_count || 1;
+    return Math.round(Number(skillResult.score) * levelsCount);
+};
+
 const skillMap = {
     'listening': 'Listening',
     'reading': 'Reading',
-    'grammar': 'Grammar',
+    'structure': 'Structure',
     'writing': 'Writing',
     'writting': 'Writing',
     'speaking': 'Speaking'
@@ -98,13 +110,13 @@ const getSkillDisplayName = (name) => {
 
 const sortedAttemptSkills = computed(() => {
     if (!selectedAttempt.value || !selectedAttempt.value.attempt_skills) return [];
-const orderMap = {
-        'listening': 1,
-        'reading': 2,
-        'grammar': 3,
-        'writing': 4,
-        'speaking': 5
-    };
+    const orderMap = {
+            'listening': 1,
+            'reading': 2,
+            'structure': 3,
+            'writing': 4,
+            'speaking': 5
+        };
 
     const getOrder = (name) => {
         name = name?.toLowerCase() || '';
@@ -230,8 +242,13 @@ onMounted(fetchDetails);
                         <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">Efficiency
                             Index</p>
                         <div class="flex items-baseline gap-2">
-                            <span class="text-5xl font-black italic tracking-tighter text-brand-primary">{{
-                                selectedAttempt.overall_score }}</span>
+                            <span class="text-5xl font-black italic tracking-tighter text-brand-primary">
+                                {{ totalScore }}</span>
+                            
+                        </div>
+                        <div class="flex items-baseline gap-2 mt-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Total Score:</span>
+                            <span class="text-lg font-black text-emerald-400">{{selectedAttempt.overall_score }}</span>
                             <span class="text-xl font-black text-slate-500">%</span>
                         </div>
                     </div>
@@ -324,9 +341,9 @@ onMounted(fetchDetails);
 
                                             <div class="text-right border-l border-slate-100 pl-6 ml-2">
                                                 <div class="text-3xl font-black text-emerald-600 italic">
-                                                    {{ skillResult.score !== null && skillResult.score !== undefined ?
-                                                    Math.round(Number(skillResult.score)) : 0 }}<span
-                                                        class="text-lg text-emerald-400">%</span>
+                                                    {{ getCalculatedSkillScore(skillResult) !== null ? getCalculatedSkillScore(skillResult) : 0 }}
+                                                    <span
+                                                        class="text-lg text-emerald-400">{{ '/' + ((skillResult.skill?.levels_count || 1) * 100) }}</span>
                                                 </div>
                                                 <p
                                                     class="text-[9px] font-black text-slate-400 uppercase tracking-widest">

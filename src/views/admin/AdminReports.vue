@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
@@ -108,6 +108,19 @@ const scoreColor = (score) => {
     return 'text-rose-600';
 };
 
+const getCalculatedSkillScore = (skillResult) => {
+    if (!skillResult || skillResult.score === null || skillResult.score === undefined) return null;
+    const levelsCount = skillResult.skill?.levels_count || 1;
+    return Math.round(Number(skillResult.score) * levelsCount);
+};
+
+const getTotalScore = (attempt) => {
+    if (!attempt || !attempt.attempt_skills) return 0;
+    return attempt.attempt_skills.reduce((sum, skillResult) => {
+        return sum + (getCalculatedSkillScore(skillResult) || 0);
+    }, 0);
+};
+
 onMounted(() => {
     fetchReports();
     fetchPartners();
@@ -177,7 +190,7 @@ onMounted(() => {
                                 </td>
                                 <td class="p-6 text-center">
                                     <span :class="scoreColor(attempt.overall_score)" class="text-2xl font-black italic tracking-tighter">
-                                        {{ attempt.overall_score !== null ? attempt.overall_score + '%' : '—' }}
+                                        {{ getTotalScore(attempt) }}
                                     </span>
                                 </td>
                                 <td class="p-6 text-center">
@@ -208,7 +221,7 @@ onMounted(() => {
                                                 </span>
 
                                                 <span class="font-black text-sm ml-3" :class="scoreColor(skillResult.score)">
-                                                    {{ skillResult.score !== null ? Math.round(skillResult.score) + '%' : '—' }}
+                                                    {{ getCalculatedSkillScore(skillResult) !== null ? getCalculatedSkillScore(skillResult) + '/' + ((skillResult.skill?.levels_count || 1) * 100) : '—' }}
                                                 </span>
                                             </div>
                                         </div>
