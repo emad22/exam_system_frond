@@ -58,6 +58,198 @@ const getSkillDisplayName = (name) => {
     const matchedKey = Object.keys(skillMap).find(key => lowerName.includes(key));
     return matchedKey ? skillMap[matchedKey] : name;
 };
+
+const SKILL_SPECIFIC_INSTRUCTIONS = {
+    listening: {
+        title: 'Listening Mastery',
+        icon: 'pi-volume-up',
+        rules: [
+            {
+                title: 'Audio Equipment',
+                description: 'Use high-quality headphones for the best experience. Check your system volume now.',
+                icon: 'pi-headphones'
+            },
+            {
+                title: 'Single Playback',
+                description: 'Most audio clips will play only once. Listen carefully and take notes if needed.',
+                icon: 'pi-play'
+            },
+            {
+                title: 'No Pausing',
+                description: 'You cannot pause or rewind audio once it starts playing. Stay focused throughout.',
+                icon: 'pi-lock'
+            }
+        ],
+        tips: [
+            'Read the questions before the audio starts.',
+            'Focus on keywords and general meaning.',
+            'Don\'t worry if you miss one word; keep listening.'
+        ]
+    },
+    reading: {
+        title: 'Reading Proficiency',
+        icon: 'pi-book',
+        rules: [
+            {
+                title: 'Passage Navigation',
+                description: 'Scroll through the entire text. Questions may refer to any part of the passage.',
+                icon: 'pi-arrows-v'
+            },
+            {
+                title: 'Time Management',
+                description: 'Don\'t spend too long on one difficult section. Move on and come back if possible.',
+                icon: 'pi-clock'
+            },
+            {
+                title: 'Context Clues',
+                description: 'Use the surrounding text to understand unfamiliar vocabulary or complex ideas.',
+                icon: 'pi-search'
+            }
+        ],
+        tips: [
+            'Skim the passage first to get the main idea.',
+            'Read questions carefully to know what to look for.',
+            'Look for synonyms of question keywords in the text.'
+        ]
+    },
+    grammar: {
+        title: 'Structure & Grammar',
+        icon: 'pi-pencil',
+        rules: [
+            {
+                title: 'Best Fit',
+                description: 'Select the option that most naturally completes the sentence or fixes the error.',
+                icon: 'pi-check-circle'
+            },
+            {
+                title: 'Pace Yourself',
+                description: 'Grammar questions are often shorter. Maintain a steady rhythm to save time.',
+                icon: 'pi-bolt'
+            },
+            {
+                title: 'Logical Review',
+                description: 'Read the completed sentence to yourself to ensure it sounds grammatically correct.',
+                icon: 'pi-refresh'
+            }
+        ],
+        tips: [
+            'Pay attention to subject-verb agreement.',
+            'Identify the tense before choosing an answer.',
+            'Eliminate obviously wrong options first.'
+        ]
+    },
+    structure: {
+        title: 'Structure & Grammar',
+        icon: 'pi-pencil',
+        rules: [
+            {
+                title: 'Best Fit',
+                description: 'Select the option that most naturally completes the sentence or fixes the error.',
+                icon: 'pi-check-circle'
+            },
+            {
+                title: 'Pace Yourself',
+                description: 'Grammar questions are often shorter. Maintain a steady rhythm to save time.',
+                icon: 'pi-bolt'
+            },
+            {
+                title: 'Logical Review',
+                description: 'Read the completed sentence to yourself to ensure it sounds grammatically correct.',
+                icon: 'pi-refresh'
+            }
+        ],
+        tips: [
+            'Pay attention to subject-verb agreement.',
+            'Identify the tense before choosing an answer.',
+            'Eliminate obviously wrong options first.'
+        ]
+    },
+    writing: {
+        title: 'Writing Excellence',
+        icon: 'pi-file-edit',
+        rules: [
+            {
+                title: 'Clear Structure',
+                description: 'Organize your response with a clear introduction, body paragraphs, and conclusion.',
+                icon: 'pi-list'
+            },
+            {
+                title: 'Task Fulfillment',
+                description: 'Ensure you address all parts of the prompt provided in the task description.',
+                icon: 'pi-target'
+            },
+            {
+                title: 'Final Proofread',
+                description: 'Save 2-3 minutes at the end to check for spelling and punctuation errors.',
+                icon: 'pi-eye'
+            }
+        ],
+        tips: [
+            'Plan your outline before you start typing.',
+            'Use a variety of vocabulary and sentence structures.',
+            'Stay within the recommended word count if provided.'
+        ]
+    },
+    speaking: {
+        title: 'Speaking Performance',
+        icon: 'pi-microphone',
+        rules: [
+            {
+                title: 'Environment Check',
+                description: 'Ensure you are in a quiet room and your microphone is working correctly.',
+                icon: 'pi-verified'
+            },
+            {
+                title: 'Steady Delivery',
+                description: 'Speak clearly and at a moderate pace. Do not rush your response.',
+                icon: 'pi-volume-up'
+            },
+            {
+                title: 'Recording Limits',
+                description: 'Watch the timer. Your response must be completed before the recording ends.',
+                icon: 'pi-stopwatch'
+            }
+        ],
+        tips: [
+            'Take a deep breath before starting.',
+            'Use natural intonation and emphasis.',
+            'If you make a mistake, just correct yourself and keep going.'
+        ]
+    },
+    default: {
+        title: 'Assessment Guidelines',
+        icon: 'pi-info-circle',
+        rules: [
+            {
+                title: 'Timed Environment',
+                description: 'Each skill has a dedicated time limit. The timer starts when you click Begin.',
+                icon: 'pi-clock'
+            },
+            {
+                title: 'Honesty & Integrity',
+                description: 'The system monitors activity. Please stay within the browser window.',
+                icon: 'pi-eye'
+            },
+            {
+                title: 'Progress Saving',
+                description: 'Your answers are saved automatically as you progress through questions.',
+                icon: 'pi-save'
+            }
+        ],
+        tips: [
+            'Read each question carefully.',
+            'Manage your time wisely.',
+            'Ensure a stable internet connection.'
+        ]
+    }
+};
+
+const getSkillSpecificInstructions = (name) => {
+    if (!name) return SKILL_SPECIFIC_INSTRUCTIONS.default;
+    const lowerName = name.toLowerCase();
+    const matchedKey = Object.keys(SKILL_SPECIFIC_INSTRUCTIONS).find(key => lowerName.includes(key));
+    return matchedKey ? SKILL_SPECIFIC_INSTRUCTIONS[matchedKey] : SKILL_SPECIFIC_INSTRUCTIONS.default;
+};
 </script>
 
 <template>
@@ -82,11 +274,11 @@ const getSkillDisplayName = (name) => {
 
                     <div class="flex items-center gap-6">
                         <div class="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow-xl border border-white/10">
-                            <i class="pi pi-info-circle"></i>
+                            <i :class="['pi', getSkillSpecificInstructions(skill?.name).icon]"></i>
                         </div>
                         <div>
-                            <h1 class="text-3xl font-black tracking-tight uppercase mb-1">{{ getSkillDisplayName(skill?.name) }} Instructions</h1>
-                            <p class="text-white/50 font-bold text-[10px] uppercase tracking-widest">Crucial guidelines for your assessment</p>
+                            <h1 class="text-3xl font-black tracking-tight uppercase mb-1">{{ getSkillSpecificInstructions(skill?.name).title }}</h1>
+                            <p class="text-white/50 font-bold text-[10px] uppercase tracking-widest">Crucial guidelines for your {{ getSkillDisplayName(skill?.name) }} assessment</p>
                         </div>
                     </div>
                 </div>
@@ -100,34 +292,41 @@ const getSkillDisplayName = (name) => {
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-12">
                         <!-- Left: Rules -->
                         <div class="space-y-8">
-                            <div class="flex gap-6">
+                            <div v-for="(rule, index) in getSkillSpecificInstructions(skill?.name).rules" :key="index" class="flex gap-6 animate-in slide-in-from-left duration-500" :style="{ animationDelay: `${index * 100}ms` }">
                                 <div class="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
-                                    <i class="pi pi-clock"></i>
+                                    <i :class="['pi', rule.icon]"></i>
                                 </div>
                                 <div>
-                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-tight mb-2">Timed Environment</h3>
-                                    <p class="text-[10px] font-medium text-slate-500 leading-relaxed uppercase">Each skill has a dedicated time limit. The timer will start immediately when you click 'Begin Exam'.</p>
+                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-tight mb-2">{{ rule.title }}</h3>
+                                    <p class="text-[10px] font-medium text-slate-500 leading-relaxed uppercase">{{ rule.description }}</p>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="flex gap-6">
-                                <div class="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
-                                    <i class="pi pi-eye"></i>
+                        <!-- Right: Tips -->
+                        <div class="bg-slate-50/50 rounded-[2rem] p-8 border border-slate-100/50 animate-in slide-in-from-right duration-700">
+                            <h3 class="text-[10px] font-black text-brand-primary uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                <i class="pi pi-sparkles"></i> Pro Tips for Success
+                            </h3>
+                            <ul class="space-y-4">
+                                <li v-for="(tip, index) in getSkillSpecificInstructions(skill?.name).tips" :key="index" class="flex items-start gap-3">
+                                    <div class="w-5 h-5 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 text-[8px] text-brand-primary border border-slate-100">
+                                        {{ index + 1 }}
+                                    </div>
+                                    <p class="text-[10px] font-bold text-slate-600 uppercase leading-relaxed pt-0.5">
+                                        {{ tip }}
+                                    </p>
+                                </li>
+                            </ul>
+                            
+                            <div class="mt-10 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">System Ready</span>
                                 </div>
-                                <div>
-                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-tight mb-2">Honesty & Integrity</h3>
-                                    <p class="text-[10px] font-medium text-slate-500 leading-relaxed uppercase">The system monitors tab-switching and external activity. Please stay within the browser window.</p>
-                                </div>
-                            </div>
-
-                            <div class="flex gap-6">
-                                <div class="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
-                                    <i class="pi pi-save"></i>
-                                </div>
-                                <div>
-                                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-tight mb-2">Progress Saving</h3>
-                                    <p class="text-[10px] font-medium text-slate-500 leading-relaxed uppercase">Your answers are saved automatically as you progress through each question batch.</p>
-                                </div>
+                                <p class="text-[9px] font-bold text-slate-500 leading-relaxed uppercase">
+                                    All technical requirements met. You are ready to start the {{ getSkillDisplayName(skill?.name) }} section.
+                                </p>
                             </div>
                         </div>
 
