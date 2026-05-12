@@ -193,6 +193,45 @@ const getStudentParts = (answer) => {
     return parseJson(answer.text_answer);
 };
 
+<<<<<<< HEAD
+=======
+const normalizeString = (str) => {
+    if (!str) return '';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = str;
+    let clean = tmp.textContent || tmp.innerText || '';
+    
+    // Replace non-breaking spaces with regular spaces
+    clean = clean.replace(/\u00a0/g, ' ');
+    
+    // Strip Arabic Tashkeel (diacritics) for robust matching
+    // Range: \u064B to \u0652
+    clean = clean.replace(/[\u064B-\u0652]/g, '');
+    
+    return clean.trim().toLowerCase();
+};
+
+const isPartCorrect = (answer, correctVal, pIdx) => {
+    const studentParts = getStudentParts(answer);
+    if (!studentParts || studentParts.length === 0) return false;
+
+    const normalizedStudentPart = normalizeString(studentParts[pIdx] || '');
+    
+    // Split correctVal by | to handle alternative answers
+    const acceptedValues = correctVal.split('|').map(v => normalizeString(v));
+
+    if (['word_selection', 'click_word', 'highlight'].includes(answer.question?.type)) {
+        // For selection types, we check if the correct option is in the student's selected list
+        const normalizedCorrect = normalizeString(correctVal);
+        const normalizedStudentParts = studentParts.map(s => normalizeString(s));
+        return normalizedStudentParts.includes(normalizedCorrect);
+    }
+
+    // For fill_blank and others, check if the student's answer matches any accepted alternative
+    return acceptedValues.includes(normalizedStudentPart);
+};
+
+>>>>>>> 674d827 (update question type vue)
 const resolveUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
