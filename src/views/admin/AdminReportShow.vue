@@ -20,6 +20,14 @@ const selectedAttempt = ref(null);
 const loading = ref(true);
 const currentUser = ref(null);
 let totalLevels = 0;
+let calculated_score = 0;
+
+// const totalScore = computed(() => {
+//     if (!selectedAttempt.value || !selectedAttempt.value.attempt_skills) return 0;
+//     return selectedAttempt.value.attempt_skills.reduce((sum, skillResult) => {
+//         return sum + (getCalculatedSkillScore(skillResult) || 0);
+//     }, 0);
+// });
 
 
 const getTotalScore = (attempt) => {
@@ -193,8 +201,6 @@ const getStudentParts = (answer) => {
     return parseJson(answer.text_answer);
 };
 
-<<<<<<< HEAD
-=======
 const normalizeString = (str) => {
     if (!str) return '';
     const tmp = document.createElement('div');
@@ -231,7 +237,6 @@ const isPartCorrect = (answer, correctVal, pIdx) => {
     return acceptedValues.includes(normalizedStudentPart);
 };
 
->>>>>>> 674d827 (update question type vue)
 const resolveUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -518,26 +523,28 @@ onMounted(fetchDetails);
                                                                 <div v-for="(correctVal, pIdx) in getCorrectOptions(answer.question)"
                                                                     :key="pIdx"
                                                                     class="p-4 rounded-2xl border flex flex-col gap-2 transition-all"
-                                                                    :class="getStudentParts(answer)[pIdx] === correctVal ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'">
+                                                                    :class="isPartCorrect(answer, correctVal, pIdx) ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'">
                                                                     <div class="flex justify-between items-start">
                                                                         <span
                                                                             class="text-[8px] font-black uppercase tracking-wider"
-                                                                            :class="getStudentParts(answer)[pIdx] === correctVal ? 'text-emerald-400' : 'text-rose-400'">
+                                                                            :class="isPartCorrect(answer, correctVal, pIdx) ? 'text-emerald-400' : 'text-rose-400'">
                                                                             Part {{ pIdx + 1 }}
                                                                         </span>
                                                                         <i
-                                                                            :class="getStudentParts(answer)[pIdx] === correctVal ? 'pi pi-check-circle text-emerald-500' : 'pi pi-times-circle text-rose-500'"></i>
+                                                                            :class="isPartCorrect(answer, correctVal, pIdx) ? 'pi pi-check-circle text-emerald-500' : 'pi pi-times-circle text-rose-500'"></i>
                                                                     </div>
                                                                     <div class="space-y-1">
                                                                         <p
                                                                             class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
                                                                             Student:</p>
                                                                         <p class="text-xs font-black"
-                                                                            :class="getStudentParts(answer)[pIdx] === correctVal ? 'text-emerald-700' : 'text-rose-700'">
-                                                                            {{ getStudentParts(answer)[pIdx] || '—' }}
+                                                                            :class="isPartCorrect(answer, correctVal, pIdx) ? 'text-emerald-700' : 'text-rose-700'">
+                                                                            {{ ['word_selection', 'click_word', 'highlight'].includes(answer.question?.type) 
+                                                                                ? (isPartCorrect(answer, correctVal, pIdx) ? correctVal : (getStudentParts(answer)[0] || '—'))
+                                                                                : (getStudentParts(answer)[pIdx] || '—') }}
                                                                         </p>
                                                                     </div>
-                                                                    <div v-if="getStudentParts(answer)[pIdx] !== correctVal"
+                                                                    <div v-if="!isPartCorrect(answer, correctVal, pIdx)"
                                                                         class="pt-1 border-t border-rose-100 mt-1">
                                                                         <p
                                                                             class="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
