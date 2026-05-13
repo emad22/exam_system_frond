@@ -119,6 +119,7 @@ const getCalculatedSkillScore = (skillResult) => {
 
 const getTotalScore = (attempt) => {
     if (!attempt || !attempt.attempt_skills) return 0;
+    // alert("************"+ attempt.skills_count);
     return attempt.attempt_skills
         .filter(skillResult => {
             const skillName = skillResult.skill?.name?.toLowerCase() || '';
@@ -222,10 +223,10 @@ onMounted(() => {
                                         {{ attempt.overall_score*800 }}
                                     </span> -->
                                     <span :class="scoreColor(attempt.overall_score)" class="text-2xl font-black italic tracking-tighter">
-                                       {{ Number((Number(getTotalScore(attempt)) / 3).toFixed(2)) }}</span>
+                                       {{ Number((Number(getTotalScore(attempt)) / attempt.skills_count).toFixed(2)) }}</span>
                                     
                                     <!-- <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-2"></span> -->
-                                    <span class="text-xl font-black text-slate-500"> / {{ Number((getTotalLevels(attempt) * 100 / 3).toFixed(2)) }}</span>
+                                    <span class="text-xl font-black text-slate-500"> / {{ Number((getTotalLevels(attempt) * 100 / attempt.skills_count).toFixed(2)) }}</span>
                                 </td>
                                 <td class="p-6 text-center">
                                     <Tag :value="attempt.status" 

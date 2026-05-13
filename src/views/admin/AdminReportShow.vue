@@ -23,7 +23,9 @@ let totalLevels = 0;
 
 
 const getTotalScore = (attempt) => {
+
     if (!attempt || !attempt.attempt_skills) return 0;
+   // alert("************"+ attempt.skills_count);
     totalLevels = 0;
     return attempt.attempt_skills
         .filter(skillResult => {
@@ -259,8 +261,8 @@ onMounted(fetchDetails);
                             Index</p>
                         <div class="flex items-baseline gap-2">
                             <span class="text-5xl font-black italic tracking-tighter text-brand-primary">
-                                {{ Math.round(Number(getTotalScore(selectedAttempt)) / 3,2) }}</span>
-                            <span class="text-xl font-black text-slate-500">/ {{totalLevels * 100 /3}}</span>
+                                {{ Math.round(Number(getTotalScore(selectedAttempt)) / selectedAttempt.skills_count ,2) }}</span>
+                            <span class="text-xl font-black text-slate-500">/ {{totalLevels * 100 /selectedAttempt.skills_count}}</span>
                             
                         </div>
                         <div class="flex items-baseline gap-2 mt-2">
