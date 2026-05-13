@@ -114,9 +114,7 @@ const handleTestPassed = (req) => {
     activeTesterReq.value = null;
 };
 
-const autoVerifyRequirements = (requirements) => {
-    // Requirements are now handled in a separate screen
-};
+
 
 const fetchData = async () => {
     isLoading.value = true;
@@ -472,6 +470,21 @@ const shouldShowQuestion = computed(() => {
     return !!currentQ.value; // Show immediately if a question exists
 });
 
+const isCurrentAnswerValid = computed(() => {
+    if (!currentQ.value || !answers.value[currentIndex.value]) return false;
+    const ans = answers.value[currentIndex.value];
+    const q = currentQ.value;
+    return VALIDATORS[q.type] ? VALIDATORS[q.type](ans, q) : !!ans.text_answer;
+});
+
+// Reset confirmation when answer changes
+watch(() => answers.value[currentIndex.value], (newVal, oldVal) => {
+    // Only reset if it's the same question being modified
+    if (newVal && oldVal && newVal.question_id === oldVal.question_id) {
+        questionSubmitted.value = false;
+    }
+}, { deep: true });
+
 const cleanHtml = (html) => {
     if (!html) return '';
     // Replace non-breaking spaces with normal spaces to allow wrapping
@@ -639,7 +652,6 @@ onUnmounted(() => {
     <div class="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
         <StudentHeader />
 
-
         <header v-if="!isStarting && currentSkill" class="bg-slate-800 text-white shadow-md h-20 px-6 shrink-0"
             dir="rtl">
             <div class="max-w-[1600px] mx-auto h-full flex justify-between items-center">
@@ -661,20 +673,21 @@ onUnmounted(() => {
                     <button @click="prevQuestion"
                         :class="currentIndex > 0 ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
                         class="h-10 px-6 rounded-lg font-bold text-xs transition-all flex items-center gap-2">
-                        <span>السابق</span>
+                        <span>previous</span>
                     </button>
-                    <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} من {{ totalSkillQuestions
-                    }}</span>
-                    <button v-if="!questionSubmitted" @click="submitAnswer"
-                        class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg">تأكيد
-                        الإجابة</button>
-                    <button v-else @click="advanceQuestion" :disabled="isSubmittingBatch"
+                    <span class="text-xs font-bold text-slate-500"> {{ displayNumber }} / {{ totalSkillQuestions  }}</span>
+                    <button @click="submitAnswer" :disabled="!isCurrentAnswerValid || questionSubmitted"
+                        class="h-10 px-8 bg-brand-primary text-white rounded-lg font-black text-xs hover:bg-brand-primary/90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                        confirm
+                    </button>
+
+                    <button @click="advanceQuestion" :disabled="!questionSubmitted || isSubmittingBatch"
                         class="h-10 px-8 bg-emerald-600 text-white rounded-lg font-black text-xs hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         <span v-if="isSubmittingBatch" class="flex items-center gap-2">
-                            <i class="pi pi-spin pi-spinner text-[10px]"></i> جاري الحفظ...
+                            <i class="pi pi-spin pi-spinner text-[10px]"></i> saving...
                         </span>
                         <template v-else>
-                            <span>السؤال التالي</span> <i class="pi pi-chevron-left text-[10px]"></i>
+                            <span>next</span> <i class="pi pi-chevron-left text-[10px]"></i>
                         </template>
                     </button>
 
@@ -704,8 +717,7 @@ onUnmounted(() => {
             <div class="flex items-center space-x-3 space-x-reverse">
 
                 <div class="px-3 py-1 bg-slate-100 rounded-md border border-slate-200">
-                    <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name
-                    }}</span>
+                    <span class="text-xs font-black text-slate-600 uppercase tracking-wider">{{ currentLevel?.name }}</span>
                 </div>
             </div>
         </div>
@@ -721,13 +733,13 @@ onUnmounted(() => {
                         class="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
                         <i class="pi pi-refresh"></i>
                     </div>
-                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">إشعار النظام</h3>
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 uppercase">System Notification</h3>
                     <p class="text-slate-600 text-base font-medium leading-relaxed mb-8">
-                        لم يتم استيفاء الحد الأدنى للدرجة المطلوبة. جاري بدء دورة تقييم ثانية بمحتوى جديد...
+                        You did not meet the minimum score requirement. A second evaluation cycle with new content is about to begin...
                     </p>
                     <button @click="showRetryNotification = false"
                         class="w-full py-4 bg-slate-800 text-white rounded font-bold uppercase text-xs tracking-widest hover:bg-slate-700 transition-all">
-                        بدء محاولة جديدة
+                        Start New Attempt
                     </button>
                 </div>
             </div>
@@ -741,14 +753,14 @@ onUnmounted(() => {
                         class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-3xl">
                         <i class="pi pi-check-circle"></i>
                     </div>
-                    <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-4">أحسنت! لقد أتممت المستوى</h3>
+                    <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-4">Well done! You have completed the level</h3>
                     <p class="text-slate-600 text-lg font-medium leading-relaxed mb-10">
-                        أنت الآن جاهز للانتقال إلى المستوى التالي: <br />
+                        You are now ready to move to the next level: <br />
                         <span class="text-brand-primary font-black text-2xl mt-2 block">{{ nextLevelName }}</span>
                     </p>
                     <button @click="startNextLevel"
                         class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-brand-primary transition-all shadow-xl shadow-slate-200">
-                        بدء المستوى التالي
+                        Start Next Level
                     </button>
                 </div>
             </div>
@@ -756,7 +768,7 @@ onUnmounted(() => {
             <!-- Loading -->
             <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
                 <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-                <p class="mt-6 text-sm font-bold text-slate-500 uppercase tracking-widest">جاري تحميل المحتوى...</p>
+                <p class="mt-6 text-sm font-bold text-slate-500 uppercase tracking-widest">Loading...</p>
             </div>
 
 
@@ -768,12 +780,12 @@ onUnmounted(() => {
                     <i class="pi pi-exclamation-circle"></i>
                 </div>
                 <div class="space-y-2">
-                    <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">تنبيه النظام</h2>
+                    <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">System Notification</h2>
                     <p class="text-slate-500 font-medium leading-relaxed">{{ errorMsg }}</p>
                 </div>
                 <button @click="router.push('/skill-selection')"
                     class="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-brand-primary transition-all active:scale-95">
-                    العودة للوحة التحكم
+                    Back to Dashboard
                 </button>
             </div>
 
@@ -788,14 +800,6 @@ onUnmounted(() => {
                     class="flex flex-col h-full border-r border-slate-200 shadow-inner animate-in slide-in-from-left-8 duration-700 overflow-hidden">
                     <div
                         :class="hasStimulusContent ? 'w-full p-4' : 'max-w-5xl mx-auto w-full bg-white my-4 rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col max-h-[calc(100vh-120px)] overflow-hidden'">
-                        <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100"
-                            dir="rtl">
-                            <i class="pi pi-pencil text-brand-primary"></i>
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المهمة
-                                المطلوبة</span>
-
-                        </div>
-
                         <!-- Audio Player Integrated (One-time playback, no controls) -->
                         <div v-if="currentQ.passage?.audio_url || currentQ.passage?.audio_path || currentQ.audio_url || currentQ.audio_path"
                             class="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
@@ -804,9 +808,7 @@ onUnmounted(() => {
                                     class="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center text-brand-primary text-[10px]">
                                     <i class="pi pi-volume-up" :class="isAudioPlaying ? 'animate-pulse' : ''"></i>
                                 </div>
-                                <span class="text-[20px] font-black text-slate-400 uppercase tracking-widest">المقطع
-                                    الصوتي قيد
-                                    التشغيل (مرة واحدة فقط)</span>
+                                <span class="text-[20px] font-black text-slate-400 uppercase tracking-widest"></span>
                             </div>
 
                             <audio ref="audioRef"
@@ -819,11 +821,11 @@ onUnmounted(() => {
                                 class="mt-2 flex items-center justify-between p-2 bg-rose-50 border border-rose-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
                                 <div class="flex items-center gap-2">
                                     <i class="pi pi-exclamation-triangle text-rose-500 text-xs"></i>
-                                    <span class="text-[10px] font-bold text-rose-700">اضغط للبدء في الاستماع</span>
+                                    <span class="text-[10px] font-bold text-rose-700">Click to start listening</span>
                                 </div>
                                 <button @click="toggleAudioManual"
                                     class="px-4 py-1.5 bg-rose-600 text-white rounded-md text-[10px] font-black hover:bg-rose-700 transition-all shadow-sm">
-                                    تشغيل المقطع
+                                    Play audio
                                 </button>
                             </div>
 
@@ -848,11 +850,6 @@ onUnmounted(() => {
                             </h3>
 
                             <div class="bg-slate-50 border border-slate-100 p-3 rounded-lg" dir="rtl">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="pi pi-question-circle text-brand-primary text-[9px]"></i>
-                                    <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">تعليمات
-                                        المهمة</span>
-                                </div>
                                 <p class="text-[10px] font-bold text-slate-600 leading-relaxed" dir="auto">
                                     {{ currentQ.instructions || `يرجى مراجعة المواد المقدمة بعناية وتقديم إجابتك بناءً
                                     عليها.`
@@ -865,9 +862,7 @@ onUnmounted(() => {
                         </div>
 
                         <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                            <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Institutional
-                                Assessment
-                                Protocol 2024</span>
+                            <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest"></span>
                         </div>
                     </div>
                 </div>
@@ -878,7 +873,7 @@ onUnmounted(() => {
                     <div class="flex items-center space-x-2 space-x-reverse mb-4 pb-2 border-b border-slate-100"
                         dir="rtl">
                         <i class="pi pi-file-edit text-slate-400"></i>
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">المادة العلمية</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">  </span>
                     </div>
 
                     <div class="flex-grow prose prose-slate max-w-none">
@@ -923,14 +918,14 @@ onUnmounted(() => {
                     <i class="pi pi-clock text-4xl text-rose-500 animate-pulse"></i>
                 </div>
                 <div class="space-y-2">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">انتهى الوقت!</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">لقد انتهت الفترة المخصصة لهذا الجزء من التقييم.
-                        سيتم حفظ
-                        إجاباتك وتوجيهك تلقائياً.</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight"> timeout! </h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">The time allocated for this part of the assessment
+                        has expired.
+                        Your answers will be saved and you will be directed automatically.</p>
                 </div>
                 <button @click="handleTimeout"
                     class="w-full py-5 bg-brand-primary text-white rounded-2xl font-black text-lg hover:bg-brand-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-100">
-                    متابعة النتائج
+                    continue to results
                 </button>
             </div>
         </div>
@@ -945,19 +940,18 @@ onUnmounted(() => {
                     <i class="pi pi-exclamation-triangle text-4xl text-amber-500"></i>
                 </div>
                 <div class="space-y-2">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">هل أنت متأكد؟</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">هل أنت متأكد أنك تريد الخروج؟ سيتم إنهاء
-                        الامتحان وحفظ
-                        تقدمك الحالي ولن تتمكن من العودة مرة أخرى.</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Are you sure?</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">Are you sure you want to exit? The exam will be
+                        ended and your current progress will be saved and you will not be able to return.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 pt-2">
                     <button @click="showExitModal = false"
                         class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
-                        تراجع
+                        cancel
                     </button>
                     <button @click="confirmExit"
                         class="py-4 bg-rose-600 text-white rounded-2xl font-black text-sm hover:bg-rose-700 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-100">
-                        تأكيد الخروج
+                        confirm exit
                     </button>
                 </div>
             </div>
@@ -977,13 +971,14 @@ onUnmounted(() => {
                     <i class="pi pi-exclamation-triangle text-4xl text-amber-500"></i>
                 </div>
                 <div class="space-y-2">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">يرجى إكمال المهمة قبل المتابعة.</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">يرجى إكمال المهمة قبل المتابعة.</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Please complete the task before
+                        continuing.</h2>
+                    <p class="text-slate-500 font-bold leading-relaxed">Please complete the task before continuing.</p>
                 </div>
                 <div class="grid grid-cols-1 gap-4 pt-2">
                     <button @click="showConfirmAnswerModal = false"
                         class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
-                        حسنا
+                        ok
                     </button>
                 </div>
             </div>
@@ -1002,23 +997,16 @@ onUnmounted(() => {
                 <div class="space-y-2">
                     <!-- instruction in english lang -->
                     <h2 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Security Alert</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">يرجى عدم مغادرة صفحة الامتحان أو تبديل النوافذ.
-                        سيتم
-                        إنهاء الامتحان تلقائياً عند تكرار المحاولة.</p>
-                    <p class="text-slate-400 text-xs font-medium">Please do not leave the exam page or switch tabs. The
-                        exam
-                        will be automatically terminated if you try again.</p>
+                    <p class="text-slate-500 font-bold leading-relaxed">Please do not leave the exam page or switch tabs.
+                        The exam will be automatically terminated if you try again.</p>
                     <div class="pt-2">
-                        <p class="text-rose-600 font-black text-lg">تحذير {{ cheatWarnings }} من 3</p>
-                        <p class="text-rose-400 text-[10px] font-black uppercase tracking-widest">Warning {{
-                            cheatWarnings }} of
-                            3</p>
+                        <p class="text-rose-600 font-black text-lg">Warning {{ cheatWarnings }} of 3</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 gap-4 pt-2">
                     <button @click="showCheatModal = false"
                         class="py-4 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-slate-800 transition-all shadow-lg">
-                        فهمت، سألتزم بالتعليمات
+                        Understood, I will adhere to the instructions
                     </button>
                 </div>
             </div>
@@ -1035,12 +1023,7 @@ onUnmounted(() => {
                 </div>
                 <div class="space-y-2">
                     <h2 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Inactivity Alert</h2>
-                    <p class="text-slate-500 font-bold leading-relaxed">لقد كنت غير نشط لفترة طويلة. سيتم إنهاء الجلسة
-                        وتوجيهك
-                        لوحة التحكم خلال ثوانٍ.</p>
-                    <p class="text-slate-400 text-xs font-medium">You have been inactive for too long. Your session will
-                        be
-                        terminated in a few seconds.</p>
+                    <p class="text-slate-500 font-bold leading-relaxed">You have been inactive for too long. Your session will be terminated in a few seconds.</p>
                 </div>
             </div>
         </div>
@@ -1055,12 +1038,7 @@ onUnmounted(() => {
                 </div>
                 <div class="space-y-2">
                     <h2 class="text-3xl font-black text-rose-600 tracking-tight uppercase">Exam Terminated</h2>
-                    <p class="text-slate-700 font-bold leading-relaxed">تم اكتشاف محاولة غش متكررة (تبديل النوافذ). سيتم
-                        إنهاء
-                        الامتحان الآن وتوجيهك لوحة التحكم.</p>
-                    <p class="text-slate-500 text-xs font-medium">Repeated cheating attempts detected (tab switching).
-                        The exam
-                        is now terminated.</p>
+                    <p class="text-slate-700 font-bold leading-relaxed">Repeated cheating attempts detected (tab switching). The exam is now terminated.</p>
                 </div>
                 <div class="pt-4">
                     <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -1068,8 +1046,7 @@ onUnmounted(() => {
                             style="animation: shrink 5s linear forwards;">
                         </div>
                     </div>
-                    <p class="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest">جاري التحويل
-                        تلقائياً...</p>
+                    <p class="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest">Redirecting to dashboard...</p>
                 </div>
             </div>
         </div>

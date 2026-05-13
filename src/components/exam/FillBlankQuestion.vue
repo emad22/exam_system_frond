@@ -84,17 +84,30 @@ const handleFocus = (e) => {
 };
 
 /**
- * Sync answers back to DOM inputs if they change from outside (e.g. keyboard)
+ * Syncs the current answers from state to the DOM inputs.
  */
-watch(fillBlankAnswers, (newVal) => {
+const syncInputs = () => {
     if (!containerRef.value) return;
     const inputs = containerRef.value.querySelectorAll('.fb-input-field');
     inputs.forEach((input, i) => {
-        if (input.value !== newVal[i]) {
-            input.value = newVal[i] || '';
+        const val = fillBlankAnswers.value[i] || '';
+        if (input.value !== val) {
+            input.value = val;
         }
     });
-}, { deep: true });
+};
+
+/**
+ * Sync answers back to DOM inputs if they change from outside (e.g. keyboard)
+ */
+watch(fillBlankAnswers, syncInputs, { deep: true });
+
+/**
+ * Re-sync inputs whenever the HTML is re-rendered (e.g. when disabled state changes)
+ */
+watch(processedHtml, () => {
+    nextTick(syncInputs);
+});
 
 onMounted(() => {
     // Ensure the initial array is prepared
@@ -107,6 +120,8 @@ onMounted(() => {
         }
         fillBlankAnswers.value = newArr;
     }
+    // Initial sync
+    nextTick(syncInputs);
 });
 </script>
 
