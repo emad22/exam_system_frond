@@ -306,7 +306,7 @@ onMounted(fetchDetails);
                         <div class="flex items-baseline gap-2">
                             <span class="text-5xl font-black italic tracking-tighter text-brand-primary">
                                 {{ Math.round(Number(getTotalScore(selectedAttempt)) / selectedAttempt.skills_count ,2) }}</span>
-                            <span class="text-xl font-black text-slate-500">/ {{totalLevels * 100 /selectedAttempt.skills_count}}</span>
+                             <span class="text-xl font-black text-slate-500"> / {{   Number(selectedAttempt.total_levels* 100 / selectedAttempt.skills_count , 2)}} </span>
                             
                         </div>
                         <div class="flex items-baseline gap-2 mt-2">
