@@ -127,7 +127,6 @@ const resolveUrl = (path) => {
 
     let baseUrl = import.meta.env.VITE_API_BASE_URL;
 
-
     if (!baseUrl) {
         const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
         baseUrl = isLocal
@@ -136,10 +135,6 @@ const resolveUrl = (path) => {
     }
 
     const origin = new URL(baseUrl).origin;
-
-
-    console.log("origin :",`${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`);
-
     return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
 };
 
@@ -147,6 +142,7 @@ const resolveUrl = (path) => {
 
 
 const qrUrl = computed(() => {
+    console.log("-------------student avatar -------------------------------", resolveUrl(student.value?.avatar))
     if (certificates.value.length === 0) return null;
     const cert = certificates.value[0];
     const verificationUrl = window.location.origin + '/verify-certificate/' + (cert.verification_code || cert.certificate_number);
