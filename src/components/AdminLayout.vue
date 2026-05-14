@@ -165,9 +165,18 @@ const vClickOutside = {
 const resolveUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-    const storageBase = baseUrl.replace('/api/v1', '/storage').replace('/api', '/storage');
-    return `${storageBase}/${path.replace('storage/', '')}`;
+    const getBaseURL = () => {
+        const envUrl = import.meta.env.VITE_API_BASE_URL;
+        if (envUrl) return envUrl;
+        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+        return isLocal ? 'http://localhost:8000/api/v1' : `${window.location.origin}/api/v1`;
+    };
+    const baseUrl = getBaseURL();
+    console.log("--------------------------------------baseUrl-------------------------------", baseUrl);
+    const storageBase = baseUrl.split('/api')[0].replace(/\/$/, '') + '/storage';
+    console.log("--------------------------------------storageBase-------------------------------", storageBase);
+    console.log("--------------------------------------path-------------------------------", path);
+    return `${storageBase}/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
 };
 </script>
 
