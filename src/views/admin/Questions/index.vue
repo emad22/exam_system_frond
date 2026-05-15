@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import AdminLayout from '@/components/AdminLayout.vue';
 import api from '@/services/api';
 import { useAdminStore } from '@/stores/admin';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 
 import Button from 'primevue/button';
 import Card from 'primevue/card';
@@ -129,27 +130,7 @@ const saveInstructions = async () => {
     }
 };
 
-const resolveUrl = (path) => {
-    if (!path) return null;
-
-    if (/^https?:\/\//.test(path)) {
-        return path;
-    }
-
-    let baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-    if (!baseUrl) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
-        baseUrl = isLocal
-            ? 'http://localhost:8000/api'
-            : `${window.location.origin}/api`;
-    }
-
-    const origin = new URL(baseUrl).origin;
-
-    return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
-};
+const { resolveUrl } = useMediaUrl();
 
 const filteredQuestions = computed(() => {
     let filtered = questions.value;

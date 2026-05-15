@@ -2,9 +2,9 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 import PartnerLayout from '@/components/PartnerLayout.vue';
 import AdminLayout from '@/components/AdminLayout.vue';
-import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import DatePicker from 'primevue/datepicker';
@@ -112,7 +112,15 @@ const updateProfile = async () => {
         });
 
         toast.add({ severity: 'success', summary: 'Success', detail: 'Profile updated successfully', life: 3000 });
-        backToDashboard();
+        setTimeout(() => {
+            if (isStudent.value) {
+                window.location.href = '/dashboard';
+            } else if (isPartner.value) {
+                window.location.href = '/partner';
+            } else {
+                window.location.href = user.value?.role === 'teacher' ? '/teacher' : '/admin';
+            }
+        }, 1000);
         // Reset password fields
         form.value.password = '';
         form.value.password_confirmation = '';
@@ -125,25 +133,7 @@ const updateProfile = async () => {
     }
 };
 
-const resolveUrl = (path) => {
-    if (!path) return null;
-
-    if (/^https?:\/\//.test(path)) {
-        return path;
-    }
-
-    let baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-    if (!baseUrl) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-        baseUrl = isLocal
-            ? 'http://localhost:8000/api'
-            : `${window.location.origin}/api`;
-    }
-
-    const origin = new URL(baseUrl).origin;
-    return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
-};
+const { resolveUrl } = useMediaUrl();
 
 const initialRole = localStorage.getItem('role');
 const isStudent = computed(() => {

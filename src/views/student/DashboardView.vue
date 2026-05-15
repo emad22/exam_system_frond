@@ -2,6 +2,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+import { useMediaUrl } from '@/composables/useMediaUrl';
+
 import StudentHeader from '@/components/StudentHeader.vue';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
@@ -118,25 +120,8 @@ const logout = () => {
     router.push('/login');
 };
 
-const resolveUrl = (path) => {
-    if (!path) return null;
+const { resolveUrl } = useMediaUrl();
 
-    if (/^https?:\/\//.test(path)) {
-        return path;
-    }
-
-    let baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-    if (!baseUrl) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-        baseUrl = isLocal
-            ? 'http://localhost:8000/api'
-            : `${window.location.origin}/api`;
-    }
-
-    const origin = new URL(baseUrl).origin;
-    return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
-};
 
 
 

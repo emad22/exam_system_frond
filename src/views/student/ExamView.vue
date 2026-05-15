@@ -14,6 +14,8 @@ import QuestionDispatcher from '@/components/exam/QuestionDispatcher.vue';
 import { useExamTimer } from '@/composables/useExamTimer';
 import { useAntiCheat } from '@/composables/useAntiCheat';
 import { useAudioEngine } from '@/composables/useAudioEngine';
+import { useMediaUrl } from '@/composables/useMediaUrl';
+
 
 const route = useRoute();
 const router = useRouter();
@@ -491,27 +493,8 @@ const cleanHtml = (html) => {
     return html.replace(/&nbsp;/g, ' ');
 };
 
-const resolveUrl = (path) => {
-    if (!path) return null;
+const { resolveUrl } = useMediaUrl();
 
-    if (/^https?:\/\//.test(path)) {
-        return path;
-    }
-
-    let baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-    if (!baseUrl) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
-        baseUrl = isLocal
-            ? 'http://localhost:8000/api'
-            : `${window.location.origin}/api`;
-    }
-
-    const origin = new URL(baseUrl).origin;
-
-    return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
-};
 
 const getSkillIcon = (name) => {
     name = name?.toLowerCase() || '';

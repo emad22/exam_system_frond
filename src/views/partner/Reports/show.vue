@@ -11,6 +11,7 @@ import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 
 const route = useRoute();
 const router = useRouter();
@@ -181,27 +182,7 @@ const isPartCorrect = (answer, correctVal, pIdx) => {
     return acceptedValues.includes(normalizedStudentPart);
 };
 
-const resolveUrl = (path) => {
-    if (!path) return null;
-
-    if (/^https?:\/\//.test(path)) {
-        return path;
-    }
-
-    let baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-    if (!baseUrl) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
-        baseUrl = isLocal
-            ? 'http://localhost:8000/api'
-            : `${window.location.origin}/api`;
-    }
-
-    const origin = new URL(baseUrl).origin;
-
-    return `${origin}/storage/${path.replace(/^storage\//, '').replace(/^\/+/, '')}`;
-};
+const { resolveUrl } = useMediaUrl();
 
 onMounted(fetchDetails);
 </script>
