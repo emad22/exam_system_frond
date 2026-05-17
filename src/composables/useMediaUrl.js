@@ -14,11 +14,18 @@ export function useMediaUrl() {
 
         try {
             const url = new URL(apiUrl);
+            const isLocal = ['localhost', '127.0.0.1'].includes(url.hostname);
 
-            // نشيل /v1
+            if (isLocal) {
+                // On local, storage is served directly from the root of the server
+                return url.origin;
+            }
+
+            // On production, storage is served from the /api subdirectory
             return url.origin + '/api';
         } catch (e) {
-            return `${window.location.origin}/api`;
+            const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            return isLocal ? window.location.origin : `${window.location.origin}/api`;
         }
     };
 
