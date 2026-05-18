@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '@/components/AdminLayout.vue';
+import { useModal } from '@/composables/useModal';
 import api from '@/services/api';
 
 import Button from 'primevue/button';
@@ -14,6 +15,7 @@ import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 
 const router = useRouter();
+const { showAlert, showConfirm } = useModal();
 
 const students = ref([]);
 const packages = ref([]);
@@ -85,7 +87,7 @@ const fetchStudents = async () => {
         const res = await api.get('/admin/students');
         students.value = res.data.data || res.data;
     } catch (err) {
-        console.error('Failed to load students', err);
+        showAlert('Failed to load students', 'Error', 'error');
     } finally {
         loading.value = false;
     }
@@ -96,7 +98,7 @@ const fetchSkills = async () => {
         const res = await api.get('/admin/skills');
         skills.value = res.data;
     } catch (err) {
-        console.error('Failed to load skills', err);
+        showAlert('Failed to load skills', 'Error', 'error');
     }
 };
 
@@ -105,7 +107,7 @@ const fetchPackages = async () => {
         const res = await api.get('/admin/packages');
         packages.value = res.data;
     } catch (err) {
-        console.error('Failed to load packages', err);
+        showAlert('Failed to load packages', 'Error', 'error');
     }
 };
 
@@ -130,19 +132,16 @@ const deleteStudent = (student) => {
                 await api.delete(`/admin/students/${student.id}`);
                 students.value = students.value.filter(s => s.id !== student.id);
             } catch (err) {
-                showModal({
-                    title: 'Error',
-                    message: 'Failed to delete student.',
-                    type: 'danger'
-                });
+                showAlert('Failed to delete student', 'Error', 'error');
             }
         }
     });
 };
 
+
 const resetProgress = (student) => {
     const fullName = `${student.user?.first_name} ${student.user?.last_name}`;
-    showModal({
+    showConfirm({
         title: 'Reset Progress',
         message: `CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh.`,
         type: 'warning',
@@ -185,11 +184,7 @@ const bulkDelete = () => {
                 students.value = students.value.filter(s => !ids.includes(s.id));
                 selectedStudents.value = [];
             } catch (err) {
-                showModal({
-                    title: 'Error',
-                    message: err.response?.data?.message || 'Failed to bulk delete students.',
-                    type: 'danger'
-                });
+                showAlert('Failed to delete students', 'Error', 'error');
             }
         }
     });
@@ -209,8 +204,7 @@ const downloadExcelTemplate = async () => {
         document.body.appendChild(link);
         link.click();
     } catch (err) {
-        console.error('Download error:', err);
-        showModal({ title: 'Error', message: 'Failed to download template.', type: 'danger' });
+        showAlert('Failed to download template', 'Error', 'error');
     }
 };
 
@@ -220,13 +214,13 @@ const submitBulkSkills = async () => {
         formData.append('file', bulkFile.value);
         isBulkSaving.value = true;
         try {
-            const res = await api.post('/admin/students/bulk-skills-import', formData, {
+            await api.post('/admin/students/bulk-skills-import', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             showBulkSkillsModal.value = false;
             fetchStudents();
         } catch (err) {
-            showModal({ title: 'Error', message: err.response?.data?.message || 'Failed to import file.', type: 'danger' });
+            showAlert('Failed to import file', 'Error', 'error');
         } finally {
             isBulkSaving.value = false;
         }
@@ -243,7 +237,7 @@ const submitBulkSkills = async () => {
             showBulkSkillsModal.value = false;
             fetchStudents();
         } catch (err) {
-            showModal({ title: 'Error', message: err.response?.data?.message || 'Failed to update skills.', type: 'danger' });
+            showAlert('Failed to update skills', 'Error', 'error');
         } finally {
             isBulkSaving.value = false;
         }

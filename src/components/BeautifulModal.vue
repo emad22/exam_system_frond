@@ -92,14 +92,7 @@ const parsedErrors = computed(() => {
       <!-- Footer Buttons -->
       <template #footer>
           <div class="flex items-center justify-center gap-3 w-full px-6 pb-7 pt-4 mt-2">
-              <Button 
-                v-if="modalConfig.showCancel" 
-                @click="handleModalCancel" 
-                class="flex-1 font-bold py-3.5 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 active:scale-[0.97] transition-all duration-200 text-center justify-center text-sm"
-              >
-                {{ modalConfig.cancelText }}
-              </Button>
-              <Button 
+            <Button 
                 @click="handleModalConfirm" 
                 class="flex-1 font-bold py-3.5 rounded-xl border-none shadow-lg active:scale-[0.97] transition-all duration-200 text-center justify-center text-sm text-white"
                 :class="{
@@ -111,6 +104,14 @@ const parsedErrors = computed(() => {
               >
                 {{ modalConfig.confirmText }}
               </Button>
+              <Button 
+                v-if="modalConfig.showCancel" 
+                @click="handleModalCancel" 
+                class="flex-1 font-bold py-3.5 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 active:scale-[0.97] transition-all duration-200 text-center justify-center text-sm"
+              >
+                {{ modalConfig.cancelText }}
+              </Button>
+              
           </div>
       </template>
   </Dialog>
