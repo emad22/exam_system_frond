@@ -372,6 +372,32 @@ const saveBatch = async () => {
 onMounted(() => {
     loadInitialData();
 });
+
+
+const editorModules = {
+    toolbar: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+
+        [{ color: [] }, { background: [] }],
+
+        [{ list: 'ordered' }, { list: 'bullet' }],
+
+        [{ align: [] }],
+
+        ['blockquote', 'code-block'],
+
+        ['link', 'image', 'video'],
+
+        [{ script: 'sub' }, { script: 'super' }],
+
+        [{ indent: '-1' }, { indent: '+1' }],
+
+        [{ direction: 'rtl' }],
+
+        ['clean']
+    ]
+}
 </script>
 
 <template>
@@ -385,7 +411,8 @@ onMounted(() => {
                         @click="router.push({ name: adminStore.user?.role === 'teacher' ? 'teacher.questions' : 'admin.questions' })" />
                     <div>
                         <h1 class="text-2xl font-black text-slate-800 tracking-tight">Create New Questions</h1>
-                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Add content and link properties</p>
+                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Add content and link
+                            properties</p>
                     </div>
                 </div>
                 <!-- Primary Action -->
@@ -399,7 +426,8 @@ onMounted(() => {
             <Card class="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-slate-50/50">
                 <template #title>
                     <div class="flex items-center px-4 py-2 gap-4">
-                        <div class="w-10 h-10 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                        <div
+                            class="w-10 h-10 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
                             <i class="pi pi-cog text-xl"></i>
                         </div>
                         <span class="text-lg font-black text-slate-800">Exam & Skill Settings</span>
@@ -408,13 +436,15 @@ onMounted(() => {
                 <template #content>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
                         <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Linked Exam (Required)</label>
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Linked
+                                Exam (Required)</label>
                             <Select v-model="form.exam_id" :options="exams" optionLabel="title" optionValue="id"
                                 placeholder="Select Exam"
                                 class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white" />
                         </div>
                         <div class="flex flex-col">
-                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Target Skill (Required)</label>
+                            <label class="text-xs font-black text-slate-500 mb-3 ml-2 uppercase tracking-wider">Target
+                                Skill (Required)</label>
                             <Select v-model="form.skill_id" :options="filteredSkills" optionLabel="name"
                                 optionValue="id" placeholder="Select Skill"
                                 class="w-full rounded-2xl border-none shadow-sm h-14 flex items-center px-4 bg-white"
@@ -422,21 +452,20 @@ onMounted(() => {
                         </div>
                         <div class="flex flex-col">
                             <label class="text-xs font-black text-slate-500 mb-2 ml-2 uppercase tracking-wider">
-                                Difficulty Level <span v-if="form.level_id" class="text-indigo-500 font-extrabold">({{ form.level_id }})</span><span v-else class="text-rose-500 font-extrabold">(Required)</span>
+                                Difficulty Level <span v-if="form.level_id" class="text-indigo-500 font-extrabold">({{
+                                    form.level_id }})</span><span v-else
+                                    class="text-rose-500 font-extrabold">(Required)</span>
                             </label>
                             <div class="flex flex-wrap gap-2 mt-2 ml-2">
-                                <button 
-                                    v-for="lvl in currentSkillMaxLevel" 
-                                    :key="lvl"
-                                    type="button"
+                                <button v-for="lvl in currentSkillMaxLevel" :key="lvl" type="button"
                                     @click="form.level_id = lvl"
                                     :class="form.level_id === lvl ? 'bg-indigo-500 text-white shadow-md shadow-indigo-200 border-indigo-500 scale-105' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20'"
-                                    class="w-10 h-10 rounded-xl border font-black text-sm flex items-center justify-center transition-all duration-200 active:scale-95"
-                                >
+                                    class="w-10 h-10 rounded-xl border font-black text-sm flex items-center justify-center transition-all duration-200 active:scale-95">
                                     {{ lvl }}
                                 </button>
                             </div>
-                            <div class="flex justify-between text-[9px] text-slate-400 font-black mt-3 ml-2 uppercase tracking-widest">
+                            <div
+                                class="flex justify-between text-[9px] text-slate-400 font-black mt-3 ml-2 uppercase tracking-widest">
                                 <span>Beginner (Level 1)</span>
                                 <span>Expert (Level {{ currentSkillMaxLevel }})</span>
                             </div>
@@ -512,6 +541,7 @@ onMounted(() => {
                                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Type
                                     the reading text that questions will be based on</p>
                                 <Editor v-model="form.passage_content" editorStyle="height: 200px"
+                                    :modules="editorModules"
                                     class="rounded-3xl overflow-hidden border border-slate-100 bg-slate-50/50"
                                     placeholder="Enter formatted reading text here..." />
                             </div>
@@ -681,7 +711,7 @@ onMounted(() => {
                             <div v-if="q.content_mode === 'text'" class="space-y-2">
                                 <Editor v-model="q.content" editorStyle="height: 120px"
                                     class="rounded-[1.5rem] overflow-hidden border border-slate-100 bg-slate-50/50"
-                                    placeholder="Type your formatted question here..." />
+                                    :modules="editorModules" placeholder="Type your formatted question here..." />
 
                                 <div v-if="q.type === 'writing'"
                                     class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-right" dir="rtl">
@@ -728,8 +758,12 @@ onMounted(() => {
                                         <i class="pi pi-info-circle"></i> دليل ملء الفراغات
                                     </p>
                                     <p class="text-[11px] text-blue-500 mt-1">
-                                        استخدم <b>...............</b> في المكان الذي تريد فيه مربع نص. كل <b>...............</b> سيتم فحصه مقابل الخيارات أدناه بالترتيب.<br><br>
-                                        <b>إجابات متعددة مقبولة:</b> إذا كانت الإجابة الصحيحة أكثر من كلمة، ضعها في نفس الخيار مفصولةً بـ <b>|</b><br>
+                                        استخدم <b>...............</b> في المكان الذي تريد فيه مربع نص. كل
+                                        <b>...............</b>
+                                        سيتم فحصه مقابل الخيارات أدناه بالترتيب.<br><br>
+                                        <b>إجابات متعددة مقبولة:</b> إذا كانت الإجابة الصحيحة أكثر من كلمة، ضعها في نفس
+                                        الخيار
+                                        مفصولةً بـ <b>|</b><br>
                                         مثال: <b>لم | لن</b> يعني أن كتابة أي منهما صحيحة.
                                     </p>
                                 </div>
@@ -742,7 +776,9 @@ onMounted(() => {
                                     </p>
                                     <p class="text-[11px] text-purple-500 mt-1">
                                         أضف الأزواج باستخدام علامة الأنبوب. مثال: <b>الكلمة | التعريف</b>.<br>
-                                        سيتم تقسيم كل زوج تلقائياً. لإضافة مشتت (إجابة ليس لها أصل)، ببساطة أدخل النص بدون علامة الأنبوب.
+                                        سيتم تقسيم كل زوج تلقائياً. لإضافة مشتت (إجابة ليس لها أصل)، ببساطة أدخل النص
+                                        بدون علامة
+                                        الأنبوب.
                                     </p>
                                 </div>
 
@@ -853,7 +889,7 @@ onMounted(() => {
                                                 class="max-h-24 rounded-xl"></video>
                                             <span v-else class="text-xs font-bold text-slate-600">File: {{
                                                 q.q_media_preview.type
-                                                }}</span>
+                                            }}</span>
                                             <button @click="q.q_media = null; q.q_media_preview = null"
                                                 class="text-rose-500 font-black text-[10px] uppercase">Remove</button>
                                         </div>
@@ -880,7 +916,7 @@ onMounted(() => {
                                         :class="opt.is_correct ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-50 shadow-sm'">
                                         <div class="flex flex-col items-center gap-1 shrink-0">
                                             <span class="text-[9px] font-black text-slate-400 uppercase">#{{ oIdx + 1
-                                            }}</span>
+                                                }}</span>
                                             <button v-if="q.type !== 'short_answer'" type="button"
                                                 @click="setCorrect(qIdx, oIdx)"
                                                 class="w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all"
@@ -917,26 +953,39 @@ onMounted(() => {
                                 class="flex flex-col space-y-8 bg-slate-50/80 p-8 md:p-10 rounded-[3rem] border border-slate-200/50 shadow-sm transition-all hover:shadow-md">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+                                        <div
+                                            class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
                                             <i class="pi pi-calculator text-lg"></i>
                                         </div>
                                         <div>
-                                            <label class="text-sm font-black text-slate-800 uppercase tracking-wide block">Scoring & Parameters</label>
-                                            <span class="text-[10px] font-bold text-slate-400 uppercase">Define weight and constraints</span>
+                                            <label
+                                                class="text-sm font-black text-slate-800 uppercase tracking-wide block">Scoring
+                                                &
+                                                Parameters</label>
+                                            <span class="text-[10px] font-bold text-slate-400 uppercase">Define weight
+                                                and
+                                                constraints</span>
                                         </div>
                                     </div>
-                                    <div v-if="q.type === 'writing'" class="hidden md:flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
+                                    <div v-if="q.type === 'writing'"
+                                        class="hidden md:flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
                                         <i class="pi pi-info-circle text-indigo-400 text-xs"></i>
-                                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Writing Task Config</span>
+                                        <span
+                                            class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Writing
+                                            Task
+                                            Config</span>
                                     </div>
                                 </div>
 
-                                <div :class="['writing', 'speaking', 'upload'].includes(q.type) ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10' : 'grid grid-cols-1 gap-8'">
+                                <div
+                                    :class="['writing', 'speaking', 'upload'].includes(q.type) ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10' : 'grid grid-cols-1 gap-8'">
                                     <!-- Sort Order -->
                                     <div class="flex flex-col gap-3">
                                         <div class="flex items-center gap-2 ml-1">
                                             <i class="pi pi-sort-alt text-[10px] text-slate-400"></i>
-                                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Display Order</label>
+                                            <label
+                                                class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Display
+                                                Order</label>
                                         </div>
                                         <InputNumber v-model="q.sort_order" :min="0" showButtons
                                             buttonLayout="horizontal" class="w-full h-12"
@@ -951,7 +1000,9 @@ onMounted(() => {
                                     <div class="flex flex-col gap-3">
                                         <div class="flex items-center gap-2 ml-1">
                                             <i class="pi pi-star text-[10px] text-emerald-400"></i>
-                                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Question Points</label>
+                                            <label
+                                                class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Question
+                                                Points</label>
                                         </div>
                                         <InputNumber v-model="q.points" :min="1" showButtons buttonLayout="horizontal"
                                             class="w-full h-12"
@@ -967,9 +1018,12 @@ onMounted(() => {
                                         <div class="flex flex-col gap-3 animate-in fade-in slide-in-from-left-4">
                                             <div class="flex items-center gap-2 ml-1">
                                                 <i class="pi pi-minus-circle text-[10px] text-orange-400"></i>
-                                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Minimum Word Count</label>
+                                                <label
+                                                    class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Minimum
+                                                    Word Count</label>
                                             </div>
-                                            <InputNumber v-model="q.min_words" placeholder="e.g. 150" class="w-full h-12"
+                                            <InputNumber v-model="q.min_words" placeholder="e.g. 150"
+                                                class="w-full h-12"
                                                 inputClass="font-black text-slate-700 bg-white border-2 border-slate-100 rounded-2xl px-6 focus:border-orange-400 transition-all" />
                                         </div>
 
@@ -977,9 +1031,12 @@ onMounted(() => {
                                         <div class="flex flex-col gap-3 animate-in fade-in slide-in-from-left-8">
                                             <div class="flex items-center gap-2 ml-1">
                                                 <i class="pi pi-plus-circle text-[10px] text-rose-400"></i>
-                                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maximum Word Count</label>
+                                                <label
+                                                    class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maximum
+                                                    Word Count</label>
                                             </div>
-                                            <InputNumber v-model="q.max_words" placeholder="e.g. 250" class="w-full h-12"
+                                            <InputNumber v-model="q.max_words" placeholder="e.g. 250"
+                                                class="w-full h-12"
                                                 inputClass="font-black text-slate-700 bg-white border-2 border-slate-100 rounded-2xl px-6 focus:border-rose-400 transition-all" />
                                         </div>
                                     </template>
@@ -1006,14 +1063,38 @@ onMounted(() => {
 </template>
 
 <style scoped>
+:deep(.p-editor-toolbar) {
+    display: none !important;
+}
+
 :deep(.p-select) {
     border: none;
     background: white;
 }
 
+
+
 :deep(.p-inputnumber-input) {
     font-weight: 900;
     text-align: center;
     border-radius: 1rem;
+}
+
+.ql-toolbar {
+    border: none !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    background: #fff;
+    padding: 12px;
+}
+
+.ql-container {
+    border: none !important;
+    font-size: 15px;
+}
+
+
+.ql-editor {
+    min-height: 160px;
+    padding: 20px;
 }
 </style>

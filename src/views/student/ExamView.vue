@@ -491,7 +491,7 @@ watch(() => answers.value[currentIndex.value], (newVal, oldVal) => {
     }
 }, { deep: true });
 
-const cleanHtml = async (html) => {
+const cleanHtml = (html) => {
     if (!html) return '';
     // Replace non-breaking spaces with normal spaces to allow wrapping
     return html.replace(/&nbsp;/g, ' ');

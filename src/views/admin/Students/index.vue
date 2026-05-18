@@ -119,75 +119,70 @@ const openEdit = (student) => {
     router.push(`/admin/students/${student.id}/edit`);
 };
 
-const deleteStudent = (student) => {
+const deleteStudent = async (student) => {
     const fullName = `${student.user?.first_name} ${student.user?.last_name}`;
-    showModal({
-        title: 'Delete Student',
-        message: `Are you sure you want to permanently delete student: ${fullName}? This will also delete their User account and all exam history.`,
-        type: 'danger',
-        showCancel: true,
-        confirmText: 'Yes, Delete Permanently',
-        onConfirm: async () => {
-            try {
-                await api.delete(`/admin/students/${student.id}`);
-                students.value = students.value.filter(s => s.id !== student.id);
-            } catch (err) {
-                showAlert('Failed to delete student', 'Error', 'error');
-            }
-        }
-    });
+    
+    const confirmed = await showConfirm(
+        `Are you sure you want to permanently delete student: ${fullName}? This will also delete their User account and all exam history.`,
+        'Delete Student',
+        'danger',
+        'Yes'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        await api.delete(`/admin/students/${student.id}`);
+        students.value = students.value.filter(s => s.id !== student.id);
+        await showAlert('Student deleted successfully.', 'Success', 'success');
+    } catch (err) {
+        showAlert('Failed to delete student.', 'Error', 'danger');
+    }
 };
 
 
-const resetProgress = (student) => {
+const resetProgress = async (student) => {
     const fullName = `${student.user?.first_name} ${student.user?.last_name}`;
-    showConfirm({
-        title: 'Reset Progress',
-        message: `CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh.`,
-        type: 'warning',
-        showCancel: true,
-        confirmText: 'Yes, Reset Progress',
-        onConfirm: async () => {
-            try {
-                await api.post(`/admin/students/${student.id}/reset`);
-                showModal({
-                    title: 'Success',
-                    message: 'Candidate progress has been successfully reset.',
-                    type: 'success',
-                    onConfirm: () => {
-                        fetchStudents();
-                    }
-                });
-            } catch (err) {
-                showModal({
-                    title: 'Error',
-                    message: err.response?.data?.error || 'Failed to reset progress.',
-                    type: 'danger'
-                });
-            }
-        }
-    });
+
+    const confirmed = await showConfirm(
+        `CAUTION: Are you sure you want to reset all exam progress for ${fullName}? This will permanently delete their previous attempts and allow them to start fresh.`,
+        'Reset Progress',
+        'warning',
+        'Yes'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        await api.post(`/admin/students/${student.id}/reset`);
+        await showAlert('Candidate progress has been successfully reset. They can now retake the assessment.', 'Reset Successful', 'success');
+        fetchStudents();
+    } catch (err) {
+        showAlert(err.response?.data?.error || 'Failed to reset progress.', 'Error', 'danger');
+    }
 };
 
-const bulkDelete = () => {
+const bulkDelete = async () => {
     if (!selectedStudents.value.length) return;
-    showModal({
-        title: 'Bulk Delete',
-        message: `Are you sure you want to delete ${selectedStudents.value.length} selected students? This action cannot be undone.`,
-        type: 'danger',
-        showCancel: true,
-        confirmText: 'Yes, Delete Selected',
-        onConfirm: async () => {
-            try {
-                const ids = selectedStudents.value.map(s => s.id);
-                await api.post('/admin/students/bulk-delete', { ids });
-                students.value = students.value.filter(s => !ids.includes(s.id));
-                selectedStudents.value = [];
-            } catch (err) {
-                showAlert('Failed to delete students', 'Error', 'error');
-            }
-        }
-    });
+
+    const confirmed = await showConfirm(
+        `Are you sure you want to delete ${selectedStudents.value.length} selected students? This action cannot be undone.`,
+        'Bulk Delete',
+        'danger',
+        'Yes, Delete Selected'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const ids = selectedStudents.value.map(s => s.id);
+        await api.post('/admin/students/bulk-delete', { ids });
+        students.value = students.value.filter(s => !ids.includes(s.id));
+        selectedStudents.value = [];
+        await showAlert('Selected students deleted successfully.', 'Success', 'success');
+    } catch (err) {
+        showAlert('Failed to delete students.', 'Error', 'danger');
+    }
 };
 
 const handleFileUpload = (e) => {
