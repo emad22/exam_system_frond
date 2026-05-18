@@ -21,10 +21,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'primevue': ['primevue', '@primevue/themes'],
-          'quill': ['quill'],
-          'vendor': ['vue', 'vue-router']
+        manualChunks(id) {
+          if (id.includes('node_modules/primevue') || id.includes('node_modules/@primevue/themes')) {
+            return 'primevue';
+          }
+          if (id.includes('node_modules/quill')) {
+            return 'quill';
+          }
+          if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router')) {
+            return 'vendor';
+          }
         }
       }
     }
